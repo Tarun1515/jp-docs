@@ -1588,6 +1588,120 @@ tak foreign keys point kar rahi hongi.
 
 ---
 
+### 2.46 APPROVAL ENGINE — PHASE 2C
+
+jp_mdm mein 10 procedures (9 + `USP_LogError`), 33 tables, 93 indexes,
+30 FKs. Test suite **26/26**.
+
+#### 🔴 RequestNo — counter row, MAX()+1 nahi, SEQUENCE bhi nahi
+
+Format `REG-SCH-2026-00001`. Har request type ke liye, har saal alag.
+
+```sql
+UPDATE s SET LastNumber = s.LastNumber + 1
+OUTPUT inserted.LastNumber INTO @Seq
+FROM dbo.t_mdm_request_number_series AS s WITH (UPDLOCK, ROWLOCK)
+WHERE s.RequestTypeId = @RequestTypeId AND s.SeriesYear = @Year;
+```
+
+**MAX()+1 kyun nahi:** do sessions same maximum padh lete hain insert se pehle,
+dono ko same number milta hai. Kuch error nahi aata — duplicate bas ban jaata
+hai, aur pata tab chalta hai jab do schools support ko same reference bolte
+hain.
+
+**SEQUENCE kyun nahi:** numbering **saal aur type dono** pe restart hoti hai.
+Uske liye har combination ka apna SEQUENCE chahiye, har January mein dynamic
+SQL se banaya hua. Aur row restore ke baad bhi zinda rehti hai, padhi aur theek
+ki ja sakti hai — SEQUENCE ka current value server state hai jo data ke backup
+mein nahi aata.
+
+**Prefix hardcoded nahi hai** — `m_mdm_request_types.RequestNoPrefix` column
+hai (2C mein add hua). Paanchva request type ab seed row hai, code change nahi.
+
+⚠️ `SeriesYear` **IST** saal hai. 1 January 01:00 IST abhi 31 December UTC
+hai — UTC saal use karte to har saal ki pehli request galat saal mein
+number paati.
+
+#### Idempotent submit — do layers
+
+1. Procedure pehle dekhta hai: is `(RequestTypeId, EntityUid)` ka Pending
+   request already hai? Hai to **wahi return** karta hai, naya nahi banata.
+2. 2A ka filtered unique index race pakadta hai — do concurrent sessions dono
+   check pass kar sakte hain insert se pehle.
+
+CATCH mein 2627 ko `ALREADY_PENDING` bana kar return karte hain, kyunki us
+submission mein kuch galat tha hi nahi.
+
+#### 🔴 RowVersion do jagah check hota hai
+
+Validation mein padha jaata hai, **aur UPDATE ke WHERE clause mein dobara**:
+
+```sql
+WHERE RequestId = @RequestId AND RowVersion = @RowVersion AND StatusId = 1
+```
+
+Validation wala read transaction ke **bahar** hota hai. Beech mein koi doosra
+session commit kar sakta hai. WHERE clause check aur write ko atomic banata
+hai. `@@ROWCOUNT = 0` par 50023, jise CONCURRENCY_CONFLICT bana kar
+return karte hain — 500 nahi.
+
+Test: do admins same RowVersion se act karte hain, doosra haar jaata hai aur
+**trail mein uski koi row nahi banti**.
+
+#### Multi-level engine, chahe abhi ek hi level ho
+
+MVP har request type ke liye ek level seed karta hai (`IsFinalLevel = 1`), par
+`USP_ProcessApprovalAction` configuration **padhta** hai — assume nahi karta.
+
+Phase 6 ka do-level offer approval ek **INSERT** hona chahiye, procedure ka
+rewrite nahi. Isliye shortcut nahi liya.
+
+#### Cross-DB kaam API ka hai
+
+`USP_ProcessApprovalAction` `IsCompleted` return karta hai. Request complete
+hone par school `jp_app` mein banani hai aur user `jp_sso` mein activate
+karna hai — **dono cross-database writes**, jo 2.2 ke hisaab se API layer mein
+hain. Yahan karne ke liye teen databases ka distributed transaction chahiye
+hota, jo bilkul wahi coupling hai jo 2.2 rokta hai.
+
+#### Documents — Version badhta hai, overwrite kabhi nahi
+
+Rejected document hi saboot hai ki reject kyun hua. Resubmit file ko replace
+kar deta to rejection reason ek aise document pe point karta jo ab exist nahi
+karta — aur applicant baad mein badal sakta tha ki kya reject hua tha.
+
+`USP_SaveRequestDocument` version read pe `UPDLOCK, HOLDLOCK` leta hai,
+warna do concurrent uploads same MAX padh kar dono same version insert karte
+aur unique index ek ko reject kar deta — ek upload fail jo galat tha hi nahi.
+
+#### `USP_GetMaster` — whitelist, dynamic SQL nahi
+
+`@MasterCode` query string se aata hai. Use table name mein concatenate karna
+SQL injection hai, chahe kitna bhi quote kar lo. Parameter sirf ek CASE branch
+chunta hai jo is file ne likha hai. Unknown code = **khaali result set**, error
+nahi — caller uska kuch kar nahi sakta.
+
+#### Test suite — 26 assertions, aur do cheezein jo theek karni padi
+
+Cover: happy path · reject · request-resubmit → resubmit → approve · illegal
+transition refuse · concurrent approve (stale RowVersion haarta hai, trail row
+nahi banti) · repeated submit se doosra Pending nahi banta aur RequestNo nahi
+badalta · 10 submissions = 10 distinct contiguous numbers · error log rollback
+ke baad bhi zinda.
+
+⚠️ **Suite kuch peeche nahi chhodti** — requests/trail/subjects/series counts
+pehle aur baad mein identical.
+
+Do galtiyan jo build ke dauraan pakdi gayin:
+1. **Table variable scalar ke saath ek DECLARE share nahi kar sakta.**
+   `DECLARE @i int = 0, @Made TABLE (...)` syntax error hai. Aur `WHILE` ke
+   andar `DECLARE` sirf ek baar chalta hai — har iteration ke liye `SET`
+   chahiye, warna sab iterations same Uid use karti.
+2. **`m_mdm_subject` khaali hai 2B tak.** Suite apne subject fixtures khud
+   banati hai, **900+ id block** mein jo asli seed kabhi use nahi karega.
+
+---
+
 ## 3. SCOPE (Client spec ke against)
 
 ### IN SCOPE — MVP
@@ -1692,6 +1806,7 @@ AI candidate matching · AI resume scoring/generation · Video interview / demo 
 | 2026-08-08 | — | **Public site static pages** — home, how-it-works, about, faq, contact, terms, privacy, 404. Per-route SEO + OG + canonical, robots.txt, sitemap.xml, prerendered. Lighthouse SEO 100 / a11y 100 saaton pages pe. Job search Phase 4 ke liye chhoda, contact form Phase 7 ke liye (2.44) | ✅ Done |
 | 2026-08-08 | 1 | **PHASE 1 CLOSE-OUT** — dono APIs clean rebuild 0/0, 121/121 SQL assertions, paanchon frontend prod builds clean, jp_sso 20 tables · 32 procs · 4 functions · 71 indexes. Known gaps section 2A mein likhe. Test 001 toota mila aur fix hua | ✅ Done |
 | 2026-08-09 | 2A | **`jp_mdm` database** — 23 masters + 8 transactional + error log = 32 tables, 91 indexes, 29 FKs, 4 IST functions, USP_LogError. Seed limited to the 5 masters we own. Re-run creates zero new objects | ✅ Done |
+| 2026-08-09 | 2C | **Approval engine** — 9 procedures + USP_LogError. RequestNo per-type-per-year counter, idempotent submit, RowVersion concurrency, multi-level engine. 26/26 test assertions | ✅ Done |
 | — | 2E | Admin screens → `frontend/apps/admin` | ⬜ Next |
 | — | 2F | School screens → `frontend/apps/school` | ⬜ Next |
 
