@@ -1413,7 +1413,8 @@ a11y 100 saaton pages pe.
 
 ### G8. Test coverage
 
-- **SQL tests hain (121 assertions), C#/Angular unit tests NAHI hain.** Koi
+- **SQL tests hain (121 assertions), C#/Angular unit tests NAHI hain.** E2E
+  ke liye G9 dekho. Koi
   xUnit project nahi, koi Karma/Jest spec nahi. Verification abhi SQL suites +
   browser checks pe depend karta hai.
 - ⚠️ **Test 001 aaj toota hua mila aur fix hua.** `USP_CreatePasswordResetToken`
@@ -1421,6 +1422,81 @@ a11y 100 saaton pages pe.
   `#ResetTok` temp table 5 column ka reh gaya tha — `INSERT ... EXEC` 6 values
   nahi le paaya. Sabak: **proc ka result set badlo to usi commit mein test ka
   temp table badlo.**
+
+---
+
+### G9. E2E TESTING — Phase 8
+
+Playwright abhi bhi use ho raha hai — screenshots, SEO audit, layout measure,
+sign-in check, federation ka singleton proof. Phase 8 mein ye **regression
+suite** ban jaata hai jo poore flows cover kare:
+
+1. **School onboarding** — school signup → admin approve → school active
+   (aur account-status screen ka pending state beech mein)
+2. **Hiring** — teacher signup → apply → school shortlists → offer → accept
+3. **Cross-app guard** — school owner teacher app pe sign in kare to local
+   sign-out + sahi app ka naam aur link
+
+#### Pehle kyun nahi likha
+
+Screens abhi badal rahi hain. Aisi screen ke against likha test jo agle hafte
+badal jaaye, save karne se zyada maintain karne mein kharcha karta hai — aur
+phir log use delete nahi karte, `skip` kar dete hain, jo usse aur mehnga bana
+deta hai.
+
+Pipeline ban jaane ke baad aur UI settle hone ke baad ye suite worth hai, **aur
+tab na hone ki keemat lagni shuru ho jaati hai** — kyunki tab tak flows itne
+lambe ho chuke honge ki haath se regression pakadna practical nahi rahega.
+
+#### 🔴 Setup KAHAN hai — `jp-docs/scripts/verify/`
+
+⚠️ **Phase 1 ke aakhir tak ye kahin bhi commit nahi tha.** Saare scripts ek
+scratch directory se, npx cache ke Playwright se chal rahe the — yaani agla
+phase inhe **zero se dobara likhta**. Close-out pe rescue karke commit kiya.
+
+| Cheez | Kahan |
+|---|---|
+| Scripts | `jp-docs/scripts/verify/*.mjs` (8) |
+| Kya-kya karte hain | `jp-docs/scripts/verify/README.md` |
+| npm scripts | `jp-docs/package.json` — `verify:site`, `verify:seo`, `verify:layout`, `verify:chooser`, `verify:signin`, `verify:federation`, `verify:scss`, `screenshots` |
+| Dependencies | `jp-docs` devDependencies mein **declared**, par abhi **install nahi** — `npm install && npx playwright install chromium` |
+
+**`jp-docs` mein kyun, kisi app repo mein nahi:** ye scripts app boundaries paar
+karte hain. Chooser flow `jp-public` → `jp-school`/`jp-teacher` jaata hai,
+federation check host aur remote dono dekhta hai, aur cross-app guard do apps
+ka hai. `jp-docs` akeli repo hai jo baaki sab ke **beside** rehti hai. Phase 8
+ke teeno flows bhi multi-app hain, to suite ka ghar wahi rehna chahiye.
+
+#### Phase 8 ko jo pehle se mil raha hai
+
+- Har public route pe SEO + heading order + dead-link crawl
+- Lighthouse SEO/a11y per page, failing audits ke naam ke saath
+- Sign-in flow jo `/dashboard` tak jaata hai aur storage keys check karta hai
+- Federation ka singleton proof (`instanceof` wala)
+- Screenshots 1440 + 375, dono widths, horizontal-scroll check ke saath
+
+#### ⚠️ Do traps jo already solve ho chuke hain — dobara mat girna
+
+1. **Hydration race.** Hydrate hone se pehle pada click kuch nahi karta, aur
+   page aisa dikhta hai jaise validation fail hui. Ye asli hua tha: contact form
+   ne "0 field errors" report kiya jabki wo theek kaam kar raha tha. Fix retry
+   hai jab tak app respond na kare — **fixed `waitForTimeout` fix nahi hai**, wo
+   wahi race hai lambi fuse ke saath.
+2. **`fullPage` screenshot + sticky header.** Playwright scroll karke stitch
+   karta hai, to `position: sticky` header image ke beech mein dobara render
+   hota hai. **Ye page ka bug nahi hai** — ye ek baar "contact page pe header
+   form ke beech aa raha hai" bug ke roop mein report bhi ho chuka hai. Capture
+   se pehle sticky neutralise karo.
+
+#### Jab likhna shuru karo
+
+- Test accounts HOW_TO_RUN §4 mein hain. ⚠️ **Suite ko apna data khud banana
+  chahiye**, un accounts pe depend nahi karna — wo shared hain aur ek test ka
+  state doosre ko tod dega.
+- School approve karne ka abhi koi admin UI nahi (G6), to onboarding flow ko
+  filhaal Swagger/API call karna padega. Phase 2E ke baad ye UI se ho sakega.
+- Flows ko chalane ke liye `jp-shared` :4999 chahiye. Suite ko wo bhi start
+  karna hoga, ya CI step mein.
 
 ---
 

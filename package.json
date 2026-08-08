@@ -4,10 +4,22 @@
   "private": true,
   "description": "Project memory, schema reference and run instructions for Staffroom India. Cloned as a sibling of every other repository.",
   "scripts": {
-    "bootstrap": "node scripts/bootstrap.mjs"
+    "bootstrap": "node scripts/bootstrap.mjs",
+    "verify:site": "node scripts/verify/site-audit.mjs",
+    "verify:seo": "node scripts/verify/lh.mjs",
+    "verify:layout": "node scripts/verify/measure.mjs",
+    "verify:chooser": "node scripts/verify/chooser-e2e.mjs",
+    "verify:signin": "node scripts/verify/signin-check.mjs",
+    "verify:federation": "node scripts/verify/final-verify.mjs",
+    "verify:scss": "node scripts/verify/check-scss-depth.mjs ../jp-admin ../jp-school ../jp-teacher ../jp-public",
+    "screenshots": "node scripts/verify/shoot-site.mjs"
   },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/Tarun1515/jp-docs.git"
+  },
+  "devDependencies": {
+    "playwright": "^1.62.1",
+    "lighthouse": "^12.8.2"
   }
 }
