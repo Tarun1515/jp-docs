@@ -901,6 +901,12 @@ Chaaron `angular.json` mein declared, dono APIs ke CORS allow-list mein, aur `sc
 
 ### 🔴 2.41 SAAT REPOSITORIES (LOCKED — client decision 2026-08-08)
 
+> ⚠️ **Is section ka npm-package / GitHub Packages wala hissa ab SUPERSEDED hai —
+> dekho 2.42 (Module Federation).** Saat repos, ports aur backend-ek-repo wala
+> reasoning waisa hi valid hai. Neeche GitHub Packages, npm link,
+> preserveSymlinks aur version-drift ke baare mein jo likha hai wo ab **nahi**
+> hota — record ke liye rakha hai taaki koi use dobara propose na kare.
+
 Client ne har frontend project alag GitHub repository mein maanga. Ye 2.40 (ek workspace) ko **replace** karta hai.
 
 ```
@@ -1006,6 +1012,201 @@ Geography ko apni alag screen milegi — usme parent cascade aur bulk import cha
 4. **`PROJECT_MEMORY.md` bhi ek waqt mein ek session likhega.** Do sessions progress log mein append karenge to ek doosre ko clobber kar denge.
 
 2 aur 4 discipline hain, tooling nahi. Deadline pressure mein sabse pehle yehi tootenge — isiliye version check aur git history maujood hain.
+
+---
+
+### 🔴 2.42 MODULE FEDERATION — FRONTEND STRUCTURE **LOCKED** (client decision 2026-08-08)
+
+Ye **2.41 ka npm-package wala hissa replace karta hai**. Saat repos, ports, aur
+backend-ek-repo wala reasoning waisa hi rehta hai. Structure ab **band hai** —
+Phase 8 tak dobara nahi khulega.
+
+```
+jp-shared   :4999   REMOTE — ek baar chalao, chalta rehne do
+jp-admin    :4200   host
+jp-school   :4300   host
+jp-teacher  :4400   host
+jp-public   :4500   STANDALONE — federated NAHI hai (neeche wajah)
+```
+
+#### npm package kyun chhoda
+
+`jp-shared` npm package tha, `npm link` se consume hota tha. Do cheezein tooti:
+repo split ke baad SCSS path resolution, aur har change pe
+**build → link → app restart** ka cycle. Wo cycle hi roz ke kaam mein sabse
+bada ghisav tha.
+
+Ab: **JavaScript runtime pe share hoti hai** (federation), **SCSS build time pe**
+(sibling include path). Git ka isme koi role nahi — saat repos, sirf push/pull,
+koi publishing nahi, koi registry nahi, koi version bump nahi.
+
+#### 🔴 Native Federation — do cheezein jo docs mein nahi milti
+
+**1. Expose keys `ui` hain, `./ui` NAHI.**
+
+Runtime import map ki key `join(name, exposeKey)` se banti hai aur use
+normalise nahi karta. To conventional `'./ui'` se specifier `jp-shared/./ui`
+banta hai — jise koi host import nahi kar sakta:
+
+```
+Unable to resolve specifier 'jp-shared/ui' imported from http://localhost:4300/
+```
+
+`./` hataane se key exactly `jp-shared/ui` banti hai. `./` sirf
+`loadRemoteModule()` ko chahiye, jo hum use nahi karte.
+
+**2. Static import ka koi documented raasta nahi hai — `externals` se banaya.**
+
+`FederationConfig` mein `remotes` field hai hi nahi, aur `loadRemoteModule()`
+async hai — wo component ke `imports: []` array ko feed nahi kar sakti, kyunki
+Angular ko class chahiye, promise nahi. 50 templates mein use hone wale design
+system ke liye wo raasta bekaar hai.
+
+To har host apni `federation.config.mjs` mein:
+
+```js
+externals: ['jp-shared/ui', 'jp-shared/core', 'jp-shared/models', 'jp-shared/pages']
+```
+
+Isse ye chaar specifier build output mein **unresolved** chhut jaate hain, aur
+`initFederation` jo import map lagata hai wo inhe browser mein :4999 ke bundles
+pe resolve karta hai. TypeScript inhe sirf **types** ke liye resolve karta hai,
+tsconfig `paths` se.
+
+**3. Hosts mein `ignoreUnusedDeps` band rakhna hai.**
+
+Wo Sheriff se import graph chalta hai, aur Sheriff project root ke bahar ki
+file par mana kar deta hai:
+
+```
+Error: D:\Projects\jp-shared\src\ui\...\ui-app-shell.component.ts
+is outside of root D:\Projects\jp-school
+```
+
+tsconfig `paths` jaan-boojh kar sibling repo pe point karta hai, to ye traversal
+hamesha root chhodega aur hamesha fail karega.
+
+⚠️ **Iska ek side effect hai**: pruning band hone se esbuild
+`@angular/platform-browser` ke animations entry points bhi bundle karta hai, jo
+`@angular/animations/browser` import karte hain. **Isiliye `@angular/animations`
+har host ki dependency hai jabki koi code use nahi karta.** Hataoge to build
+`Could not resolve @angular/animations/browser` pe marega — aur `skip` isse
+theek NAHI karta, kyunki `skip` control karta hai kya SHARE hoga, kya resolve
+hoga wo nahi.
+
+#### 🔴 Angular singletons — sirf declare nahi, prove kiya
+
+`@angular/core`, `common`, `router`, `forms`, `rxjs` — `singleton: true`,
+`strictVersion: true`. Do Angular copies ka matlab do `InjectionToken` classes,
+do DI graphs, do `AuthService` — yaani login safal dikhta hai aur shell samajhta
+hai ki aap signed out ho.
+
+Proof (jp-school :4300 chalte hue, remote :4999):
+
+| kya | result |
+|---|---|
+| `@angular/core` copies page mein | **1** |
+| `JP_APP_IDENTITY instanceof ng.InjectionToken` | **true** |
+| `jp-shared/core` do baar resolve → same class | **true** |
+| sign-in → `/dashboard`, `ui-app-shell` render | ✔ |
+| storage keys | `jp.school.accessToken`, `jp.school.refreshToken` |
+
+Beech wali line asli proof hai: **remote** ne jo token banaya wo **host** ki
+`InjectionToken` class ka instance hai. Do Angular hote to `false` aata.
+
+#### ⚠️ jp-public federated NAHI hai — STANDALONE
+
+Attempt karne se pehle dekha: **jp-public ek bhi shared JavaScript import nahi
+karta.** Ek bhi TS file mein nahi. Uska jp-shared se rishta sirf SCSS tokens ka
+hai.
+
+To federate karne se milta kuch nahi aur lagta ye: es-module-shims polyfill,
+bootstrap se pehle initFederation ka round-trip, :4999 par runtime dependency,
+aur SSR ke liye Native Federation ka node-loader — sab **chaar buttons** share
+karne ke liye jo wo use hi nahi karta. Uski SEO behaviour zyada important hai.
+
+**jp-public normal Angular SSR app rehta hai.** SCSS wahi sibling include path
+se leta hai, baaki sab jaisa. Ye exception nahi hai — SCSS sabke liye build-time
+hai.
+
+#### 🔴 SCSS build time pe — CI ko ye pata hona chahiye
+
+Har app ki `angular.json`:
+
+```json
+"stylePreprocessorOptions": { "includePaths": ["../jp-shared/src/styles"] }
+```
+
+Components waise hi `@use 'variables' as v;` likhte hain — koi relative path
+nahi, koi copy nahi. Naya token add karna aaj bhi jp-shared mein **ek file ka
+change** hai.
+
+⚠️ **CI ko `jp-shared` app ke saath checkout karna hoga**, warna build pehli hi
+component stylesheet pe fail hoga. Sirf ek repo clone karne wala agent isse
+compile nahi kar sakta. Har app ke README mein likha hai.
+
+⚠️ **Deep-nested component verify karna zaroori tha, top-level se kaam nahi
+chalta** — original error wahi se aaya tha. jp-admin aur jp-teacher mein koi
+bhi deep component shared partials use hi nahi kar raha tha, to unka build pass
+hona kuch **prove nahi karta tha**. Dono ke sabse gehre component stylesheet
+mein ab jaan-boojh kar `@use 'variables'` + `@use 'mixins'` hai, comment ke
+saath ki ye dead code nahi hai. Include path galat kar ke check kiya —
+build theek us deep file pe fail hota hai.
+
+#### 🔴 Production — ek single point of failure, jaan-boojh kar
+
+`jp-shared` static files bana kar ek URL se serve hota hai, jo har app ki
+environment config se aata hai, hardcoded nahi.
+
+⚠️ **Agar jp-shared ka host down hai to teeno apps boot hi nahi karengi.** Ye
+trade hum le rahe hain.
+
+**Mitigation (implement karna hai):** jp-shared ko **apps ke same origin** se
+serve karo. Tab alag failure point rehta hi nahi — wo server down hai to waise
+bhi sab down hai.
+
+#### Dev workflow — poora point yehi tha
+
+```bash
+cd jp-shared && npm start     # :4999 — ek baar, chalta rehne do
+cd jp-school && npm start     # :4300
+```
+
+jp-shared mein component edit karo → app reload karo → change dikh jaata hai.
+Koi publish nahi, koi version bump nahi, koi link step nahi. Verify kiya:
+`ui-auth-shell` mein attribute add kiya, jp-school reload kiya, DOM mein mila.
+
+⚠️ **Ek honest detail**: app ka dev server phir bhi ~0.2s ka rebuild karta hai,
+kyunki tsconfig `paths` jp-shared ki **source** pe point karta hai, to uska
+watcher bhi us par lagta hai. Ye automatic hai aur "no build step" ke spirit ko
+poora karta hai (koi publish/link/version cycle nahi), par literally zero nahi
+hai. Isse hatane ka ek hi tareeka hai — pre-built `.d.ts` consume karna — jo
+jp-shared mein type-change pe manual build step wapas le aata, aur stale types
+ke confusing errors bhi. Isliye source-paths rakha gaya.
+
+⚠️ **Dev server chalte waqt production build MAT chalao.** Dono federation
+externals cache share karte hain, aur production build dev wali
+`@angular/core` copy ko replace kar deta hai. App phir isse marta hai:
+
+```
+ReferenceError: ngDevMode is not defined
+```
+
+Message cause ke baare mein kuch nahi batata. Fix: dev server band karo,
+`.angular/cache` delete karo, dobara start karo. Ye actually hua tha.
+
+#### Hataya gaya — poora ka poora
+
+GitHub Packages `publishConfig` · `.npmrc` aur `.npmrc.example` (chaaron apps) ·
+`.github/workflows/publish.yml` · `link:shared`/`unlink:shared`/`update:shared`/
+`shared-version` scripts · `check-versions.mjs` aur uska npm script ·
+`bump-version.mjs` · `src/lib/version.ts` aur `logSharedVersion` calls ·
+`ng-package.json` · `tsconfig.lib*.json` · `public-api.ts` · `preserveSymlinks` ·
+global `npm link` registration · chaaron apps ke stale symlinks aur `@tarun1515`
+scope references.
+
+Version-drift ki machinery **ab zaroori nahi** — chaar copies thi hi isliye ki
+package chaar baar install hota tha. Ab ek hi copy chalti hai, :4999 se.
 
 ---
 

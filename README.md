@@ -6,7 +6,7 @@ every other repository**, and read `PROJECT_MEMORY.md` before starting any work.
 ```
 D:\Projects\
 ├── jp-docs\      ← you are here
-├── jp-shared\    Angular library, published to GitHub Packages
+├── jp-shared\    :4999 — the Module Federation remote. Start it first
 ├── jp-admin\     :4200
 ├── jp-school\    :4300
 ├── jp-teacher\   :4400
@@ -40,12 +40,16 @@ others pull before writing.
 ## Scripts
 
 ```bash
-npm run bootstrap        # clone all seven repos as siblings, install, link shared
-npm run check-versions   # which @tarun1515/jp-shared is each app running?
+npm run bootstrap        # clone all seven repos as siblings and install them
 ```
 
-`check-versions` is the one to run after any change to `jp-shared`. Four apps
-install it independently, so an app that was not updated keeps running the old
-copy and builds perfectly cleanly while doing so. The script reports each app's
-version and whether it is **linked** (follows the sibling working copy) or
-**installed** (frozen at a published version), and exits non-zero on drift.
+There is no version-drift check any more, and nothing to link. `jp-shared` is
+a Module Federation **remote** now: the apps load its JavaScript at runtime
+from `http://localhost:4999`, so there is exactly one copy running and nothing
+that can drift. Its SCSS is shared at build time through
+`includePaths: ["../jp-shared/src/styles"]`, which is why the seven repos must
+sit as siblings — including on CI.
+
+See `PROJECT_MEMORY.md` decision **2.42** for why the npm package was dropped,
+and `HOW_TO_RUN.md` §3 for the start order and the two failure modes worth
+knowing in advance.

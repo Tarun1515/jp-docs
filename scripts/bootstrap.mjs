@@ -1,21 +1,24 @@
 #!/usr/bin/env node
 /*==============================================================================
-  Set up a new machine: clone all seven repositories as siblings, install each,
-  and link the shared library for development.
+  Set up a new machine: clone all seven repositories as siblings and install
+  each one.
 
-    node scripts/bootstrap.mjs            clone anything missing, install, link
-    node scripts/bootstrap.mjs --no-link  install against the published package
+    node scripts/bootstrap.mjs
 
   Run it from inside jp-docs. It works on the folder ABOVE jp-docs, so the seven
-  repos end up as siblings — which is what every other script and README assumes.
+  repos end up as siblings — which is what everything else assumes, and not only
+  as a convention:
 
-  Seven clones and seven installs is a lot of ceremony to get wrong by hand, and
-  getting it wrong tends to fail late and confusingly: an app that quietly
-  installed a published package when you meant to link it looks fine until you
-  cannot work out why your change is not showing up.
+    - jp-shared is a Module Federation REMOTE. The four apps resolve its
+      JavaScript at runtime from http://localhost:4999, not from node_modules.
+    - SCSS is shared at BUILD time through each app's angular.json:
+      "includePaths": ["../jp-shared/src/styles"]. That `../` is why the repos
+      must sit side by side. A nested or renamed checkout breaks every build.
 
-  It does NOT try to do the things that need a human: the GitHub token, SQL
-  Server, and the JWT user-secrets. It prints those at the end instead.
+  There is no npm link step and no registry token any more — see PROJECT_MEMORY.
+
+  It does NOT try to do the things that need a human: SQL Server, the dev
+  settings files, and the JWT user-secrets. It prints those at the end.
 ==============================================================================*/
 
 import { spawnSync } from 'node:child_process';
@@ -25,16 +28,15 @@ import { fileURLToPath } from 'node:url';
 
 const siblings = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const ORG = 'Tarun1515';
-const linkShared = !process.argv.includes('--no-link');
 
 const REPOS = [
   { name: 'jp-docs', kind: 'docs' },
   { name: 'jp-backend', kind: 'dotnet' },
-  { name: 'jp-shared', kind: 'library' },
-  { name: 'jp-admin', kind: 'app' },
-  { name: 'jp-school', kind: 'app' },
-  { name: 'jp-teacher', kind: 'app' },
-  { name: 'jp-public', kind: 'app' },
+  { name: 'jp-shared', kind: 'node' },
+  { name: 'jp-admin', kind: 'node' },
+  { name: 'jp-school', kind: 'node' },
+  { name: 'jp-teacher', kind: 'node' },
+  { name: 'jp-public', kind: 'node' },
 ];
 
 const run = (command, cwd, { fatal = true } = {}) => {
@@ -50,7 +52,7 @@ const run = (command, cwd, { fatal = true } = {}) => {
 };
 
 // ---- 1. clone ---------------------------------------------------------------
-console.log('\n=== 1/4  repositories ===\n');
+console.log('\n=== 1/3  repositories ===\n');
 
 for (const { name } of REPOS) {
   const path = resolve(siblings, name);
@@ -63,70 +65,37 @@ for (const { name } of REPOS) {
   run(`git clone https://github.com/${ORG}/${name}.git`, siblings);
 }
 
-// ---- 2. shared library ------------------------------------------------------
-// Built before the apps install, because a linked app resolves this output and
-// an unbuilt library links to an empty directory.
-console.log('\n=== 2/4  jp-shared ===\n');
-
-const sharedPath = resolve(siblings, 'jp-shared');
-run('npm install', sharedPath);
-run('npm run build', sharedPath);
-
-if (linkShared) {
-  run('npm link', resolve(sharedPath, 'dist/jp-shared'));
-}
-
-// ---- 3. apps ----------------------------------------------------------------
-console.log('\n=== 3/4  applications ===\n');
+// ---- 2. install -------------------------------------------------------------
+console.log('\n=== 2/3  npm install ===\n');
 
 for (const { name, kind } of REPOS) {
-  if (kind !== 'app') {
-    continue;
-  }
+  if (kind !== 'node') continue;
 
   const path = resolve(siblings, name);
-  console.log(`\n--- ${name} ---`);
-
-  // Installing the published package needs a token. Without one npm reports a
-  // 404, not a 401, so the message would be misleading — say so plainly rather
-  // than letting the run die on it.
-  const installed = run('npm install', path, { fatal: false });
-
-  if (!installed) {
-    console.log(`\n  ${name}: npm install failed.`);
-    console.log('  If it mentions 404 for @tarun1515/jp-shared, that is almost certainly');
-    console.log('  a missing GITHUB_TOKEN or .npmrc. See the checklist below.\n');
-    continue;
-  }
-
-  if (linkShared) {
-    run('npm link @tarun1515/jp-shared', path, { fatal: false });
-  }
+  console.log(`\n  ${name}`);
+  run('npm install', path, { fatal: false });
 }
 
-// ---- 4. what still needs a human -------------------------------------------
-console.log('\n=== 4/4  still to do by hand ===\n');
-console.log('  1. GitHub Packages token');
-console.log('       cp .npmrc.example .npmrc          (in jp-shared and each app)');
-console.log('       setx GITHUB_TOKEN "ghp_..."       needs read:packages');
-console.log('       Only needed for the PUBLISHED package. A linked setup does not use it.');
-console.log('');
-console.log('  2. SQL Server 2019, instance localhost\\TARUN, Windows auth');
-console.log('       cd ../jp-backend');
-console.log('       sqlcmd -S localhost\\TARUN -E -b -f 65001 -i database\\run_all.sql');
-console.log('');
-console.log('  3. JWT signing key — the SAME value in BOTH APIs, or every call to');
-console.log('     JP.App.Api returns 401 with nothing in the logs explaining why');
-console.log('       cd ../jp-backend/JP.Sso.Api ; dotnet user-secrets set "Jwt:Key" "<64+ chars>"');
-console.log('       cd ../JP.App.Api           ; dotnet user-secrets set "Jwt:Key" "<same value>"');
-console.log('');
-console.log('  4. Dev settings');
-console.log('       copy appsettings.Development.example.json to appsettings.Development.json');
-console.log('       in both API projects');
-console.log('');
-console.log('  5. First administrator');
-console.log('       cd ../jp-backend/JP.Tools.SeedAdmin');
-console.log('       dotnet run -- --email you@example.com --generate');
-console.log('');
-console.log('  Then check everything agrees:  node scripts/check-versions.mjs');
-console.log('');
+// ---- 3. what still needs a human -------------------------------------------
+console.log('\n=== 3/3  still to do by hand ===\n');
+console.log('  1. SQL Server 2019 on localhost\\TARUN, then:');
+console.log('       cd ..\\jp-backend');
+console.log('       sqlcmd -S localhost\\TARUN -E -b -f 65001 -i database\\run_all.sql\n');
+console.log('  2. Dev settings (gitignored — copy the committed examples):');
+console.log('       copy JP.Sso.Api\\appsettings.Development.example.json ^');
+console.log('            JP.Sso.Api\\appsettings.Development.json');
+console.log('       copy JP.App.Api\\appsettings.Development.example.json ^');
+console.log('            JP.App.Api\\appsettings.Development.json\n');
+console.log('  3. The SAME JWT signing key in BOTH APIs — see jp-backend/README.md\n');
+console.log('  4. The first administrator:');
+console.log('       cd JP.Tools.SeedAdmin && dotnet run -- --email you@example.com --generate\n');
+
+console.log('  Then, to run anything at all:\n');
+console.log('       cd ..\\jp-shared  && npm start     # :4999 — START THIS FIRST');
+console.log('       cd ..\\jp-admin   && npm start     # :4200');
+console.log('       cd ..\\jp-school  && npm start     # :4300');
+console.log('       cd ..\\jp-teacher && npm start     # :4400');
+console.log('       cd ..\\jp-public  && npm start     # :4500 (standalone — no remote)\n');
+console.log('  🔴 jp-shared must be running before jp-admin, jp-school or jp-teacher.');
+console.log('     They load their components from it at runtime; without it they');
+console.log('     boot to a blank page. jp-public does not need it.\n');

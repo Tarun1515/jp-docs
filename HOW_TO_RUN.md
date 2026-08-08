@@ -132,143 +132,146 @@ cd jp-docs ; npm run bootstrap   # clones, installs and links all seven
 
 ---
 
-## 3. The frontend — seven repositories
+## 3. The frontend — seven repositories, one remote
 
 Everything lives as **siblings** under `D:\Projects\`. Nothing is nested.
 
 ```
 D:\Projects\
-├── jp-docs\      ← this file. Clone it beside every other repo
-├── jp-shared\    @tarun1515/jp-shared — the design system and core
-├── jp-admin\     :4200
-├── jp-school\    :4300
-├── jp-teacher\   :4400
-├── jp-public\    :4500
-└── jp-backend\   both APIs + all three databases
+├── jp-docs      ← this file. Clone it beside every other repo
+├── jp-shared    :4999  the REMOTE — start this first
+├── jp-admin     :4200  host
+├── jp-school    :4300  host
+├── jp-teacher   :4400  host
+├── jp-public    :4500  standalone SSR site — NOT federated
+└── jp-backend   both APIs + all three databases
 ```
 
 New machine:
 
 ```bash
 cd jp-docs
-npm run bootstrap        # clones the lot, installs, links shared
+npm run bootstrap        # clones the lot and installs
 ```
 
-It stops short of the things that need a human — the GitHub token, SQL Server,
-and the JWT user-secrets — and prints those as a checklist at the end.
+It stops short of the things that need a human — SQL Server, the dev settings
+files and the JWT user-secrets — and prints those as a checklist at the end.
 
-### 3.1 Ports
+There is no registry token, no `.npmrc` and no `npm link` any more. See
+PROJECT_MEMORY decision 2.42.
+
+### 3.1 Ports and start order
 
 | Project | Port | Command |
 |---|---|---|
-| `jp-admin` | **4200** | `cd jp-admin ; npm start` |
-| `jp-school` | **4300** | `cd jp-school ; npm start` |
-| `jp-teacher` | **4400** | `cd jp-teacher ; npm start` |
-| `jp-public` | **4500** | `cd jp-public ; npm start` |
-| `JP.Sso.Api` | **5199** | `cd jp-backend\JP.Sso.Api ; dotnet run` |
-| `JP.App.Api` | **5299** | `cd jp-backend\JP.App.Api ; dotnet run` |
+| **`jp-shared`** | **4999** | `cd jp-shared ; npm start` |
+| `jp-admin` | 4200 | `cd jp-admin ; npm start` |
+| `jp-school` | 4300 | `cd jp-school ; npm start` |
+| `jp-teacher` | 4400 | `cd jp-teacher ; npm start` |
+| `jp-public` | 4500 | `cd jp-public ; npm start` |
+| `JP.Sso.Api` | 5199 | `cd jp-backend\JP.Sso.Api ; dotnet run` |
+| `JP.App.Api` | 5299 | `cd jp-backend\JP.App.Api ; dotnet run` |
 
-For most work you need **`JP.Sso.Api` plus whichever app you are on**.
+> 🔴 **Start `jp-shared` first, and leave it running.** `jp-admin`, `jp-school`
+> and `jp-teacher` fetch their components from it at runtime. Without it they
+> boot to a blank page. `jp-public` does not need it.
 
-### 3.2 🔴 The two modes — link or publish
+For most work you need **`jp-shared` + `JP.Sso.Api` + whichever app you are on**.
 
-Publishing `jp-shared` for every change during design work is unworkable, so
-there are two ways an app can consume it. **Know which one you are in.**
+### 3.2 How the sharing actually works
 
-**DEVELOPMENT — linked.** The default while building anything. The app points at
-the sibling working copy, so a change in `jp-shared` shows up immediately with
-no version bump and no publish.
+Two different mechanisms, on purpose:
+
+| | shared how | when |
+|---|---|---|
+| **JavaScript** — components, services, guards | Module Federation import map → `http://localhost:4999` | **runtime** |
+| **SCSS** — tokens, mixins, partials | `includePaths: ["../jp-shared/src/styles"]` | **build time** |
+
+Apps import JavaScript through four specifiers, and nothing else:
+
+```ts
+import { UiButtonComponent }  from 'jp-shared/ui';
+import { AuthService }        from 'jp-shared/core';
+import { UserType }           from 'jp-shared/models';
+import { NotFoundComponent }  from 'jp-shared/pages';
+```
+
+Those are **not** packages in `node_modules`. The build leaves them unresolved
+(`externals` in `federation.config.mjs`), TypeScript resolves them for types
+only (`paths` in `tsconfig.json`), and the browser resolves them from the import
+map that `initFederation` installs before the app bootstraps.
+
+Component stylesheets keep writing `@use 'variables' as v;` exactly as before.
+
+> ⚠️ **The sibling layout is load-bearing.** That `../jp-shared/src/styles` is a
+> real relative path on disk. **CI must check out `jp-shared` alongside the app**
+> or the build fails on the first component stylesheet.
+
+### 3.3 The development loop — this is the point of the whole setup
 
 ```bash
-cd jp-shared && npm run link      # builds, then npm link from dist/jp-shared
-cd ../jp-admin && npm run link:shared
+cd jp-shared && npm start      # once, then forget about it
+cd jp-school && npm start
 ```
 
-**RELEASE — published.** What CI and other machines use.
+Edit a component in `jp-shared`, reload `jp-school`, see the change. No publish,
+no version bump, no link step.
+
+The app's own dev server does still do a ~0.2 s incremental rebuild, because its
+tsconfig `paths` point at jp-shared's **source** for types, so its watcher sees
+the edit too. That is automatic and you do not have to do anything — but it is
+not literally zero, and it is worth knowing before you go looking for why the
+terminal moved.
+
+### 3.4 🔴 "ngDevMode is not defined" — the one you will hit
+
+**Symptom.** The app was fine, then every route renders blank and the console
+says:
+
+```
+ERROR ReferenceError: ngDevMode is not defined
+    at new _LoginComponent (...)
+```
+
+**Cause.** You ran a **production build** while the **dev server** was running.
+Both share the Native Federation externals cache, so the production copy of
+`@angular/core` — which does not define `ngDevMode` — replaced the dev one. The
+message says nothing about any of this.
+
+**Fix.**
 
 ```bash
-# in jp-shared
-npm run version:bump              # package.json AND src/lib/version.ts together
-# write the CHANGELOG entry, then
-git commit -am "release: 1.1.0" && git tag v1.1.0 && git push --follow-tags
-
-# in each app
-npm run update:shared
+# stop the dev server first
+rm -rf .angular/cache
+npm start
 ```
 
-**Which am I in?**
+Do production builds with the dev servers stopped.
 
-```bash
-cd jp-docs && npm run check-versions
-```
+### 3.5 ⚠️ `@angular/animations` is a dependency nothing imports
 
-```
-  @tarun1515/jp-shared
-    source        1.0.0
-    built         1.0.0
+Leave it alone. The hosts turn off Native Federation's `ignoreUnusedDeps` (it
+walks the import graph with Sheriff, which refuses files outside the project
+root — and the tsconfig `paths` deliberately point at the sibling repo). With
+pruning off, esbuild bundles `@angular/platform-browser`'s animations entry
+points, which import `@angular/animations/browser`.
 
-    ok    jp-admin    1.0.0     linked     follows jp-shared (dev mode)
-    ok    jp-school   1.0.0     linked     follows jp-shared (dev mode)
-    ok    jp-teacher  1.0.0     linked     follows jp-shared (dev mode)
-    ok    jp-public   1.0.0     linked     follows jp-shared (dev mode)
-```
+Removing the package breaks the build with `Could not resolve
+@angular/animations/browser`, and adding it to `skip` does **not** help — `skip`
+controls what is *shared*, not what *resolves*.
 
-`linked` follows the sibling working copy and cannot drift. `installed` is frozen
-at a published version and can. **Run this after every change to `jp-shared`** —
-four apps install it independently, and an app you forgot keeps running the old
-copy while building perfectly cleanly.
+### 3.6 jp-public is not federated
 
-### 3.3 🔴 "NG0203 … token injection failed" — the one you will hit
+It is a normal Angular SSR application. It imports **zero** shared JavaScript —
+not one TypeScript file — so federating it would add a polyfill, a startup
+round-trip and a runtime dependency on :4999 in exchange for nothing, while
+complicating the SSR pipeline that its SEO depends on.
 
-**Symptom.** A linked app compiles fine and then renders nothing. The console
-shows:
+It still gets the design tokens the same way everything else does, through the
+build-time SCSS include path. That is not an exception: SCSS is build-time for
+all five projects.
 
-```
-NG0203: The `InjectionToken JP_APP_IDENTITY` token injection failed.
-`inject()` function must be called from an injection context such as a
-constructor, a factory function, a field initializer, ...
-```
-
-**It is not an injection-context problem.** The message points at dependency
-injection and the cause is module resolution, which is why it costs people an
-afternoon.
-
-**Cause.** A linked package is a symlink. By default the bundler resolves the
-symlink to its real path, so imports inside the library are resolved from
-`jp-shared/node_modules` — which has its own `@angular/core`. The app now has
-**two copies of Angular**, each with its own `InjectionToken` class, so the token
-the app provides is not the token the library asks for.
-
-**Fix.** In the app's `angular.json`, under `architect.build.options`:
-
-```json
-"preserveSymlinks": true
-```
-
-All four apps already have it. **Do not remove it.** If you scaffold a new app
-from the Angular CLI, add it before linking.
-
-**How to confirm this is what you are looking at:**
-
-```bash
-ls jp-shared/node_modules/@angular/core     # exists -> the second copy
-```
-
-### 3.4 GitHub Packages token
-
-Only needed to install the **published** package. A linked setup does not touch
-the registry at all.
-
-```bash
-cp .npmrc.example .npmrc          # in each app; .npmrc is gitignored
-setx GITHUB_TOKEN "ghp_..."       # needs read:packages; reopen the shell
-```
-
-> ⚠️ **A 404 for `@tarun1515/jp-shared` usually means 401.** GitHub Packages
-> answers unauthenticated requests for a private package with "not found" rather
-> than "not authorised", so a missing token looks like a missing package.
-
-### 3.5 Each app takes only its own account type
+### 3.7 Each app takes only its own account type
 
 All three signed-in apps authenticate against the same SSO API, so a school owner
 **can** sign in successfully on the teacher app — valid token, wrong app.
@@ -283,6 +286,16 @@ security — the token stays valid and the server is what enforces access.
 
 Tokens are stored per app (`jp.admin.accessToken`, `jp.school.accessToken`), so
 two apps on one origin never read each other's session.
+
+### 3.8 Production
+
+`jp-shared` builds to static files served from a URL that comes from each app's
+environment config, never hardcoded.
+
+> ⚠️ **If the jp-shared host is unreachable, all three apps fail to boot.** That
+> is the trade. **Mitigation: serve `jp-shared` from the same origin as the
+> apps**, so there is no independent failure point — if that server is down,
+> everything is down anyway.
 
 ---
 
@@ -523,18 +536,19 @@ are safe against your working database and leave nothing behind.
 ```
 D:\Projects\
 ├── jp-docs\        PROJECT_MEMORY.md, HOW_TO_RUN.md, DB_TABLE_STRUCTURE.md,
-│                   design-screens/, and the check-versions + bootstrap scripts
+│                   design-screens/, and the bootstrap script
 │
-├── jp-shared\      @tarun1515/jp-shared — published to GitHub Packages
-│   ├── src/styles/       13 SCSS partials, shipped as package assets
-│   ├── src/ui/          17 ui-* components + the app and auth shells
-│   ├── src/core/        services, guards, interceptors, models, shared pages
-│   └── src/public-api.ts  THE only entry point
+├── jp-shared\      :4999  the Module Federation REMOTE — start it first
+│   ├── src/styles/       13 SCSS partials — shared at BUILD time
+│   ├── src/ui/           17 ui-* components + the app and auth shells
+│   ├── src/core/         services, guards, interceptors, models, shared pages
+│   └── src/entries/      ui.ts · core.ts · models.ts · pages.ts
+│                         the four exposed barrels. Nothing else is reachable.
 │
-├── jp-admin\      :4200  login, forgot/reset, admin shell. Phase 2E lands here
-├── jp-school\     :4300  login, signup, OTP, invite, account status. Phase 2F
-├── jp-teacher\    :4400  login, signup, OTP, teacher shell
-├── jp-public\     :4500  SSR marketing site, no login, its own lighter partials
+├── jp-admin\       :4200  host. Phase 2E lands here
+├── jp-school\      :4300  host. Phase 2F
+├── jp-teacher\     :4400  host
+├── jp-public\      :4500  standalone SSR marketing site — NOT federated
 │
 └── jp-backend\
     ├── JP.Core/            envelope, constants, enums, exceptions
