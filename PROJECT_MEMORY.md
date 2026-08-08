@@ -1287,6 +1287,143 @@ se aate hain.
 
 ---
 
+## 2A. KNOWN GAPS — Phase 1 close-out (2026-08-08)
+
+Sab kuch jo jaan-boojh kar adhoora, stubbed ya defer kiya gaya hai. **Ye list
+maintain karni hai** — Phase 5 mein inhe dobara discover karna sabse mehnga
+tareeka hai.
+
+Har item pe: kya hai, kyun chhoda, aur kahan theek hoga.
+
+---
+
+### 🔴 G0. SAAT REPOS MEIN SE KISI KA GIT REMOTE NAHI HAI
+
+```
+jp-shared, jp-admin, jp-school, jp-teacher, jp-public, jp-docs, jp-backend
+  -> git remote: (koi nahi)
+```
+
+Sab kuch **sirf is machine pe** hai. Har commit local hai, kahin push nahi hua.
+Disk gaya to poora Phase 1 gaya — database scripts, dono APIs, chaaron frontend
+projects, aur ye file bhi.
+
+**Ye technical gap nahi hai, ye risk hai.** Phase 2 shuru karne se pehle GitHub
+pe saat repos banao aur push karo. `gh` CLI is machine pe install nahi hai, to
+ya to install karo ya repos web se banao aur `git remote add origin` chalao.
+
+---
+
+### G1. Design items — Phase 1D review se bache hue
+
+| # | Item | Status |
+|---|---|---|
+| 1 | Password **Show** toggle field mein content hone par wapas nahi aata | ✅ **Fix ho chuka** — 2026-08-08 ko browser mein verify kiya: type pe aata hai, clear pe jaata hai, dobara type pe **wapas aata hai**, click pe `Hide` + `type=text`. Template `@if (value())` hai aur `onInput` har keystroke pe `value` set karta hai |
+| 2 | Split panel **1440 se upar** toot-ta hai | ⏳ Open — aaj re-verify nahi kiya |
+| 3 | Dashboard panel **height mismatch** | ⏳ Open — aaj re-verify nahi kiya |
+| 4 | Job titles **375 pe truncate** ho rahe | ⏳ Open — aaj re-verify nahi kiya |
+
+⚠️ 2, 3, 4 client ki report ke hisaab se carry kiye hain; maine aaj sirf #1
+check kiya kyunki uske code se ulta lag raha tha. Baaki teen Phase 2E/2F mein
+un screens ko chhoote waqt verify karke fix karne hain.
+
+---
+
+### G2. Public site layout — ✅ SAB FIX HO CHUKE (commit `c7fe8fd`)
+
+Ye Phase 1 close-out ke liye report hue the, par usi din fix ho gaye. Record
+ke liye, taaki dobara list na hon:
+
+| Item | Kya nikla |
+|---|---|
+| About/Terms centre, FAQ/How-it-works left-align | About/Terms column `.container` **par** tha (centred), FAQ/How-it-works ne usse **andar** rakha (left). Ab ek convention: `.measure` (44rem) aur `.measure--wide` (64rem), dono centred |
+| FAQ 1440 pe aadha viewport khaali | Wahi wajah. Ab centred |
+| Homepage "Every school is checked" misaligned | 88rem container mein 44rem column left-aligned tha. Ab centred |
+| Contact pe header form ke beech render ho raha | 🔴 **Bug nahi tha.** Playwright ke `fullPage` capture ka artifact — wo scroll karke stitch karta hai aur `position: sticky` header har band mein dobara render hota hai. DOM mein ek hi `.site-header` hai aur scroll pe uska viewport `top` exactly 0 rehta hai. Capture script ab sticky ko neutralise karta hai |
+
+Measure ke baad: har page ka column 2px ke andar centred. Lighthouse SEO 100 +
+a11y 100 saaton pages pe.
+
+---
+
+### G3. Jo bana hi nahi — Phase 4 (data chahiye)
+
+- **Job search, job detail, featured jobs, featured schools.** Inhe
+  `JP.App.Api` aur job tables chahiye. Homepage pe dashed **placeholder band**
+  hai (`⚠️ PHASE 4 PLACEHOLDER` comment ke saath), nakli job cards nahi.
+- **Header se "Find jobs" hataya hua hai.** `/jobs` exist nahi karta; 404 pe
+  jaane wala nav item bane hue product ko toota dikhata hai. Job search ke saath
+  wapas aayega.
+- **`applyToJobUrl()` likha hua hai par doosra sira nahi juda.** Wo
+  `teacher app /auth/register?redirect=/jobs/<slug>/apply` banata hai, par
+  **jp-teacher ka register component `redirect` param padhta hi nahi**. Job page
+  banne se pehle ye add karna hai, warna Apply ke baad banda dashboard pe girega.
+
+### G4. Jo bana hi nahi — Phase 7
+
+- **Contact form ka koi endpoint nahi.** `t_app_contact_enquiries` aur uska API
+  Phase 7 hai. Form validate karta hai, phir **saaf batata hai ki bheja nahi
+  gaya** aur prefilled `mailto:` deta hai. 🔴 Success message jaan-boojh kar
+  nahi hai — nakla confirmation ka matlab asli enquiry gayab.
+
+### G5. Client se chahiye — launch blocker
+
+- 🔴 **Terms aur Privacy legal review ke bina live nahi ja sakte.** Headings
+  asli hain (Privacy mein DPDP Act 2023 ki obligations named hain), body
+  plain-language placeholder hai, dono pages pe loud `draft-notice` hai.
+  **Client ko wording deni ya approve karni hai.**
+- **Pricing finalise nahi hai.** FAQ isse seedha bolta hai; Terms §6 tab tak
+  likha nahi ja sakta.
+- **`og:image` nahi hai**, isliye `twitter:card` `summary` hai,
+  `summary_large_image` nahi. Share image milte hi dono badalne hain.
+- **Domain confirm hona hai.** `environment.production.ts` ka `siteUrl` aur
+  `public/sitemap.xml` ka host — dono ek saath badalne hain.
+
+### G6. Mockup hai, asli nahi
+
+- 🔴 **jp-school ka Dashboard aur Applicants poori tarah static hain.** Saare
+  numbers, applicant names, job titles aur stage counts component mein hardcoded
+  hain. **Koi API call nahi hoti.** Ye Phase 2/3 mein `JP.App.Api` se juden ge.
+  ⚠️ Client demo mein inhe "bana hua" bol kar mat dikhana.
+- **School approve karne ka koi admin UI nahi.** Abhi Swagger se
+  `PUT /api/users/{userUid}/status` chalana padta hai. Phase 2E.
+- **`JP.App.Api` mein koi business endpoint nahi** — sirf health. Phase 1 ka
+  sab kuch `JP.Sso.Api` hai.
+
+### G7. Operational — inhe jaanna zaroori hai
+
+- **Production mein `jp-shared` down = teeno apps boot nahi hongi.** Ye
+  federation ka accepted trade hai. **Mitigation implement karna hai: usse apps
+  ke same origin se serve karo** (2.42).
+- **CI ko `jp-shared` app ke saath checkout karna hoga**, warna SCSS pehli
+  component stylesheet pe fail hoga.
+- **Dev server chalte waqt production build mat chalao** — `ngDevMode is not
+  defined`. Fix: dev server band, `.angular/cache` delete (HOW_TO_RUN §3.5).
+- **`@angular/animations` teeno hosts ki dependency hai jise koi import nahi
+  karta** — `ignoreUnusedDeps` band hone ka side effect. Hatana build todta hai.
+- **"No build step in the app" literally zero nahi hai** — app ka dev server
+  phir bhi ~0.2s incremental rebuild karta hai, kyunki tsconfig `paths`
+  jp-shared ki source pe point karta hai.
+- **`sitemap.xml` haath se maintain hota hai.** Naya route add karo to usme URL
+  bhi add karna hai.
+- **SMTP dev mein band hai** — emails `jp-backend\JP.Sso.Api\App_Data\mail-drop\*.eml`
+  mein girti hain.
+- **Public job search ke bina teacher bina account ke browse nahi kar sakta.**
+  FAQ isse seedha bolta hai. Phase 4 isse badlega.
+
+### G8. Test coverage
+
+- **SQL tests hain (121 assertions), C#/Angular unit tests NAHI hain.** Koi
+  xUnit project nahi, koi Karma/Jest spec nahi. Verification abhi SQL suites +
+  browser checks pe depend karta hai.
+- ⚠️ **Test 001 aaj toota hua mila aur fix hua.** `USP_CreatePasswordResetToken`
+  ab `UserTypeId` bhi return karta hai (per-app reset links ke liye), par test ka
+  `#ResetTok` temp table 5 column ka reh gaya tha — `INSERT ... EXEC` 6 values
+  nahi le paaya. Sabak: **proc ka result set badlo to usi commit mein test ka
+  temp table badlo.**
+
+---
+
 ## 3. SCOPE (Client spec ke against)
 
 ### IN SCOPE — MVP
@@ -1389,6 +1526,7 @@ AI candidate matching · AI resume scoring/generation · Video interview / demo 
 | 2026-08-08 | — | **Deep-nested SCSS assertion** — jp-admin/jp-teacher mein koi deep component shared partials use hi nahi kar raha tha, to unka build pass hona kuch prove nahi karta tha. Ab depth-6 pe jaan-boojh kar `@use`, aur include path toad kar verify kiya ki fail hota hai | ✅ Done |
 | 2026-08-08 | — | **`/continue` audience chooser** — jp-public, school/teacher fork, admin ka option nahi (compiler-enforced). SSR mode-aware. jp-public ke local design tokens hataye — wo purane blue pe drift ho chuke the (2.43) | ✅ Done |
 | 2026-08-08 | — | **Public site static pages** — home, how-it-works, about, faq, contact, terms, privacy, 404. Per-route SEO + OG + canonical, robots.txt, sitemap.xml, prerendered. Lighthouse SEO 100 / a11y 100 saaton pages pe. Job search Phase 4 ke liye chhoda, contact form Phase 7 ke liye (2.44) | ✅ Done |
+| 2026-08-08 | 1 | **PHASE 1 CLOSE-OUT** — dono APIs clean rebuild 0/0, 121/121 SQL assertions, paanchon frontend prod builds clean, jp_sso 20 tables · 32 procs · 4 functions · 71 indexes. Known gaps section 2A mein likhe. Test 001 toota mila aur fix hua | ✅ Done |
 | — | 2E | Admin screens → `frontend/apps/admin` | ⬜ Next |
 | — | 2F | School screens → `frontend/apps/school` | ⬜ Next |
 
@@ -1700,87 +1838,62 @@ app/app.component.{ts,html,scss}  Public shell — header + nav + footer + outle
 
 ## 7. NEXT ACTION
 
-**⏸️ PHASE 1 COMPLETE (1A + 1B + 1C + 1D) aur verified. 120/120 SQL assertions pass (73 + 17 + 30). Backend clean build 0 warning 0 error. Frontend restructure bhi complete — ab **Module Federation** (2.42, LOCKED).
+## ✅ PHASE 1 COMPLETE — 2026-08-08
 
-📖 **Setup, run order, test accounts aur — sabse zaroori — kaunsi screen asli API pe hai aur kaunsi mockup hai: [HOW_TO_RUN.md](HOW_TO_RUN.md)**
+1A + 1B + 1C + 1D sab done aur verified. Verification output:
 
-**Phase 1 close-out counts (jp_sso):** 20 tables · 32 procedures · 4 functions · 71 indexes · 120/120 test assertions.
+| Check | Result |
+|---|---|
+| `dotnet build JP.sln --no-incremental` | **0 warnings, 0 errors** |
+| `001_test_sso_procedures.sql` | **73 / 73** |
+| `002_test_error_log.sql` | **17 / 17** |
+| `003_test_menus.sql` | **31 / 31** |
+| SQL assertions total | **121 / 121** |
+| jp-shared / jp-admin / jp-school / jp-teacher / jp-public prod builds | **paanchon clean** |
+| jp_sso objects | **20 tables · 32 procedures · 4 functions · 71 indexes** |
 
-### 🔴 Kuch bhi shuru karne se pehle — start order
+⚠️ Verification ke dauraan **test 001 toota hua mila** —
+`USP_CreatePasswordResetToken` ab `UserTypeId` return karta hai par test ka
+temp table 5 column ka reh gaya tha. Fix kiya, phir 73/73. Details section 2A
+(G8) mein.
 
-```bash
-cd jp-shared  && npm start     # :4999 — SABSE PEHLE. Ye remote hai
-cd jp-admin   && npm start     # :4200
-cd jp-school  && npm start     # :4300
-cd jp-teacher && npm start     # :4400
-cd jp-public  && npm start     # :4500 — standalone, isko remote nahi chahiye
-```
+📖 Setup, run order, test accounts, aur kaunsi screen asli hai kaunsi mockup:
+[HOW_TO_RUN.md](HOW_TO_RUN.md)
 
-`jp-shared` chalu nahi hai to teeno apps **blank page** pe boot hongi. Wo bug
-nahi hai — unke components runtime pe :4999 se aate hain.
+🔴 **Known gaps section 2A mein hain. Phase 2 shuru karne se pehle padho** —
+khaas kar **G0: kisi repo ka git remote nahi hai**, sab kuch sirf ek machine pe
+hai.
 
-### Phase 1C mein kya bana
-- **`JP.Sso.Api` — 20 endpoints**: auth (12), users (4), roles (2), permissions (1), menus (1)
-- **`JP.Tools.SeedAdmin`** — operator tool, super admin banata hai. Koi hash kisi .sql mein nahi
-- **Menu system** — tables, seed, proc, API, Angular `MenuService` (2.37)
+---
 
-### Phase 1D mein kya bana
-- **Design direction "The Register"** (2.38) — source pe badla, 17 `ui-*` components ne inherit kiya
-- **6 auth screens** + `ui-roll` / `ui-otp-input` / `ui-password-field`
-- **Account status rewrite**, school dashboard, applicants list (rows fixture se — `JP.App.Api` Phase 2/3 hai)
+## ▶️ NEXT: PHASE 2A — `jp_mdm` DATABASE
 
-### 🔴 Phase 2 shuru karne se PEHLE padho
+Master data ka database. Ye Phase 2 ka pehla step hai.
 
-**2.39 — Organization scope resolution.** `OrganizationUid` sirf JWT se →
-`t_app_schools.SchoolId` → branch scope. `SchoolId` server se bahar kabhi nahi.
-Integration test 2.39 mein likha hua hai aur wo **Phase 3 ki definition of done**
-ka hissa hai.
+### Pehle ye padho
+- **2.39** — organization scope resolution. `OrganizationUid` sirf JWT se.
+  Uska integration test Phase 3 ki definition of done ka hissa hai.
+- **2.42** — frontend structure LOCKED. Start order: `jp-shared` :4999 pehle.
+- **2.11** — SQL Server 2019 syntax only. Koi 2022+ feature nahi.
+- **2.21 / 2.31** — SP error convention aur CATCH ordering.
+- **Section 2A** — known gaps.
 
-**2.42 — Module Federation (LOCKED).** Frontend structure band hai. Saat repos,
-siblings, `jp-shared` remote :4999 pe.
+### Phase 2A ka scope
+17 master tables, sabka shape ek: `Code`, `Name`, `DisplayOrder`,
+`Is_Active` + standard columns (2.4). Geography apni alag shakal rakhta hai —
+usme parent cascade chahiye.
 
-#### Phase 2 prompts ka target ab kya hai
+Har table ke liye wahi discipline jo `jp_sso` mein thi:
+1. `00_create_database.sql` idempotent, compat level 150 pinned
+2. Business key pe **filtered unique index** (`WHERE Is_Deleted = 0`)
+3. Har naya file `run_all.sql` mein `:r` se register
+4. Seed data alag `03_seed/` mein
+5. **Test suite usi commit mein**, `99_tests/` mein — proc ka result set
+   badle to temp table bhi
 
-| Phase | Purana (galat) | **Ab** |
-|---|---|---|
-| **2E** — admin screens | `frontend/apps/admin/...` | **`jp-admin/src/app/features/`** |
-| **2F** — school screens | `frontend/apps/school/...` | **`jp-school/src/app/features/`** |
+⚠️ Master data ki **screens** jp-admin mein config-driven banengi (2.41), 17
+alag screens nahi. Wo Phase 2E hai, 2A nahi.
 
-Dono ke liye ek hi discipline:
-
-1. **Shared cheez `jp-shared` mein jaati hai, app mein nahi.** Naya `ui-*`
-   component → `jp-shared/src/ui/` + `src/entries/ui.ts` mein export. Naya
-   service/guard/model → `src/core/` + `entries/core.ts` ya `entries/models.ts`.
-   App folder sirf us app ke SCREENS ke liye hai.
-
-2. **Import hamesha chaar barrels se** — `jp-shared/ui`, `jp-shared/core`,
-   `jp-shared/models`, `jp-shared/pages`. **Aur kuch nahi.** Barrel ke andar
-   ghusna (`jp-shared/ui/ui-button/...`) import map entry nahi hai aur runtime
-   pe fail karega.
-
-   ⚠️ Naya barrel add karna sasta **nahi** hai: `jp-shared` ke `exposes` ke
-   saath har host ka `externals` aur `tsconfig.paths` bhi badalna padta hai.
-   Chaar hi rakho.
-
-3. **Naya route = usi commit mein naya menu row.** `005_seed_menus.sql`, sahi
-   `UserTypeId` ke saath, **app prefix ke bina** (`/users`,
-   `/verification/schools`). Menu row bina route ke 404 hai; route bina menu row
-   ke invisible.
-
-4. **Screen sirf apne app mein.** Admin ki verification queue `jp-admin` mein,
-   school ka job posting `jp-school` mein. Dono ko chahiye to matlab wo
-   `jp-shared` ka component hai.
-
-5. **`jp-shared` ek waqt mein ek session.** Chaar projects us par depend karte
-   hain aur har ek jo mile uske against theek build karta rahega.
-
-#### ⚠️ Do gotchas jo Phase 2 mein zaroor milenge
-
-- **Dev server chalte waqt production build mat chalao** — federation externals
-  cache share hota hai, aur app `ReferenceError: ngDevMode is not defined` pe
-  mar jaati hai. Fix: dev server band, `.angular/cache` delete, restart.
-- **`@angular/animations` hataana mat** — koi code use nahi karta, par
-  `ignoreUnusedDeps` band hone ki wajah se build usse maangta hai.
-
-Dono HOW_TO_RUN §3.5 aur §3.6 mein detail se hain.
+🔴 **Phase 2 abhi shuru NAHI karna hai.** Ye section next action likhta hai,
+permission nahi deta.
 
