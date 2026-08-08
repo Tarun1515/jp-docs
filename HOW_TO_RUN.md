@@ -251,9 +251,15 @@ dev server is memory and one more thing to have left running by mistake.
 | **Admin screens** | `jp-shared` :4999 · `JP.Sso.Api` :5199 · `jp-admin` :4200 |
 | **Teacher screens** | `jp-shared` :4999 · `JP.Sso.Api` :5199 · `jp-teacher` :4400 |
 | **A shared component** | `jp-shared` :4999 + **any one** app to look at it in |
-| **The public site** | `jp-public` :4500 — **nothing else**. No remote, no API |
+| **The public site**, on its own | `jp-public` :4500 — **nothing else**. No remote, no API |
+| **The `/continue` chooser flow** | `jp-public` :4500 **plus whichever target app you are checking** — `jp-school` :4300 or `jp-teacher` :4400, and `jp-shared` :4999 for that app to render |
 | **Master data / business endpoints** (Phase 2+) | the above **plus** `JP.App.Api` :5299 |
 | **Database or SP work** | none of them — `sqlcmd` only |
+
+> The chooser row is the one exception to "jp-public needs nothing else". The
+> page itself renders standalone, but following a card into `/auth/login` or
+> `/auth/register` crosses into another app — and that app needs the remote.
+> This is a legitimate reason to have `jp-public` running during Phase 1 work.
 
 Two things follow from that table:
 

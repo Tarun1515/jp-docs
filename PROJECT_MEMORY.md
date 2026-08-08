@@ -1091,6 +1091,13 @@ header ka Sign in / Sign up. Us click se ye maloom nahi hota ki banda school
 hai ya teacher, aur guess karne ka matlab hai aadhe logon ko galat login screen
 pe bhejna.
 
+#### Entry point jp-public ke paas kyun hai
+
+Teeno apps **alag origins** pe hain — :4300, :4400, :4200. Koi bhi app apne
+andar se ye choice nahi de sakti, kyunki wo pehle hi ek audience chun chuki hai.
+**jp-public akeli jagah hai jahan se teeno dikhte hain**, to entry point yahin
+hona hai. Ye layout ka side effect nahi, iska kaam hai.
+
 **Route:** `/continue?mode=login` ya `?mode=signup`.
 
 Do options, **barabar weight** — ek hi sheet, beech mein ek rule. Grid
@@ -1109,6 +1116,10 @@ Admin internal hai. Kisi public page pe uska naam, link ya zikr nahi.
 Ye **compiler se enforce** hai, yaad rakhne se nahi: `Audience` type sirf
 `'school' | 'teacher'` hai. Koi page admin pe link karega to **compile hi nahi
 hoga**.
+
+⚠️ **Ye page "adhoora" nahi hai.** Do cards hain aur do hi rahenge. Baad mein
+koi teesra card add kar ke ise "complete" karne ki koshish mat karna — jise
+admin chahiye use URL pata hai.
 
 #### Kaun chooser dekhta hai aur kaun nahi
 
@@ -1147,6 +1158,15 @@ baar ho chuki hai.
   wagairah **kahin nahi jaate** — wo Phase 4 hai, CMS tables se banega.
 - `applyToJobUrl()` likha hua hai par **`jp-teacher` ka register component abhi
   `redirect` query param padhta nahi**. Job page banne se pehle wo add karna hai.
+
+#### jp-public iske liye federate NAHI hui
+
+Chooser ne jp-public ka unfederated hona **nahi badla**. Wo abhi bhi ek bhi
+shared JavaScript import nahi karti (HOW_TO_RUN §3.7). Dono option cards
+jp-public ki apni styles se bane hain — shared `ui-*` component ek bhi nahi.
+
+Chaar buttons share karne ke liye ek poori runtime dependency (:4999) aur SSR ki
+complexity lena ulta sauda hota.
 
 #### Design tokens — ek purani drift jo yahan pakdi gayi
 
