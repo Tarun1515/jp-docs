@@ -1185,6 +1185,108 @@ marketing pages ke liye alag hone chahiye.
 
 ---
 
+### 2.44 PUBLIC SITE — STATIC PAGES (Phase 1 scope)
+
+Pehle `localhost:4500` par `Cannot GET /` aata tha aur header ke links kahin
+nahi jaate the. Ab poori static site hai.
+
+| Route | Kya hai |
+|---|---|
+| `/` | Homepage — hero, do CTA, condensed how-it-works, verification, Phase 4 placeholder |
+| `/how-it-works` | Teacher aur school ki alag-alag journey (`#teachers`, `#schools`) |
+| `/about` | Verification kyun, aur kiske liye banaya |
+| `/faq` | Audience ke hisaab se, `#teachers` / `#schools` |
+| `/contact` | Form — validate hota hai, **bhejta nahi** (neeche dekho) |
+| `/terms`, `/privacy` | Asli structure, body **legal review pending** |
+| `/continue` | Pehle se tha (2.43) |
+| `**` | 404 |
+
+#### 🔴 Jo jaan-boojh kar NAHI banaya
+
+Job search, job detail, featured jobs, featured schools. Inhe data chahiye jo
+Phase 4 tak exist nahi karta, aur mock data pe banane ka matlab hota **do baar
+banana**.
+
+Homepage pe jahan featured jobs aayenge wahan ek **dashed placeholder band** hai
+— jaan-boojh kar nakli job cards nahi. Code mein `⚠️ PHASE 4 PLACEHOLDER` comment
+hai jisme likha hai usse bharna kaise hai.
+
+⚠️ **Header se "Find jobs" aur footer se "Browse jobs" hata diye.** Wo `/jobs`
+pe jaate the jo exist nahi karta. Nav item jo 404 pe le jaaye, wo banne hue
+product ko toota hua dikhata hai — item ka na hona behtar hai. Phase 4 mein
+wapas aayenge.
+
+#### 🔴 Koi nakli statistics nahi
+
+"10,000+ teachers" jaisa kuch is page pe nahi hai aur tab tak nahi aayega jab
+tak sach na ho. Bina users wale product pe wo demo mein client ka bharosa
+sabse tez todta hai, aur baad mein hatana hi padta hai.
+
+#### Contact form — endpoint hai hi nahi (Phase 7)
+
+`t_app_contact_enquiries` aur uska API Phase 7 hai. To form **validate karta hai
+aur phir sach bolta hai**: saaf likhta hai ki bheja nahi gaya, email address
+deta hai, aur ek `mailto:` button jo likha hua sab pre-fill kar deta hai.
+
+🔴 **Success message jaan-boojh kar nahi hai.** Koi banda ye form bharega aur
+jawab ka intezaar karega — nakli "thanks, we'll be in touch" ka matlab hota uski
+enquiry gayab aur wo kabhi dobara koshish nahi karta. Bhadda message chalega,
+kho jaana nahi chalega.
+
+#### 🔴 Terms aur Privacy — client sign-off ke bina LIVE NAHI
+
+Headings asli hain (Privacy mein **DPDP Act 2023** ki obligations bhi named
+hain). Body **plain-language placeholder** hai taaki page review ho sake.
+
+⚠️ **Kisi lawyer ne na likha hai na check kiya hai.** Dono pages pe ek loud
+`draft-notice` hai. **Client ko final wording deni ya approve karni hogi launch
+se pehle.** Client ki taraf se enforceable terms invent karna hamara kaam nahi
+hai.
+
+#### SEO — abhi kiya, kyunki abhi sasta hai
+
+- Har route ka apna title + meta description, route `data` mein (`SeoService`)
+- Open Graph + Twitter card + **absolute** canonical (`environment.siteUrl` se)
+- `robots.txt` (`/continue` disallow — wo routing step hai, content nahi) aur
+  `sitemap.xml`
+- Ek `h1` per page, heading order bina skip ke
+- **Lighthouse SEO 100 aur Accessibility 100 — saaton pages pe**
+
+⚠️ `twitter:card` `summary` hai, `summary_large_image` nahi — abhi koi
+`og:image` nahi hai. Bina image ke large card blank panel dikhata hai.
+
+#### Prerender, SSR nahi
+
+Ye pages query params nahi lete aur per-request kuch nahi badalta, to
+`RenderMode.Prerender` — build time pe asli HTML. `/continue` akela
+`RenderMode.Server` rehta hai (2.43).
+
+#### Do a11y bugs jo Lighthouse ne pakde aur fix hue
+
+1. **`--jp-text-subtle` (#7e908a) chhote text pe contrast fail karta hai** —
+   white pe 3.36:1, chahiye 4.5:1. jp-public ke labels ab `--jp-text-muted`
+   use karte hain. **Token ki value nahi badli** — wo shared hai, apps use
+   karti hain.
+2. **Body copy ke links sirf colour se pehchane ja rahe the** — surrounding
+   text se contrast 1.7:1, chahiye 3:1. Ab `p`/`li`/`dd` ke andar ke links
+   underlined hain (`.btn` chhod kar).
+
+#### `.section--alt` ab white hai, `--jp-surface-alt` nahi
+
+Page ka ground chalk hai (`--jp-bg` = #f3f6f4) aur `--jp-surface-alt` (#f8faf9)
+usse **halka** hai — to "alternate" band ground se farq hi nahi karta tha.
+Register ka idiom chalk ground pe **white sheets** hai, to alternate ka matlab
+wahi hai.
+
+#### jp-public abhi bhi unfederated hai
+
+In saat pages ne wo nahi badla. Ek bhi shared JavaScript import nahi hai —
+404 page tak `jp-shared/pages` se nahi liya, kyunki us ek page ke liye poori
+app federate karni padti. Design tokens waise hi build-time SCSS include path
+se aate hain.
+
+---
+
 ## 3. SCOPE (Client spec ke against)
 
 ### IN SCOPE — MVP
@@ -1286,6 +1388,7 @@ AI candidate matching · AI resume scoring/generation · Video interview / demo 
 | 2026-08-08 | — | **Federation verify** — teeno hosts remote se `ui-auth-shell` render karte hain, `@angular/core` ki **1** copy, `JP_APP_IDENTITY instanceof ng.InjectionToken` **true**, jp-school sign-in `/dashboard` tak, paanchon prod builds clean | ✅ Done |
 | 2026-08-08 | — | **Deep-nested SCSS assertion** — jp-admin/jp-teacher mein koi deep component shared partials use hi nahi kar raha tha, to unka build pass hona kuch prove nahi karta tha. Ab depth-6 pe jaan-boojh kar `@use`, aur include path toad kar verify kiya ki fail hota hai | ✅ Done |
 | 2026-08-08 | — | **`/continue` audience chooser** — jp-public, school/teacher fork, admin ka option nahi (compiler-enforced). SSR mode-aware. jp-public ke local design tokens hataye — wo purane blue pe drift ho chuke the (2.43) | ✅ Done |
+| 2026-08-08 | — | **Public site static pages** — home, how-it-works, about, faq, contact, terms, privacy, 404. Per-route SEO + OG + canonical, robots.txt, sitemap.xml, prerendered. Lighthouse SEO 100 / a11y 100 saaton pages pe. Job search Phase 4 ke liye chhoda, contact form Phase 7 ke liye (2.44) | ✅ Done |
 | — | 2E | Admin screens → `frontend/apps/admin` | ⬜ Next |
 | — | 2F | School screens → `frontend/apps/school` | ⬜ Next |
 

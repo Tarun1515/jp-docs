@@ -251,7 +251,7 @@ dev server is memory and one more thing to have left running by mistake.
 | **Admin screens** | `jp-shared` :4999 · `JP.Sso.Api` :5199 · `jp-admin` :4200 |
 | **Teacher screens** | `jp-shared` :4999 · `JP.Sso.Api` :5199 · `jp-teacher` :4400 |
 | **A shared component** | `jp-shared` :4999 + **any one** app to look at it in |
-| **The public site**, on its own | `jp-public` :4500 — **nothing else**. No remote, no API |
+| **The public site** — home, how it works, about, FAQ, contact, legal | `jp-public` :4500 — **nothing else**. No remote, no API |
 | **The `/continue` chooser flow** | `jp-public` :4500 **plus whichever target app you are checking** — `jp-school` :4300 or `jp-teacher` :4400, and `jp-shared` :4999 for that app to render |
 | **Master data / business endpoints** (Phase 2+) | the above **plus** `JP.App.Api` :5299 |
 | **Database or SP work** | none of them — `sqlcmd` only |
@@ -353,10 +353,33 @@ controls what is *shared*, not what *resolves*.
 
 ### 3.7 jp-public is not federated
 
-It is a normal Angular SSR application. It imports **zero** shared JavaScript —
-not one TypeScript file — so federating it would add a polyfill, a startup
-round-trip and a runtime dependency on :4999 in exchange for nothing, while
-complicating the SSR pipeline that its SEO depends on.
+It is a normal Angular SSR application, and as of the static-site build it has
+eight real routes: `/`, `/how-it-works`, `/about`, `/faq`, `/contact`,
+`/terms`, `/privacy` and `/continue`, plus a 404.
+
+It imports **zero** shared JavaScript — not one TypeScript file — so federating
+it would add a polyfill, a startup round-trip and a runtime dependency on :4999
+in exchange for nothing, while complicating the SSR pipeline that its SEO
+depends on. Its 404 page is its own rather than `jp-shared/pages` for exactly
+that reason.
+
+All seven static pages are **prerendered** at build time; only `/continue` is
+server-rendered, because it varies by query parameter. Each route carries its
+own title, meta description, Open Graph tags and canonical URL, and
+`robots.txt` and `sitemap.xml` ship with the build. Lighthouse scores SEO 100
+and accessibility 100 on every page — keep it that way.
+
+⚠️ Job search and job detail are **not** built. They need Phase 4 data, and the
+homepage carries a marked placeholder where they will go rather than mock job
+cards. "Find jobs" is deliberately absent from the header for the same reason.
+
+⚠️ The contact form validates but has **no endpoint** until Phase 7. It tells
+the visitor so and offers a prefilled `mailto:`. Do not replace that with a
+success message before there is somewhere for the submission to go.
+
+🔴 `/terms` and `/privacy` have real structure and **placeholder body copy that
+has not been through legal review**. Both carry a visible draft notice. They
+must not go live until the client supplies or approves the wording.
 
 It still gets the design tokens the same way everything else does, through the
 build-time SCSS include path. That is not an exception: SCSS is build-time for
