@@ -801,217 +801,91 @@ Aakhri assertion sabse zaroori hai: **koi bhi response body `SchoolId` leak na k
 
 ---
 
-### ⚠️ 2.40 TEEN APPS, EK WORKSPACE (SUPERSEDED BY 2.41)
-
-> Ye ek hi Angular workspace tha jisme chaar apps aur do libs the. **2.41 ne ise replace kar diya** — client ne har project ki apni GitHub repo maangi. Yahan isliye chhoda hai kyunki iske andar ke faisle (cross-app guard, storage prefix, menu prefix stripping, per-app reset links) 2.41 mein waise ke waise carry hue hain, aur unka reasoning yahan likha hai.
-
-Client ne admin, school aur teacher ke liye alag-alag UI maange. **Sirf frontend restructure** — backend, APIs, database sab wahi ke wahi.
-
-Ye Phase 2E/2F se **pehle** hua, kyunki wo phases admin aur school screens banate hain; galat app mein ban jaate to baad mein move karne padte.
-
-#### Structure — EK workspace, teen repos nahi
-
-```
-frontend/
-├── angular.json          ← 6 projects, EK file
-├── package.json          ← EK, ek node_modules, har cheez ka ek version
-├── apps/   admin · school · teacher · public-site
-└── libs/   ui · core
-```
-
-Teen alag repos ya teen `package.json` **jaan-boojh ke nahi**. Shared UI ek mahine mein drift kar jaati aur hum teen design system maintain kar rahe hote.
-
-#### Dependency direction — ek taraf, hamesha
-
-```
-apps  →  @jp/ui  →  @jp/core
-```
-
-`tsconfig` paths `@jp/ui` aur `@jp/core` ko **source** pe map karte hain, built package pe nahi — standard Angular monorepo dev setup: lib rebuild ki zaroorat nahi, aur compiler boundary ke aar-paar type-check karta hai. App se koi relative path lib ke andar ghus hi nahi sakta, isliye boundary decorative nahi hai.
-
-⚠️ **Lib app ka `environment.ts` import nahi kar sakti** — dependency ulti disha mein jaati, aur ab chaar apps hain. Isliye `JP_API_CONFIG` token; har app apne values deta hai.
-
-#### 🔴 Storage prefix — `jp.school.accessToken`
-
-`TokenStorageService` ab `JP_APP_IDENTITY` se prefix leta hai. **Koi default nahi** — provider missing ho to startup pe injection error, chup-chaap shared key pe fallback nahi.
-
-Subdomains pe deploy karenge, aur alag origins localStorage waise hi isolate karte hain. Prefix isliye hai ki wo isolation **deployment decision pe depend na kare**: do apps ek host pe daal do — shared staging box, path-based reverse proxy, localhost pe testing — aur bina prefix ke teacher app chup-chaap school app ka token utha lega, usi SSO API ko bhejega, valid response payega, aur user ko kisi aur ke liye bane shell mein bitha dega.
-
-#### 🔴 Cross-app login guard (`AppAccessService`)
-
-Teeno apps **ek hi SSO API** se authenticate karte hain, to school owner teacher app pe **successfully** sign in kar sakta hai. Credentials sahi, token asli, API khush. **App galat.**
-
-Bina handle kiye use milta: valid session, khaali sidebar (`USP_GetUserMenus` UserTypeId pe filter karta hai, is app ke liye uske paas kuch hai hi nahi), aur blank page. Har aisa banda yahi samjhega ki product toota hua hai — aur galat nahi samjhega, screen pe kuch aur likha hi nahi hota.
-
-Isliye `utype` claim **do jagah** check hota hai:
-
-| kab | kyun |
-|---|---|
-| **login ke baad** | seedha case |
-| **bootstrap pe** | token pehle se storage mein — pichhle session se, ya shared origin pe doosre app se |
-
-Dono ka anjaam ek: **local** sign-out (server ka logout nahi — wo us session ka refresh token revoke kar deta jise user abhi sahi app pe resume karne wala hai), phir saaf batao kiska account hai aur kahan jaana hai, **chalte hue link ke saath**.
-
-Target URLs `environment.ts` mein hain, hardcoded nahi — local build mein hardcoded `school.staffroom.in` developer ko seedha production bhej deta.
-
-⚠️ **Ye SECURITY BOUNDARY NAHI HAI, aur kabhi maana bhi nahi jaana chahiye.** Token valid rehta hai aur server use maanega. Ye **wayfinding** fix hai; teacher ko school ka data padhne se server ke apne permission checks rokte hain (2.6, 2.39).
-
-#### Signup se toggle GAYA
-
-Har app ka signup single-purpose hai. School app sirf school bana sakta hai, teacher app sirf teacher — chunne ko kuch hai hi nahi, to choice **hataayi**, default nahi ki. Har label, helper line aur consequence copy ab ek hi audience se baat karti hai, reader ke neeche se switch nahi hoti. Purane toggle se behtar form hai.
-
-**Admin ka signup hai hi nahi** (2.9) — admin accounts `JP.Tools.SeedAdmin` se ya doosre admin se aate hain.
-
-#### Login copy — har app apni awaaz mein
-
-Admin **plain rehta hai aur kuch advertise nahi karta**: jo log use karte hain wo yahin kaam karte hain; apne hi operators ko market karta console unserious lagta hai. School aur teacher ko ek-ek sacchi line milti hai ki darwaze ke us paar kya hai.
-
-Panel `ui-auth-shell` mein **projected** hai, built-in nahi — warna ya teen booleans, ya admin console pe marketing.
-
-#### ⚠️ Menu RoutePath se app prefix HATA
-
-`/admin/dashboard` → `/dashboard`. Ab har app ka apna deployment hai, prefix sirf hostname dohraata — `admin.staffroom.in/admin/dashboard`.
-
-**Schema change nahi hua** (client ne sahi kaha), par **seed data badla**, aur uske saath ek test bhi badalna pada: ab teen rows legitimately `/dashboard` share karti hain, ek per user type. Uniqueness **(UserTypeId, RoutePath)** pe hai, global nahi — purana global check ab sahi data pe fail karta, jo sabse bura kism ka test hai.
-
-Verify kiya: har user type ko **0 foreign rows** milti hain — admin 14, school 11, teacher 10, aur 2-2 shared account rows.
-
-#### ⚠️ Reset link ab per-app hai
-
-`Auth:PortalBaseUrl` (ek) → `Auth:PortalBaseUrls` (per UserTypeId). `USP_CreatePasswordResetToken` ab `UserTypeId` bhi return karta hai taaki API sahi app ka link bana sake — galat app mein bheja link ek aise login page pe girta hai jo us token ko kabhi accept nahi karega.
-
-Oracle nahi banta: unknown address pe `UserId` aur `UserTypeId` dono NULL, response bilkul same (2.32).
-
-Invite hamesha **school app** pe jaata hai — colleague hamesha kisi school ki team join karta hai, chahe bhejne wala koi bhi ho.
-
-Admin ko **reset-password route** bhi mila. Sirf forgot-password dead end hai: mail chala jaata hai aur pahunchta kahin nahi.
-
-#### Ports (2.17 ka update)
-
-| app | port |
-|---|---|
-| admin | **4200** |
-| school | **4300** |
-| teacher | **4400** |
-| public-site | **4500** |
-
-Chaaron `angular.json` mein declared, dono APIs ke CORS allow-list mein, aur `scripts/serve.mjs` `NG_FORCE_TTY=0` set karta hai. Chaar apps ke saath stale dev server **normal case** hai, unlucky nahi — isliye busy port ka loud error pehle se zyada zaroori hai.
-
----
-
 ### 🔴 2.41 SAAT REPOSITORIES (LOCKED — client decision 2026-08-08)
 
-> ⚠️ **Is section ka npm-package / GitHub Packages wala hissa ab SUPERSEDED hai —
-> dekho 2.42 (Module Federation).** Saat repos, ports aur backend-ek-repo wala
-> reasoning waisa hi valid hai. Neeche GitHub Packages, npm link,
-> preserveSymlinks aur version-drift ke baare mein jo likha hai wo ab **nahi**
-> hota — record ke liye rakha hai taaki koi use dobara propose na kare.
-
-Client ne har frontend project alag GitHub repository mein maanga. Ye 2.40 (ek workspace) ko **replace** karta hai.
+Har frontend project apni alag GitHub repository mein.
 
 ```
 D:\Projects\
 ├── jp-docs\      ← PROJECT_MEMORY, HOW_TO_RUN, DB_TABLE_STRUCTURE, screenshots
-├── jp-shared\    Angular library → GitHub Packages
+├── jp-shared\    :4999  design system + core — Module Federation remote (2.42)
 ├── jp-admin\     :4200
 ├── jp-school\    :4300
 ├── jp-teacher\   :4400
-├── jp-public\    :4500
+├── jp-public\    :4500  standalone SSR site
 └── jp-backend\   dono APIs + JP.Core/Domain/Infrastructure + saare DB scripts
 ```
 
 Sibling folders, koi parent nahi. Har ek apni independent git repo.
 
+⚠️ **Ye layout load-bearing hai, convention nahi.** SCSS build time pe
+`../jp-shared/src/styles` se resolve hoti hai — dekho 2.42.
+
 #### 🔴 BACKEND EK HI REPO REHTA HAI — ye dobara mat kholo
 
-`JP.Core`, `JP.Domain` aur `JP.Infrastructure` ko **dono** APIs reference karti hain. APIs ko alag karne ka matlab hota in teeno ko NuGet packages banana, aur phir har backend change ek **version-bump → build → publish → consume** cycle ban jaata.
+`JP.Core`, `JP.Domain` aur `JP.Infrastructure` ko **dono** APIs reference karti
+hain. APIs ko alag karne ka matlab hota in teeno ko NuGet packages banana, aur
+phir har backend change ek **version-bump → build → publish → consume** cycle
+ban jaata.
 
-Frontend ye afford kar leta hai kyunki **`npm link` ek saaf local escape hatch hai**: development mein app seedha library ki working copy pe point karta hai aur change bina kisi publish ke flow ho jaata hai. **C# mein iska koi utna hi saaf equivalent nahi hai** — repo boundary ke paar `ProjectReference` supported workflow nahi hai, aur local NuGet feed uska ghatiya substitute hai.
-
-Dono APIs deploy bhi saath hi hoti hain, to alag karne se **kuch milta nahi** aur har change pe ek publish step **lag jaata**.
+Dono APIs deploy bhi saath hi hoti hain, to alag karne se **kuch milta nahi**
+aur har change pe ek publish step **lag jaata**.
 
 #### jp-docs kyun hai
 
-Saat repos ka matlab saat sessions jo alag-alag samajh se shuru kar sakte hain. `PROJECT_MEMORY.md` wahi rokta hai.
+Saat repos ka matlab saat sessions jo alag-alag samajh se shuru kar sakte hain.
+`PROJECT_MEMORY.md` wahi rokta hai.
 
-⚠️ **Use kisi doosri repo mein copy MAT karo.** Teen copies ek hafte mein teen versions ban jaati hain, aur us file ki poori value yahi hai ki wo **ek** hai. Baaki har repo ka README yahan point karta hai: jp-docs sibling ke roop mein clone hogi, aur kaam shuru karne se pehle PROJECT_MEMORY padhi jaayegi.
+⚠️ **Use kisi doosri repo mein copy MAT karo.** Teen copies ek hafte mein teen
+versions ban jaati hain, aur us file ki poori value yahi hai ki wo **ek** hai.
+Baaki har repo ka README yahan point karta hai: jp-docs sibling ke roop mein
+clone hogi, aur kaam shuru karne se pehle PROJECT_MEMORY padhi jaayegi.
 
-#### GitHub Packages
+#### Cross-app login guard
 
-Package: **`@tarun1515/jp-shared`** (npm scope lowercase hota hai; GitHub owner `Tarun1515` hai).
+Teeno apps ek hi SSO API se authenticate karte hain, to school owner teacher app
+pe **successfully** sign in kar sakta hai — token asli, app galat. Bina handle
+kiye: khaali sidebar, blank page, aur banda samjhega product toota hai.
 
-- `publishConfig` → `https://npm.pkg.github.com`
-- `.npmrc.example` committed hai, **`.npmrc` gitignored** — token file mein nahi, `${GITHUB_TOKEN}` env var se aata hai
-- `.github/workflows/publish.yml` sirf **version tag** pe chalta hai, aur publish se pehle **fail** kar deta hai agar tag, `package.json` aur `JP_SHARED_VERSION` teeno match na karein
+`utype` claim **login ke baad** aur **bootstrap pe** check hota hai. Mismatch pe:
+**local** sign-out, phir saaf batao kiska account hai aur kahan jaana hai,
+chalte hue link ke saath. Target URLs `environment.ts` se, hardcoded nahi.
 
-⚠️ **GitHub Packages private package ke liye unauthenticated request pe 404 deta hai, 401 nahi.** Yaani `@tarun1515/jp-shared` pe "not found" ka matlab das mein se nau baar "not authorised" hota hai. Ye README aur `.npmrc.example` dono mein likha hai kyunki ye har naye machine pe ek baar zaroor lagega.
-
-#### 🔴 Do modes — LINK vs PUBLISH
-
-Active design work ke dauraan har change pe publish karna **unworkable** hai.
-
-| | DEVELOPMENT | RELEASE |
-|---|---|---|
-| command | `npm run link:shared` | `npm run update:shared` |
-| kya hota hai | sibling working copy pe symlink | published version install |
-| change flow | turant, bina publish | version bump + tag + publish |
-| kab | jab bhi kuch ban raha ho | CI, ya doosri machine |
-
-Kaunse mode mein ho? `cd jp-docs && npm run check-versions` — wo har app ke aage `linked` ya `installed` likhta hai.
-
-#### 🔴 `preserveSymlinks: true` — ye HATANA mat
-
-Ye migration ke dauraan actually hua, aur exactly wahi shakal mein jaisa client ne warn kiya tha.
-
-Linked/symlinked library apna khud ka `node_modules/@angular/core` resolve karti hai → app ke paas **Angular ki do copies** → har injection token fail:
-
-```
-NG0203: The `InjectionToken JP_APP_IDENTITY` token injection failed.
-`inject()` function must be called from an injection context...
-```
-
-Message **dependency injection** pe ungli uthata hai, jabki wajah **module resolution** hai — isiliye ye log ka aadha din kha jaata hai. Fix: har app ke `angular.json` build options mein `"preserveSymlinks": true`. Chaaron mein set hai.
-
-#### 🔴 Drift — teen detections
-
-Chaar apps, chaar `node_modules`, chaar independent copies. Ek bug fix karo, teen apps update karo, chautha bhool jao — aur wo app hafton tak bug leke chalta rahega, **perfectly cleanly build karte hue**. Pata tab chalega jab user batayega.
-
-Ye rok nahi sakte — yehi us independence ki keemat hai jo structure deta hai. To use **sekondon mein dikhne wala** banaya:
-
-1. `jp-shared` apna version `JP_SHARED_VERSION` mein stamp karta hai
-2. har app bootstrap pe wo version log karta hai (**dev mode only**)
-3. `jp-docs/scripts/check-versions.mjs` chaaron ko saath dikhata hai, stale ya linked flag karta hai, aur drift pe **non-zero exit** deta hai
-
-`npm run version:bump` `package.json` aur `version.ts` dono ek saath badalta hai — warna check do numbers compare karta jo aapas mein toh mil jaate par kisi asliyat se nahi.
-
-#### Cross-app login guard (2.40 se carry hua)
-
-Teeno apps ek hi SSO API se authenticate karte hain, to school owner teacher app pe **successfully** sign in kar sakta hai — token asli, app galat. Bina handle kiye: khaali sidebar, blank page, aur banda samjhega product toota hai.
-
-`utype` claim **login ke baad** aur **bootstrap pe** check hota hai. Mismatch pe: **local** sign-out, phir saaf batao kiska account hai aur kahan jaana hai, chalte hue link ke saath. Target URLs `environment.ts` se, hardcoded nahi.
-
-⚠️ **Security boundary NAHI hai** — token valid rehta hai aur server use maanega. Ye wayfinding hai; access server ke permission checks rokte hain (2.6, 2.39).
+⚠️ **Security boundary NAHI hai** — token valid rehta hai aur server use maanega.
+Ye wayfinding hai; access server ke permission checks rokte hain (2.6, 2.39).
 
 #### Token storage
 
-`TokenStorageService` prefix `JP_APP_IDENTITY` se leta hai — `jp.admin.accessToken`, `jp.school.accessToken`. Subdomains waise hi isolate karte hain; prefix isliye hai ki wo isolation **deployment decision pe depend na kare**.
+`TokenStorageService` prefix `JP_APP_IDENTITY` se leta hai —
+`jp.admin.accessToken`, `jp.school.accessToken`. Subdomains waise hi isolate
+karte hain; prefix isliye hai ki wo isolation **deployment decision pe depend na
+kare**.
 
 #### Master data screens jp-admin mein, config-driven
 
-Alag MDM app nahi. Ye screens ek super admin mahine mein do baar use karta hai — uske liye paanchvi app, deployment aur `node_modules` cost hai, benefit nahi.
+Alag MDM app nahi. Ye screens ek super admin mahine mein do baar use karta hai —
+uske liye alag app, deployment aur `node_modules` cost hai, benefit nahi.
 
-Saari 17 master tables ka shape ek hi hai (`Code`, `Name`, `DisplayOrder`, `Is_Active`), to **ek config-driven component** sab handle karega, 17 milti-julti screens nahi. Nayi master add karna ek dictionary entry banega, nayi screen nahi.
+Saari 17 master tables ka shape ek hi hai (`Code`, `Name`, `DisplayOrder`,
+`Is_Active`), to **ek config-driven component** sab handle karega, 17
+milti-julti screens nahi. Nayi master add karna ek dictionary entry banega, nayi
+screen nahi.
 
-Geography ko apni alag screen milegi — usme parent cascade aur bulk import chahiye, jo generic manager ko absorb karne ki koshish nahi karni chahiye.
+Geography ko apni alag screen milegi — usme parent cascade aur bulk import
+chahiye, jo generic manager ko absorb karne ki koshish nahi karni chahiye.
 
 #### Parallel sessions — discipline, tooling nahi
 
-1. Har session apni repo + `jp-docs` sibling. Pehla kaam: `../jp-docs/PROJECT_MEMORY.md` padho.
-2. **`jp-shared` ek waqt mein ek session.** Concurrent edits conflict karenge aur har app apni copy ke against theek build karta rahega — conflict tab tak invisible jab tak mehnga na ho jaaye.
-3. Shared badle to: baaki sessions pause → change → build → har app re-link/update → `check-versions` → resume.
-4. **`PROJECT_MEMORY.md` bhi ek waqt mein ek session likhega.** Do sessions progress log mein append karenge to ek doosre ko clobber kar denge.
+1. Har session apni repo + `jp-docs` sibling. Pehla kaam:
+   `../jp-docs/PROJECT_MEMORY.md` padho.
+2. **`jp-shared` ek waqt mein ek session.** Concurrent edits conflict karenge aur
+   har app apni copy ke against theek build karta rahega — conflict tab tak
+   invisible jab tak mehnga na ho jaaye.
+3. **`PROJECT_MEMORY.md` bhi ek waqt mein ek session likhega.** Do sessions
+   progress log mein append karenge to ek doosre ko clobber kar denge.
 
-2 aur 4 discipline hain, tooling nahi. Deadline pressure mein sabse pehle yehi tootenge — isiliye version check aur git history maujood hain.
+Dono discipline hain, tooling nahi. Deadline pressure mein sabse pehle yehi
+tootenge — isiliye git history maujood hai.
 
 ---
 
@@ -1210,6 +1084,87 @@ package chaar baar install hota tha. Ab ek hi copy chalti hai, :4999 se.
 
 ---
 
+### 2.43 PUBLIC SITE — AUDIENCE CHOOSER (`/continue`)
+
+`jp-public` par ek hi jagah hai jahan visitor ka irada **pata nahi hota**:
+header ka Sign in / Sign up. Us click se ye maloom nahi hota ki banda school
+hai ya teacher, aur guess karne ka matlab hai aadhe logon ko galat login screen
+pe bhejna.
+
+**Route:** `/continue?mode=login` ya `?mode=signup`.
+
+Do options, **barabar weight** — ek hi sheet, beech mein ek rule. Grid
+`1fr 1fr`, kabhi `auto 1fr` nahi: warna lamba text zyada jagah le lega aur wo
+"recommended answer" jaisa padhne lagega. **Ye page ek fork hai, recommendation
+nahi.**
+
+Copy **kaam** ke hisaab se hai, pehchaan ke nahi — "Hire teachers" /
+"Find a teaching job", "I am a school" nahi. Banda apna kaam pehchan kar click
+karta hai, khud ko classify kar ke nahi.
+
+#### 🔴 Admin ka option nahi hai — aur ho bhi nahi sakta
+
+Admin internal hai. Kisi public page pe uska naam, link ya zikr nahi.
+
+Ye **compiler se enforce** hai, yaad rakhne se nahi: `Audience` type sirf
+`'school' | 'teacher'` hai. Koi page admin pe link karega to **compile hi nahi
+hoga**.
+
+#### Kaun chooser dekhta hai aur kaun nahi
+
+| Entry point | Kahan jaata hai |
+|---|---|
+| Header **Sign in** | `/continue?mode=login` |
+| Header **Sign up** | `/continue?mode=signup` |
+| Footer "Register your school" / "Create a profile" | **seedha** app pe — sawaal already jawab de chuka hai |
+| Homepage dual CTA | **seedha** app pe (jab homepage banega) |
+| Job detail "Apply" | **seedha** teacher signup pe, job redirect target ke saath |
+
+Jisne pehle hi bata diya ki wo kaun hai, use chooser dikhana sirf ek extra
+click hai.
+
+#### Server-rendered, prerender NAHI
+
+`/continue` ka content `mode` query param pe depend karta hai, aur prerendered
+file har query string ke liye ek hi HTML hoti hai. `?mode=signup` pe aane wale
+ko pehle "Sign in" dikhta aur hydration ke baad badalta. Isliye
+`RenderMode.Server`, aur `mode` `withComponentInputBinding()` se aata hai taaki
+pehle byte mein hi sahi ho.
+
+#### 🔴 URLs ek hi jagah se bante hain
+
+`src/app/core/portal-links.ts` **akela** module hai jo portal URL banata hai.
+Hosts `environment.appUrls` se aate hain, hardcoded nahi.
+
+⚠️ **Paths `/auth/login` aur `/auth/register` hain.** Mode ke naam se path
+banaoge to `/login` aur `/signup` milega — dono apps ka **404**. Ye galti ek
+baar ho chuki hai.
+
+#### Jo abhi bana hi nahi hai
+
+- **Homepage aur job detail page exist nahi karte.** `app.routes.ts` mein sirf
+  `/continue` hai. Header/footer ke `/jobs`, `/for-schools`, `/how-it-works`
+  wagairah **kahin nahi jaate** — wo Phase 4 hai, CMS tables se banega.
+- `applyToJobUrl()` likha hua hai par **`jp-teacher` ka register component abhi
+  `redirect` query param padhta nahi**. Job page banne se pehle wo add karna hai.
+
+#### Design tokens — ek purani drift jo yahan pakdi gayi
+
+`jp-public` ke paas apna `_variables.scss` tha, upar comment ke saath ki
+"portal ke identical hai, in step rakhna". **Rakha nahi gaya**: Phase 1D mein
+apps "The Register" pe chali gayin aur ye site purane corporate blue
+(`#2563eb`, Segoe UI) pe hi khadi rahi — aur kuch bhi build fail nahi hua.
+Marketing site aur jo product wo bech rahi thi, do alag brand the.
+
+Ab `jp-public` ke paas **koi token nahi** — na `_variables.scss`, na
+`_mixins.scss`. Sab `jp-shared` se aata hai build-time include path se, baaki
+apps ki tarah. Uske apne partials sirf layout/typography/components hain, jo
+marketing pages ke liye alag hone chahiye.
+
+⚠️ **Local `_variables.scss` dobara mat banao.**
+
+---
+
 ## 3. SCOPE (Client spec ke against)
 
 ### IN SCOPE — MVP
@@ -1305,13 +1260,32 @@ AI candidate matching · AI resume scoring/generation · Video interview / demo 
 | 2026-08-08 | 1D | **Account status rewrite** — roll + "what happens next" 3 steps real timings ke saath + har ACCOUNT_* code ka apna content | ✅ Done |
 | 2026-08-08 | 1D | **School dashboard + applicants list** — 50 rows, 8 columns, funnel tile. Rows fixture se (JP.App.Api Phase 2 hai) | ✅ Done |
 | 2026-08-08 | 1D | **Screenshots 375 + 1440** — Playwright, asli API ke against, to sidebar sach mein `GET /api/menus` se render hua | ✅ Done |
-| 2026-08-08 | — | **Frontend split into three apps** — one workspace, apps/{admin,school,teacher,public-site} + libs/{ui,core}. Storage prefix, cross-app guard, per-app reset links, menu prefixes stripped (2.40) | ✅ Done |
+| 2026-08-08 | — | **Frontend split per audience** — admin / school / teacher / public alag. Storage prefix, cross-app guard, per-app reset links, menu prefixes stripped | ✅ Done |
+| 2026-08-08 | — | **Saat repositories** — har frontend project apni git repo, siblings ke roop mein. jp-docs sibling, backend ek hi repo (2.41) | ✅ Done |
+| 2026-08-08 | — | **Module Federation migration** — jp-shared library se **remote** (:4999) bana, chaar exposed barrels. jp-admin/school/teacher hosts. npm package, GitHub Packages, npm link, version-drift machinery — sab hataya (2.42) | ✅ Done |
+| 2026-08-08 | — | **Federation verify** — teeno hosts remote se `ui-auth-shell` render karte hain, `@angular/core` ki **1** copy, `JP_APP_IDENTITY instanceof ng.InjectionToken` **true**, jp-school sign-in `/dashboard` tak, paanchon prod builds clean | ✅ Done |
+| 2026-08-08 | — | **Deep-nested SCSS assertion** — jp-admin/jp-teacher mein koi deep component shared partials use hi nahi kar raha tha, to unka build pass hona kuch prove nahi karta tha. Ab depth-6 pe jaan-boojh kar `@use`, aur include path toad kar verify kiya ki fail hota hai | ✅ Done |
+| 2026-08-08 | — | **`/continue` audience chooser** — jp-public, school/teacher fork, admin ka option nahi (compiler-enforced). SSR mode-aware. jp-public ke local design tokens hataye — wo purane blue pe drift ho chuke the (2.43) | ✅ Done |
 | — | 2E | Admin screens → `frontend/apps/admin` | ⬜ Next |
 | — | 2F | School screens → `frontend/apps/school` | ⬜ Next |
 
 ---
 
 ## 6. FILES CREATED SO FAR
+
+> ⚠️ **Neeche ke frontend paths 2.41 se PEHLE ke hain** (`frontend/portal/...`,
+> `frontend/public-site/...`). Wo folders ab exist nahi karte. Aaj ka mapping:
+>
+> | Purana | Ab |
+> |---|---|
+> | `frontend/portal/src/app/shared/ui/` | `jp-shared/src/ui/` |
+> | `frontend/portal/src/styles/` | `jp-shared/src/styles/` |
+> | `frontend/portal/src/app/core/` | `jp-shared/src/core/` |
+> | `frontend/portal/src/app/features/` | `jp-admin` / `jp-school` / `jp-teacher` ke apne `src/app/features/` |
+> | `frontend/public-site/` | `jp-public/` |
+>
+> Files ki LIST abhi bhi sahi hai — sirf unka ghar badla hai. Structure ke liye
+> 2.42 aur HOW_TO_RUN §8 dekho.
 
 ### `database/`
 ```
@@ -1603,11 +1577,24 @@ app/app.component.{ts,html,scss}  Public shell — header + nav + footer + outle
 
 ## 7. NEXT ACTION
 
-**⏸️ PHASE 1 COMPLETE (1A + 1B + 1C + 1D) aur verified. 120/120 SQL assertions pass (73 + 17 + 30). Backend clean build 0 warning 0 error (pristine copy, no incremental), portal aur public-site prod build clean. Sign-in browser mein admin/school/teacher teeno ke liye verify ho chuka.
+**⏸️ PHASE 1 COMPLETE (1A + 1B + 1C + 1D) aur verified. 120/120 SQL assertions pass (73 + 17 + 30). Backend clean build 0 warning 0 error. Frontend restructure bhi complete — ab **Module Federation** (2.42, LOCKED).
 
-📖 **Setup, run commands, test accounts aur — sabse zaroori — kaunsi screen asli API pe hai aur kaunsi mockup hai: [docs/HOW_TO_RUN.md](HOW_TO_RUN.md)**
+📖 **Setup, run order, test accounts aur — sabse zaroori — kaunsi screen asli API pe hai aur kaunsi mockup hai: [HOW_TO_RUN.md](HOW_TO_RUN.md)**
 
-**Phase 1 close-out counts (jp_sso):** 20 tables · 32 procedures · 4 functions · 71 indexes · 120/120 test assertions.**
+**Phase 1 close-out counts (jp_sso):** 20 tables · 32 procedures · 4 functions · 71 indexes · 120/120 test assertions.
+
+### 🔴 Kuch bhi shuru karne se pehle — start order
+
+```bash
+cd jp-shared  && npm start     # :4999 — SABSE PEHLE. Ye remote hai
+cd jp-admin   && npm start     # :4200
+cd jp-school  && npm start     # :4300
+cd jp-teacher && npm start     # :4400
+cd jp-public  && npm start     # :4500 — standalone, isko remote nahi chahiye
+```
+
+`jp-shared` chalu nahi hai to teeno apps **blank page** pe boot hongi. Wo bug
+nahi hai — unke components runtime pe :4999 se aate hain.
 
 ### Phase 1C mein kya bana
 - **`JP.Sso.Api` — 20 endpoints**: auth (12), users (4), roles (2), permissions (1), menus (1)
@@ -1615,85 +1602,62 @@ app/app.component.{ts,html,scss}  Public shell — header + nav + footer + outle
 - **Menu system** — tables, seed, proc, API, Angular `MenuService` (2.37)
 
 ### Phase 1D mein kya bana
-- **Design direction "The Register"** (2.38) — source pe badla, 13 `ui-*` components ne inherit kiya
+- **Design direction "The Register"** (2.38) — source pe badla, 17 `ui-*` components ne inherit kiya
 - **6 auth screens** + `ui-roll` / `ui-otp-input` / `ui-password-field`
 - **Account status rewrite**, school dashboard, applicants list (rows fixture se — `JP.App.Api` Phase 2/3 hai)
 
 ### 🔴 Phase 2 shuru karne se PEHLE padho
 
-**2.39 — Organization scope resolution.** `OrganizationUid` sirf JWT se → `t_app_schools.SchoolId` → branch scope. `SchoolId` server se bahar kabhi nahi. Integration test 2.39 mein likha hua hai aur wo Phase 3 ki definition of done ka hissa hai.
+**2.39 — Organization scope resolution.** `OrganizationUid` sirf JWT se →
+`t_app_schools.SchoolId` → branch scope. `SchoolId` server se bahar kabhi nahi.
+Integration test 2.39 mein likha hua hai aur wo **Phase 3 ki definition of done**
+ka hissa hai.
 
-**2.40 — Teen apps.** Frontend ab ek workspace hai chaar apps aur do libs ke saath.
+**2.42 — Module Federation (LOCKED).** Frontend structure band hai. Saat repos,
+siblings, `jp-shared` remote :4999 pe.
 
 #### Phase 2 prompts ka target ab kya hai
 
-| Phase | Pehle | **Ab** |
+| Phase | Purana (galat) | **Ab** |
 |---|---|---|
-| **2E** — admin screens | `frontend/portal` | **`frontend/apps/admin/src/app/features/`** |
-| **2F** — school screens | `frontend/portal` | **`frontend/apps/school/src/app/features/`** |
+| **2E** — admin screens | `frontend/apps/admin/...` | **`jp-admin/src/app/features/`** |
+| **2F** — school screens | `frontend/apps/school/...` | **`jp-school/src/app/features/`** |
 
 Dono ke liye ek hi discipline:
 
-1. **Shared cheez lib mein jaati hai, app mein nahi.** Naya `ui-*` component → `libs/ui` + `public-api.ts` mein export. Naya service/guard/model → `libs/core`. App folder sirf us app ke SCREENS ke liye hai.
-2. **Import hamesha `@jp/ui` / `@jp/core`.** Koi relative path app se bahar nahi nikalta — nikalega to resolve hi nahi hoga.
-3. **Naya route = usi commit mein naya menu row.** `005_seed_menus.sql`, sahi `UserTypeId` ke saath, **app prefix ke bina** (`/users`, `/verification/schools`). Menu row bina route ke 404 hai; route bina menu row ke invisible.
-4. **Screen sirf apne app mein.** Admin ki verification queue `apps/admin` mein, school ka job posting `apps/school` mein. Dono ko chahiye to matlab wo `libs/ui` ka component hai.
-5. **`jp_app` ka koi bhi endpoint 2.39 follow karta hai** — scope token se resolve hoga, request se nahi.
+1. **Shared cheez `jp-shared` mein jaati hai, app mein nahi.** Naya `ui-*`
+   component → `jp-shared/src/ui/` + `src/entries/ui.ts` mein export. Naya
+   service/guard/model → `src/core/` + `entries/core.ts` ya `entries/models.ts`.
+   App folder sirf us app ke SCREENS ke liye hai.
 
+2. **Import hamesha chaar barrels se** — `jp-shared/ui`, `jp-shared/core`,
+   `jp-shared/models`, `jp-shared/pages`. **Aur kuch nahi.** Barrel ke andar
+   ghusna (`jp-shared/ui/ui-button/...`) import map entry nahi hai aur runtime
+   pe fail karega.
 
-### Do cheezein jo abhi khuli hain
-1. Rate-limit windows **per process** hain. Ek se zyada instance pe effective limit instance-count se multiply hoti hai. Shared store (Redis) chahiye hoga jab scale-out hoga — 1C ka scope nahi tha.
-2. `frontend/portal/src/app/features/school/applicants/applicant.data.ts` **fixture hai**. `JP.App.Api` aate hi delete hoga aur component `PagedResult<T>` lega — screen ka baaki kuch nahi badlega.
+   ⚠️ Naya barrel add karna sasta **nahi** hai: `jp-shared` ke `exposes` ke
+   saath har host ka `externals` aur `tsconfig.paths` bhi badalna padta hai.
+   Chaar hi rakho.
 
-⚠️ **Menu discipline:** naya route `app.routes.ts` mein add karo to **usi commit mein** `005_seed_menus.sql` mein row bhi. Menu row bina route ke 404 hai, route bina menu row ke invisible. Test 003 dangling routes nahi pakad sakta (wo SQL mein chalta hai) — ye discipline manual hai.
+3. **Naya route = usi commit mein naya menu row.** `005_seed_menus.sql`, sahi
+   `UserTypeId` ke saath, **app prefix ke bina** (`/users`,
+   `/verification/schools`). Menu row bina route ke 404 hai; route bina menu row
+   ke invisible.
 
-Yaad rakhne wali cheezein:
-- **Write procs `Status, Code, Message, Id` return karte hain** — service `Status = 0` pe `ApiResponse.Failure(Message, Code)` banaye. `Code` seedha `ErrorCodes` value hai, mapping ki zaroorat nahi
-- **Password reuse check service layer mein hai**: `USP_GetPasswordHistory` → `IPasswordService.VerifyPassword` har row pe → phir `USP_ChangePassword`. SQL ye decide nahi kar sakta, har row ka salt alag hai
-- **Login ka jawab hamesha same** — `USP_GetUserForLogin` empty set de ya password galat ho, dono pe `INVALID_CREDENTIALS`
-- **`EffectiveStatusId` use karo, `StatusId` nahi** — expired lockout ke baad wahi sahi status deta hai
-- **`USP_RotateRefreshToken` ka `ReuseDetected = 1`** matlab token leak hua. Poori chain already revoke ho chuki hai; user ko dobara sign in karao aur ye event log karo
-- `USP_GetUserList` aur `USP_GetUserByUid` **multiple result sets** dete hain → `QueryMultipleAsync`
-- Login validator pe **`MinimumLength` mat lagana** (2.32) — wo ek doosra timing signal khol deta hai
+4. **Screen sirf apne app mein.** Admin ki verification queue `jp-admin` mein,
+   school ka job posting `jp-school` mein. Dono ko chahiye to matlab wo
+   `jp-shared` ka component hai.
 
----
+5. **`jp-shared` ek waqt mein ek session.** Chaar projects us par depend karte
+   hain aur har ek jo mile uske against theek build karta rahega.
 
-### 🔒 STANDARD COLUMNS — CONFIRMED, NO EXCEPTIONS
+#### ⚠️ Do gotchas jo Phase 2 mein zaroor milenge
 
-Saari **87 tables**, teeno databases, **bina kisi exception ke**:
+- **Dev server chalte waqt production build mat chalao** — federation externals
+  cache share hota hai, aur app `ReferenceError: ngDevMode is not defined` pe
+  mar jaati hai. Fix: dev server band, `.angular/cache` delete, restart.
+- **`@angular/animations` hataana mat** — koi code use nahi karta, par
+  `ignoreUnusedDeps` band hone ki wajah se build usse maangta hai.
 
-```sql
-Is_Active   tinyint    NOT NULL DEFAULT 1
-Is_Deleted  tinyint    NOT NULL DEFAULT 0
-CreatedOn   datetime2  NOT NULL DEFAULT SYSUTCDATETIME()
-CreatedBy   bigint     NULL
-ModifiedOn  datetime2  NULL
-ModifiedBy  bigint     NULL
-```
+Dono HOW_TO_RUN §3.4 aur §3.5 mein detail se hain.
 
-**Ismein ye sab bhi shamil hain** (yahi wo jagah hai jahan log exception banate hain):
-- **Bridge / link tables** — `t_sso_role_permissions`, `t_app_teacher_subjects`, `t_app_job_class_levels`, `t_app_school_facilities`, `t_app_school_user_branches`, sab
-- **Log / audit tables** — `t_sso_user_login_attempts`, `t_app_job_moderation_log`, `t_app_notification_delivery_log`, `t_app_application_status_history`
-- **Append-only tables** — `t_mdm_request_approvals` (append-only ka matlab UPDATE nahi hota; columns phir bhi honge)
-- **Master tables** — inke upar `Code` / `Name` / `DisplayOrder` bhi
-- **Payment tables** — MVP mein use nahi ho rahe tab bhi
-
-Plus har table pe: `CK_<table>_Is_Active` aur `CK_<table>_Is_Deleted` CHECK constraints (`IN (0,1)`).
-`RowVersion int NOT NULL DEFAULT 1` **sirf header / aggregate-root tables pe**, child aur bridge pe nahi — wahan parent version owner hai.
-
-Canonical shape `database/_TEMPLATE_table.sql` mein hai. Har nayi table wahin se cut hogi, isliye ye uniformity apne aap milegi.
-
-### Phase 1A — `jp_sso` DDL (approval milte hi)
-- `database/jp_sso/01_tables/` — 17 tables (7 master + 10 transactional), numbered, dependency order mein
-- `database/jp_sso/02_indexes/` — har FK pe + StatusId/UserTypeId/OrganizationUid/IsCurrent/ExpiresOn pe
-- `database/jp_sso/03_seed/` — 7 masters, 8 roles, modules, 23 permissions, role-permission mappings
-- **Business keys pe filtered unique index** (`WHERE Is_Deleted = 0`) — section 2.24 ka retry safety inhi pe depend karta hai
-- Har naya file `run_all.sql` mein `:r` line add karke register karna hai
-- **SQL Server 2019 syntax only** (section 2.11)
-- Super admin ka password hash hardcode nahi — `JP.Tools.SeedAdmin` console utility Phase 1C mein banegi
-
-### Tarun ke liye pending items
-1. **`D:\angular.json` delete karo** — May 2024 ki orphan file, poore D: drive pe `ng new` block karti hai
-2. **`git` install karo** — abhi Phase 0 ka saara kaam uncommitted pada hai
-3. Section 2.12 (`code` field) — review mein approve ho gaya
-4. ⚠️ Section 2.24 ka `-2` timeout caveat padho — retry spec ke mutabik implement hai, par Phase 1A ke unique indexes us risk ko close karne ke liye zaroori hain

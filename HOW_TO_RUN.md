@@ -43,11 +43,44 @@ and never from `appsettings.json`.
 
 ## 2. First-time setup
 
-### 2.1 Build the databases
+Follow this in order. It assumes nothing but the prerequisites above.
 
-From the **repository root**:
+### 2.1 Clone all seven repositories as siblings
+
+There is no parent repository. All seven sit side by side, and that layout is
+**load-bearing** — the apps compile their SCSS from `../jp-shared/src/styles`.
 
 ```powershell
+mkdir D:\Projects ; cd D:\Projects
+git clone https://github.com/Tarun1515/jp-docs.git
+cd jp-docs
+npm run bootstrap
+```
+
+`bootstrap` clones the remaining six beside `jp-docs` and runs `npm install` in
+each Node project. It stops short of everything below and prints it as a
+checklist, because those steps need decisions or credentials.
+
+You should end up with exactly this:
+
+```
+D:\Projects\
+├── jp-docs      ← this file
+├── jp-shared    :4999
+├── jp-admin     :4200
+├── jp-school    :4300
+├── jp-teacher   :4400
+├── jp-public    :4500
+└── jp-backend
+```
+
+> ⚠️ Do not nest them, and do not rename them. `../jp-shared` is a real path on
+> disk that four `angular.json` files depend on.
+
+### 2.2 Build the databases
+
+```powershell
+cd D:\Projects\jp-backend
 sqlcmd -S localhost\TARUN -E -b -f 65001 -i database\run_all.sql
 ```
 
@@ -67,7 +100,21 @@ sqlcmd -S localhost\TARUN -E -Q "SELECT name, compatibility_level, collation_nam
 Expect `jp_sso`, `jp_mdm`, `jp_app`, all at compatibility level **150** and
 collation `SQL_Latin1_General_CP1_CI_AS`.
 
-### 2.2 Set the JWT signing key — on BOTH APIs
+### 2.3 Create the API dev settings
+
+The real files are gitignored so a machine-specific connection string never
+lands in the repository. Committed examples sit beside them:
+
+```powershell
+cd D:\Projects\jp-backend
+copy JP.Sso.Api\appsettings.Development.example.json JP.Sso.Api\appsettings.Development.json
+copy JP.App.Api\appsettings.Development.example.json JP.App.Api\appsettings.Development.json
+```
+
+Open both and check the connection strings point at your SQL instance. The
+examples assume `localhost\TARUN` with Windows auth.
+
+### 2.4 Set the JWT signing key — on BOTH APIs
 
 The key is **not** in `appsettings.json` and never will be. It lives in
 user-secrets, and **both APIs must carry the identical key**: `JP.Sso.Api`
@@ -87,7 +134,7 @@ $key = [Convert]::ToBase64String((1..64 | ForEach-Object { Get-Random -Maximum 2
 Apply it to both:
 
 ```powershell
-cd backend\JP.Sso.Api
+cd D:\Projects\jp-backend\JP.Sso.Api
 dotnet user-secrets set "Jwt:Key" "$key"
 
 cd ..\JP.App.Api
@@ -97,18 +144,18 @@ dotnet user-secrets set "Jwt:Key" "$key"
 Confirm they match:
 
 ```powershell
-cd backend\JP.Sso.Api ; dotnet user-secrets list
-cd ..\JP.App.Api      ; dotnet user-secrets list
+cd D:\Projects\jp-backend\JP.Sso.Api ; dotnet user-secrets list
+cd ..\JP.App.Api                     ; dotnet user-secrets list
 ```
 
-### 2.3 Create the first administrator
+### 2.5 Create the first administrator
 
 There is **no admin row in any seed script**, on purpose: a password hash
 committed to a `.sql` file is a credential shared by every clone, every branch
 and every backup, forever. The hash is derived on your machine instead.
 
 ```powershell
-cd backend\JP.Tools.SeedAdmin
+cd D:\Projects\jp-backend\JP.Tools.SeedAdmin
 dotnet run -- --email admin@yourdomain.com --generate
 ```
 
@@ -124,11 +171,26 @@ window. Other options:
 | `--mobile` | Optional 10-digit number |
 | `--print-sql` | Print the `EXEC` statement instead of running it, for a server you cannot reach |
 
-### 2.4 Install the frontend dependencies
+### 2.6 Check it works
 
 ```powershell
-cd jp-docs ; npm run bootstrap   # clones, installs and links all seven
+cd D:\Projects\jp-shared ; npm start      # :4999, leave it running
 ```
+
+In a second terminal:
+
+```powershell
+cd D:\Projects\jp-backend\JP.Sso.Api ; dotnet run
+```
+
+In a third:
+
+```powershell
+cd D:\Projects\jp-school ; npm start
+```
+
+Open <http://localhost:4300/auth/login> and sign in with one of the test
+accounts in section 4. You should land on the school dashboard.
 
 ---
 
@@ -178,7 +240,30 @@ PROJECT_MEMORY decision 2.42.
 
 For most work you need **`jp-shared` + `JP.Sso.Api` + whichever app you are on**.
 
-### 3.2 How the sharing actually works
+### 3.2 What to start for what you are doing
+
+Do not start everything. Start the smallest set the task needs — every extra
+dev server is memory and one more thing to have left running by mistake.
+
+| I am working on | Start exactly this |
+|---|---|
+| **School screens** | `jp-shared` :4999 · `JP.Sso.Api` :5199 · `jp-school` :4300 |
+| **Admin screens** | `jp-shared` :4999 · `JP.Sso.Api` :5199 · `jp-admin` :4200 |
+| **Teacher screens** | `jp-shared` :4999 · `JP.Sso.Api` :5199 · `jp-teacher` :4400 |
+| **A shared component** | `jp-shared` :4999 + **any one** app to look at it in |
+| **The public site** | `jp-public` :4500 — **nothing else**. No remote, no API |
+| **Master data / business endpoints** (Phase 2+) | the above **plus** `JP.App.Api` :5299 |
+| **Database or SP work** | none of them — `sqlcmd` only |
+
+Two things follow from that table:
+
+- **`jp-shared` is in almost every row.** Start it first and leave it running
+  all day. It is not something you restart per task.
+- **`JP.App.Api` is in almost none of them.** Phase 1 is entirely
+  authentication, users, roles, permissions and menus, all of which are
+  `JP.Sso.Api`. If you are not touching master data, you do not need it.
+
+### 3.3 How the sharing actually works
 
 Two different mechanisms, on purpose:
 
@@ -207,7 +292,7 @@ Component stylesheets keep writing `@use 'variables' as v;` exactly as before.
 > real relative path on disk. **CI must check out `jp-shared` alongside the app**
 > or the build fails on the first component stylesheet.
 
-### 3.3 The development loop — this is the point of the whole setup
+### 3.4 The development loop — this is the point of the whole setup
 
 ```bash
 cd jp-shared && npm start      # once, then forget about it
@@ -223,7 +308,7 @@ the edit too. That is automatic and you do not have to do anything — but it is
 not literally zero, and it is worth knowing before you go looking for why the
 terminal moved.
 
-### 3.4 🔴 "ngDevMode is not defined" — the one you will hit
+### 3.5 🔴 "ngDevMode is not defined" — the one you will hit
 
 **Symptom.** The app was fine, then every route renders blank and the console
 says:
@@ -248,7 +333,7 @@ npm start
 
 Do production builds with the dev servers stopped.
 
-### 3.5 ⚠️ `@angular/animations` is a dependency nothing imports
+### 3.6 ⚠️ `@angular/animations` is a dependency nothing imports
 
 Leave it alone. The hosts turn off Native Federation's `ignoreUnusedDeps` (it
 walks the import graph with Sheriff, which refuses files outside the project
@@ -260,7 +345,7 @@ Removing the package breaks the build with `Could not resolve
 @angular/animations/browser`, and adding it to `skip` does **not** help — `skip`
 controls what is *shared*, not what *resolves*.
 
-### 3.6 jp-public is not federated
+### 3.7 jp-public is not federated
 
 It is a normal Angular SSR application. It imports **zero** shared JavaScript —
 not one TypeScript file — so federating it would add a polyfill, a startup
@@ -271,7 +356,7 @@ It still gets the design tokens the same way everything else does, through the
 build-time SCSS include path. That is not an exception: SCSS is build-time for
 all five projects.
 
-### 3.7 Each app takes only its own account type
+### 3.8 Each app takes only its own account type
 
 All three signed-in apps authenticate against the same SSO API, so a school owner
 **can** sign in successfully on the teacher app — valid token, wrong app.
@@ -287,7 +372,7 @@ security — the token stays valid and the server is what enforces access.
 Tokens are stored per app (`jp.admin.accessToken`, `jp.school.accessToken`), so
 two apps on one origin never read each other's session.
 
-### 3.8 Production
+### 3.9 Production
 
 `jp-shared` builds to static files served from a URL that comes from each app's
 environment config, never hardcoded.
@@ -327,32 +412,46 @@ reachable by simply signing in. Two ways to see it:
 
 ## 5. The happy path, click by click
 
-Start `JP.Sso.Api` and `portal`, then:
+Start four things: `jp-shared` (:4999), `JP.Sso.Api` (:5199), `jp-school`
+(:4300) and `jp-admin` (:4200). This walk-through crosses between two apps,
+which is why both are needed.
 
-1. **Register a school** — <http://localhost:4200/auth/register>, leave the
-   toggle on *A school*. Any email, any 10-digit mobile starting 6–9, a password
-   of 8+ characters.
+1. **Register a school** — <http://localhost:4300/auth/register>. Any email, any
+   10-digit mobile starting 6–9, a password of 8+ characters. There is no
+   "school or teacher" toggle: each app's signup is single-purpose, so the form
+   only ever speaks to one audience.
 2. You land on **account status**, pending verification. Note the roll marked
    to *In review* and the three "what happens next" steps.
-3. **Sign out**, then **sign in as `superadmin@teacherportal.local`.**
-   The sidebar is now the admin console — nested Verification and Moderation
-   groups appear, because the menu comes from `GET /api/menus` and that account
-   holds different permissions.
-4. Approve the school. There is **no admin UI for this yet**, so use Swagger:
-   `PUT /api/users/{userUid}/status` with `{ "newStatusId": 2, "rowVersion": <current>, "remarks": "Verified" }`.
+3. **Sign in as `superadmin@teacherportal.local`** — on **<http://localhost:4200>**,
+   the admin app. Signing in as an administrator on :4300 will succeed and then
+   immediately sign you back out with a message pointing here; that is the
+   cross-app guard doing its job, not a bug.
+4. Approve the school. There is **no admin UI for this yet**, so use Swagger at
+   <http://localhost:5199/swagger>:
+   `PUT /api/users/{userUid}/status` with
+   `{ "newStatusId": 2, "rowVersion": <current>, "remarks": "Verified" }`.
    Get the `userUid` and `rowVersion` from `GET /api/users?search=<email>`.
-5. **Sign in as the school again.** It is now Active, the sidebar has all 9
-   school items, and `SCHOOL_OWNER` was granted automatically at approval.
+5. **Sign in as the school again** on :4300. It is now Active, the sidebar has
+   all 9 school items, and `SCHOOL_OWNER` was granted automatically at approval.
+   The sidebar is rendered from `GET /api/menus`, not from a hardcoded array.
 6. Open **Dashboard** and **Applicants**. ⚠️ Everything on these two screens is
    hardcoded — see the next section.
 7. **Change your password** via Swagger `POST /api/auth/change-password`, then
    try to refresh with an old refresh token: it returns 401 and the entire token
    chain is revoked.
-8. **Forgot password** — <http://localhost:4200/auth/forgot-password>. SMTP is
+8. **Forgot password** — <http://localhost:4300/auth/forgot-password>. SMTP is
    disabled in development, so the email is written to
-   `backend\JP.Sso.Api\App_Data\mail-drop\*.eml`. Open the newest file, copy the
-   `token=` value out of the reset link, and visit
-   `http://localhost:4200/auth/reset-password?token=<token>`.
+   `jp-backend\JP.Sso.Api\App_Data\mail-drop\*.eml`. Open the newest file, copy
+   the `token=` value out of the reset link, and visit
+   `http://localhost:4300/auth/reset-password?token=<token>`.
+
+   The link is built per audience: a school's reset points at :4300, a teacher's
+   at :4400, an administrator's at :4200. That comes from `Auth:PortalBaseUrls`
+   keyed by user type, not from one shared base URL.
+
+9. **The public chooser** — <http://localhost:4500/continue?mode=signup>. Two
+   options, school and teacher, each linking into the app you just used.
+   `jp-public` needs neither the remote nor the API for this.
 
 ---
 
@@ -429,6 +528,61 @@ nothing in the UI navigates to them: `/auth/reset-password`,
 
 ## 6. Troubleshooting
 
+### The app loads but renders nothing, and the console mentions a specifier
+
+**Symptom.** A signed-in app compiles fine, serves fine, and paints a blank
+page. The console says something like:
+
+```
+Unable to resolve specifier 'jp-shared/ui' imported from http://localhost:4300/
+```
+
+or the network tab shows a failed request to `http://localhost:4999/remoteEntry.json`.
+
+**Cause.** `jp-shared` is not running. `jp-shared/ui`, `/core`, `/models` and
+`/pages` are **import map entries pointing at :4999**, not files in
+`node_modules`. Nothing about the app's own build can tell you this — it builds
+perfectly without the remote, because the specifiers are deliberately left
+unresolved.
+
+**Fix.**
+
+```powershell
+cd D:\Projects\jp-shared ; npm start
+```
+
+Confirm <http://localhost:4999/remoteEntry.json> returns JSON listing four
+exposes: `ui`, `core`, `models`, `pages`. Then reload the app — no rebuild
+needed.
+
+> `jp-public` is exempt. It is not federated and never contacts :4999.
+
+### "Can't find stylesheet to import"
+
+**Symptom.** The build fails, usually naming a component several folders deep:
+
+```
+X [ERROR] Can't find stylesheet to import.
+  src\app\features\auth\login\login.component.scss  16:1  root stylesheet
+```
+
+**Cause.** `jp-shared` is not a sibling of the app. SCSS is shared at **build**
+time through `stylePreprocessorOptions.includePaths: ["../jp-shared/src/styles"]`,
+so `@use 'variables'` resolves up and across the filesystem. If the repo is
+missing, nested one level deeper, or renamed, that path does not exist.
+
+**Fix.** Check the layout:
+
+```powershell
+Get-ChildItem D:\Projects -Directory | Select-Object Name
+```
+
+`jp-shared` must sit beside the app, not inside it.
+
+> 🔴 **This is the one that bites CI.** A build agent that clones only the app
+> repository will fail here every time. Check out `jp-shared` alongside it.
+
+
 ### Angular serves on a random port instead of 4200
 
 **Symptom.** `npm start` reports something like `http://localhost:53749/`, the
@@ -477,7 +631,7 @@ is why it is a toast and not a form error.
 **Fix.**
 
 ```powershell
-cd backend\JP.Sso.Api
+cd D:\Projects\jp-backend\JP.Sso.Api
 dotnet run
 ```
 
@@ -488,9 +642,9 @@ Wait for `Now listening on: http://localhost:5199`, then check
 
 1. It came up on a different port. Read the console — `launchSettings.json` says
    5199, but a `--urls` argument overrides it.
-2. Origin not allowed. The API only accepts `http://localhost:4200` and
-   `:4300` (`Cors:AllowedOrigins`). If the portal is on any other port, see the
-   previous section.
+2. Origin not allowed. The API accepts `http://localhost:4200`, `:4300`,
+   `:4400` and `:4500` only (`Cors:AllowedOrigins`). On any other port the app
+   loads and every request fails — see the random-port entry below.
 3. It failed at startup. Every options block is validated on boot, so a missing
    `Jwt:Key` kills the process immediately with a clear message rather than
    failing later on the first request.
@@ -512,16 +666,20 @@ Wait for `Now listening on: http://localhost:5199`, then check
 
 ```powershell
 # backend — expect 0 warnings, 0 errors
-cd jp-backend ; dotnet build JP.sln
+cd D:\Projects\jp-backend ; dotnet build JP.sln
 
 # database — expect 73, 17 and 31 assertions, all passing
-cd jp-backenddatabase
+cd D:\Projects\jp-backend\database
 sqlcmd -S localhost\TARUN -d jp_sso -E -b -f 65001 -I -i jp_sso\99_tests\001_test_sso_procedures.sql
 sqlcmd -S localhost\TARUN -d jp_sso -E -b -f 65001 -I -i jp_sso\99_tests\002_test_error_log.sql
 sqlcmd -S localhost\TARUN -d jp_sso -E -b -f 65001 -I -i jp_sso\99_tests\003_test_menus.sql
 
-# frontend — expect a clean bundle
-cd jp-admin ; npm run build:prod    # and jp-school, jp-teacher, jp-public
+# frontend — expect a clean bundle from all five
+# 🔴 stop every dev server first: a production build replaces the development
+#    copy of @angular/core in the shared federation cache (see 3.5)
+foreach ($p in 'jp-shared','jp-admin','jp-school','jp-teacher','jp-public') {
+  Write-Host $p; Push-Location D:\Projects\$p; npx ng build; Pop-Location
+}
 ```
 
 Every test suite runs inside a transaction that is always rolled back, so they
