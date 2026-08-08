@@ -1500,6 +1500,94 @@ ke teeno flows bhi multi-app hain, to suite ka ghar wahi rehna chahiye.
 
 ---
 
+### 2.45 `jp_mdm` — PHASE 2A BUILD NOTES
+
+32 tables (23 masters + 8 transactional + `t_mdm_error_log`), 91 indexes,
+29 foreign keys, 4 IST functions, `USP_LogError`. Re-run pe zero naye objects.
+
+#### 🔴 `t_sso_roles.RoleId` **int** hai, bigint nahi
+
+`t_mdm_request_levels.RoleId` isse match karta hai. Ye **live column se verify
+kiya**, spec se maan kar nahi liya — 2.37 mein menu ke waqt exactly yehi hua tha
+(UserTypeId aur PermissionId int nikle the, tinyint/bigint nahi).
+
+Baaki cross-DB columns: `t_sso_users.UserId` **bigint**, `OrganizationUid`
+**uniqueidentifier**. In par koi FK nahi (2.2) — har script mein comment hai ki
+kyun, taaki koi baad mein "theek" karne ki koshish na kare.
+
+#### Timezone classification (2.28) — poori list
+
+Sirf **ek** column `date` hai:
+
+| Column | Type | Kyun |
+|---|---|---|
+| `t_mdm_teacher_registration_details.DOB` | `date` | Calendar date hai, instant nahi. UTC timestamp rakhne se 1 tareekh ko paida hua banda din ke 5.5 ghante 31 ka ho jaata |
+| `t_mdm_school_registration_details.EstablishedYear` | `smallint` | ⚠️ **Ye saal hai, date nahi.** Kisi ko school ka exact din yaad nahi hota; `date` column ek precision invent karta jo data mein hai hi nahi |
+| SubmittedOn · CompletedOn · ActionOn · VerifiedOn · PaidOn · OccurredOn | `datetime2` UTC | Event/expiry timestamps |
+
+#### Business keys — filtered unique, sab `WHERE Is_Deleted = 0`
+
+Spec wale (har master ka `Code`, `RequestNo`, request-levels ka triple,
+teacher-subjects ka pair, documents ka `(RequestId, DocumentTypeId, Version)`)
+ke alawa ye add kiye:
+
+| Index | Kyun |
+|---|---|
+| `m_mdm_document_types (RequestTypeId, Code)` | `Code` akela unique nahi ho sakta — SCHOOL_REG aur TEACHER_VERIFY dono ke paas `ID_PROOF` ho sakta hai. Business key **pair** hai |
+| `m_mdm_rejection_reasons (RequestTypeId, Code)` | wahi wajah |
+| `t_mdm_approval_requests (RequestUid)` | **unfiltered** — Uid kabhi reuse nahi hona chahiye, warna purana URL doosri request pe khulega |
+| `t_mdm_request_payments (GatewayRefNo)` | Ek gateway reference = ek payment. Do rows ka matlab webhook do baar process hua — double refund isi tarah hota hai |
+
+#### 🔴 One-pending-per-entity — index hai, check nahi
+
+```
+UQ_t_mdm_approval_requests_OnePendingPerEntity
+  ON (RequestTypeId, EntityUid) WHERE StatusId = 1 AND Is_Deleted = 0
+```
+
+Do tabs, double click, timeout ke baad retry — school do baar submit kar sakta
+hai. Do Pending rows tab dikhte hain jab admin ko queue mein wahi school do baar
+dikhta hai.
+
+2C ka procedure bhi check karega, **par check bina index ke race hai**: do
+concurrent sessions dono check pass kar lenge insert se pehle.
+
+⚠️ `StatusId = 1` literal hai kyunki filtered index mein subquery nahi ho
+sakti. `m_mdm_approval_status` renumber hua to ye index rebuild karna padega —
+ek aur wajah ki master IDs contract hain.
+
+#### Seed — sirf paanch, jaan-boojh kar
+
+`m_mdm_request_types` (4) · `m_mdm_approval_status` (5) ·
+`m_mdm_action_types` (5) · `m_mdm_payment_modes` (4) ·
+`m_mdm_payment_status` (4).
+
+Ye **engine values** hain, reference data nahi — approval engine likha hi nahi
+ja sakta jab tak pata na ho ki Pending = 1 hai, aur ye list koi client nahi
+deta.
+
+Geography, education, profile aur `m_mdm_document_types`/
+`m_mdm_rejection_reasons` **2B** hain, client ki lists pe blocked. Guess seed
+kar ke baad mein theek karne ka matlab hai un rows pe data migration jinpe tab
+tak foreign keys point kar rahi hongi.
+
+#### Chhoti decisions jo likh deni chahiye
+
+- `t_mdm_request_levels.LevelId` **int** hai, bigint nahi — ye configuration
+  hai (per request type kuch rows), transactional volume nahi, aur koi isse
+  reference nahi karta.
+- `t_mdm_*_registration_details` mein `RequestId` **PK aur FK dono** hai —
+  1:1 construction se enforce hota hai, kisi procedure ke yaad rakhne se nahi.
+- `m_mdm_experience_range` mein `MinMonths`/`MaxMonths` — search filter
+  plain integer compare ban jaata hai, "5-10" string parse karne ke bajaye.
+- `t_mdm_request_approvals` **append-only**. Kabhi UPDATE nahi — trail hi
+  saboot hai ki kisne kya decide kiya.
+- `m_mdm_city` mein `Latitude`/`Longitude` abhi nullable — dataset aane par
+  bharenge. Shuru se isliye hain ki "jobs near me" ko baad mein us table pe
+  migration na karni pade jispe tab FKs hongi.
+
+---
+
 ## 3. SCOPE (Client spec ke against)
 
 ### IN SCOPE — MVP
@@ -1603,6 +1691,7 @@ AI candidate matching · AI resume scoring/generation · Video interview / demo 
 | 2026-08-08 | — | **`/continue` audience chooser** — jp-public, school/teacher fork, admin ka option nahi (compiler-enforced). SSR mode-aware. jp-public ke local design tokens hataye — wo purane blue pe drift ho chuke the (2.43) | ✅ Done |
 | 2026-08-08 | — | **Public site static pages** — home, how-it-works, about, faq, contact, terms, privacy, 404. Per-route SEO + OG + canonical, robots.txt, sitemap.xml, prerendered. Lighthouse SEO 100 / a11y 100 saaton pages pe. Job search Phase 4 ke liye chhoda, contact form Phase 7 ke liye (2.44) | ✅ Done |
 | 2026-08-08 | 1 | **PHASE 1 CLOSE-OUT** — dono APIs clean rebuild 0/0, 121/121 SQL assertions, paanchon frontend prod builds clean, jp_sso 20 tables · 32 procs · 4 functions · 71 indexes. Known gaps section 2A mein likhe. Test 001 toota mila aur fix hua | ✅ Done |
+| 2026-08-09 | 2A | **`jp_mdm` database** — 23 masters + 8 transactional + error log = 32 tables, 91 indexes, 29 FKs, 4 IST functions, USP_LogError. Seed limited to the 5 masters we own. Re-run creates zero new objects | ✅ Done |
 | — | 2E | Admin screens → `frontend/apps/admin` | ⬜ Next |
 | — | 2F | School screens → `frontend/apps/school` | ⬜ Next |
 
