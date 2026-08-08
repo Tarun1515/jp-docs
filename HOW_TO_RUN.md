@@ -127,8 +127,7 @@ window. Other options:
 ### 2.4 Install the frontend dependencies
 
 ```powershell
-cd frontend\portal      ; npm install
-cd ..\public-site       ; npm install
+cd jp-docs ; npm run bootstrap   # clones, installs and links all seven
 ```
 
 ---
@@ -509,7 +508,7 @@ sqlcmd -S localhost\TARUN -d jp_sso -E -b -f 65001 -I -i jp_sso\99_tests\002_tes
 sqlcmd -S localhost\TARUN -d jp_sso -E -b -f 65001 -I -i jp_sso\99_tests\003_test_menus.sql
 
 # frontend — expect a clean bundle
-cd frontend\portal ; npx ng build portal
+cd jp-admin ; npm run build:prod    # and jp-school, jp-teacher, jp-public
 ```
 
 Every test suite runs inside a transaction that is always rolled back, so they
