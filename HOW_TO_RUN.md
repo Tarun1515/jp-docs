@@ -133,24 +133,157 @@ cd ..\public-site       ; npm install
 
 ---
 
-## 3. Running it day to day
+## 3. The frontend — seven repositories
 
-Four processes. Ports are **fixed** (decision 2.17) because the CORS allow-list
-and `environment.ts` are both wired to them.
+Everything lives as **siblings** under `D:\Projects\`. Nothing is nested.
 
-| What | Port | Command (from repo root) |
+```
+D:\Projects\
+├── jp-docs\      ← this file. Clone it beside every other repo
+├── jp-shared\    @tarun1515/jp-shared — the design system and core
+├── jp-admin\     :4200
+├── jp-school\    :4300
+├── jp-teacher\   :4400
+├── jp-public\    :4500
+└── jp-backend\   both APIs + all three databases
+```
+
+New machine:
+
+```bash
+cd jp-docs
+npm run bootstrap        # clones the lot, installs, links shared
+```
+
+It stops short of the things that need a human — the GitHub token, SQL Server,
+and the JWT user-secrets — and prints those as a checklist at the end.
+
+### 3.1 Ports
+
+| Project | Port | Command |
 |---|---|---|
-| `JP.Sso.Api` — auth, users, roles, menus | **5199** | `cd backend\JP.Sso.Api ; dotnet run` |
-| `JP.App.Api` — masters, business data | **5299** | `cd backend\JP.App.Api ; dotnet run` |
-| Angular `portal` | **4200** | `cd frontend\portal ; npm start` |
-| Angular `public-site` | **4300** | `cd frontend\public-site ; npm start` |
+| `jp-admin` | **4200** | `cd jp-admin ; npm start` |
+| `jp-school` | **4300** | `cd jp-school ; npm start` |
+| `jp-teacher` | **4400** | `cd jp-teacher ; npm start` |
+| `jp-public` | **4500** | `cd jp-public ; npm start` |
+| `JP.Sso.Api` | **5199** | `cd jp-backend\JP.Sso.Api ; dotnet run` |
+| `JP.App.Api` | **5299** | `cd jp-backend\JP.App.Api ; dotnet run` |
 
-For the portal you only need **`JP.Sso.Api` + `portal`**. `JP.App.Api` has no
-endpoints yet beyond health, and the public site is independent.
+For most work you need **`JP.Sso.Api` plus whichever app you are on**.
 
-Swagger, in Development only: <http://localhost:5199/swagger>
+### 3.2 🔴 The two modes — link or publish
 
-Sign in at <http://localhost:4200>.
+Publishing `jp-shared` for every change during design work is unworkable, so
+there are two ways an app can consume it. **Know which one you are in.**
+
+**DEVELOPMENT — linked.** The default while building anything. The app points at
+the sibling working copy, so a change in `jp-shared` shows up immediately with
+no version bump and no publish.
+
+```bash
+cd jp-shared && npm run link      # builds, then npm link from dist/jp-shared
+cd ../jp-admin && npm run link:shared
+```
+
+**RELEASE — published.** What CI and other machines use.
+
+```bash
+# in jp-shared
+npm run version:bump              # package.json AND src/lib/version.ts together
+# write the CHANGELOG entry, then
+git commit -am "release: 1.1.0" && git tag v1.1.0 && git push --follow-tags
+
+# in each app
+npm run update:shared
+```
+
+**Which am I in?**
+
+```bash
+cd jp-docs && npm run check-versions
+```
+
+```
+  @tarun1515/jp-shared
+    source        1.0.0
+    built         1.0.0
+
+    ok    jp-admin    1.0.0     linked     follows jp-shared (dev mode)
+    ok    jp-school   1.0.0     linked     follows jp-shared (dev mode)
+    ok    jp-teacher  1.0.0     linked     follows jp-shared (dev mode)
+    ok    jp-public   1.0.0     linked     follows jp-shared (dev mode)
+```
+
+`linked` follows the sibling working copy and cannot drift. `installed` is frozen
+at a published version and can. **Run this after every change to `jp-shared`** —
+four apps install it independently, and an app you forgot keeps running the old
+copy while building perfectly cleanly.
+
+### 3.3 🔴 "NG0203 … token injection failed" — the one you will hit
+
+**Symptom.** A linked app compiles fine and then renders nothing. The console
+shows:
+
+```
+NG0203: The `InjectionToken JP_APP_IDENTITY` token injection failed.
+`inject()` function must be called from an injection context such as a
+constructor, a factory function, a field initializer, ...
+```
+
+**It is not an injection-context problem.** The message points at dependency
+injection and the cause is module resolution, which is why it costs people an
+afternoon.
+
+**Cause.** A linked package is a symlink. By default the bundler resolves the
+symlink to its real path, so imports inside the library are resolved from
+`jp-shared/node_modules` — which has its own `@angular/core`. The app now has
+**two copies of Angular**, each with its own `InjectionToken` class, so the token
+the app provides is not the token the library asks for.
+
+**Fix.** In the app's `angular.json`, under `architect.build.options`:
+
+```json
+"preserveSymlinks": true
+```
+
+All four apps already have it. **Do not remove it.** If you scaffold a new app
+from the Angular CLI, add it before linking.
+
+**How to confirm this is what you are looking at:**
+
+```bash
+ls jp-shared/node_modules/@angular/core     # exists -> the second copy
+```
+
+### 3.4 GitHub Packages token
+
+Only needed to install the **published** package. A linked setup does not touch
+the registry at all.
+
+```bash
+cp .npmrc.example .npmrc          # in each app; .npmrc is gitignored
+setx GITHUB_TOKEN "ghp_..."       # needs read:packages; reopen the shell
+```
+
+> ⚠️ **A 404 for `@tarun1515/jp-shared` usually means 401.** GitHub Packages
+> answers unauthenticated requests for a private package with "not found" rather
+> than "not authorised", so a missing token looks like a missing package.
+
+### 3.5 Each app takes only its own account type
+
+All three signed-in apps authenticate against the same SSO API, so a school owner
+**can** sign in successfully on the teacher app — valid token, wrong app.
+
+When that happens the app signs them straight back out and says where to go:
+
+> **That is a school account.** Sign in at localhost:4300
+
+That is working as designed, not a bug. The check runs after login and again at
+bootstrap, because a token can also arrive from storage. It is wayfinding, not
+security — the token stays valid and the server is what enforces access.
+
+Tokens are stored per app (`jp.admin.accessToken`, `jp.school.accessToken`), so
+two apps on one origin never read each other's session.
 
 ---
 
@@ -367,10 +500,10 @@ Wait for `Now listening on: http://localhost:5199`, then check
 
 ```powershell
 # backend — expect 0 warnings, 0 errors
-cd backend ; dotnet build JP.sln
+cd jp-backend ; dotnet build JP.sln
 
-# database — expect 73, 17 and 30 assertions, all passing
-cd database
+# database — expect 73, 17 and 31 assertions, all passing
+cd jp-backenddatabase
 sqlcmd -S localhost\TARUN -d jp_sso -E -b -f 65001 -I -i jp_sso\99_tests\001_test_sso_procedures.sql
 sqlcmd -S localhost\TARUN -d jp_sso -E -b -f 65001 -I -i jp_sso\99_tests\002_test_error_log.sql
 sqlcmd -S localhost\TARUN -d jp_sso -E -b -f 65001 -I -i jp_sso\99_tests\003_test_menus.sql
@@ -389,30 +522,31 @@ are safe against your working database and leave nothing behind.
 ## 8. Where things are
 
 ```
-backend/
-  JP.Core/            envelope, constants, enums, exceptions — no dependencies
-  JP.Domain/          request and response contracts (the public API surface)
-  JP.Infrastructure/  Dapper, PBKDF2, JWT, SMTP, middleware, filters
-                      repositories and services are `internal` here on purpose —
-                      the types carrying password hashes cannot be named from an
-                      API project, so no serializer can reach them
-  JP.Sso.Api/         auth, users, roles, permissions, menus     :5199
-  JP.App.Api/         masters and business data (Phase 2+)       :5299
-  JP.Tools.SeedAdmin/ operator tool — creates the first admin
-
-database/
-  run_all.sql         build orchestrator, idempotent
-  _TEMPLATE_*.sql     canonical table and procedure shapes — cut new ones from here
-  jp_sso/             20 tables · 32 procedures · 4 functions · 71 indexes
-  jp_sso/99_tests/    120 assertions across 3 suites
-
-frontend/
-  portal/             the signed-in app                          :4200
-  public-site/        marketing site (SSR)                       :4300
-
-docs/
-  PROJECT_MEMORY.md   every locked decision, numbered. Read 2.39 before Phase 3
-  DB_TABLE_STRUCTURE.md
-  HOW_TO_RUN.md       this file
-  design-screens/     screenshots at 375px and 1440px
+D:\Projects\
+├── jp-docs\        PROJECT_MEMORY.md, HOW_TO_RUN.md, DB_TABLE_STRUCTURE.md,
+│                   design-screens/, and the check-versions + bootstrap scripts
+│
+├── jp-shared\      @tarun1515/jp-shared — published to GitHub Packages
+│   ├── src/styles/       13 SCSS partials, shipped as package assets
+│   ├── src/ui/          17 ui-* components + the app and auth shells
+│   ├── src/core/        services, guards, interceptors, models, shared pages
+│   └── src/public-api.ts  THE only entry point
+│
+├── jp-admin\      :4200  login, forgot/reset, admin shell. Phase 2E lands here
+├── jp-school\     :4300  login, signup, OTP, invite, account status. Phase 2F
+├── jp-teacher\    :4400  login, signup, OTP, teacher shell
+├── jp-public\     :4500  SSR marketing site, no login, its own lighter partials
+│
+└── jp-backend\
+    ├── JP.Core/            envelope, constants, enums, exceptions
+    ├── JP.Domain/          request and response contracts
+    ├── JP.Infrastructure/  Dapper, PBKDF2, JWT, SMTP, middleware, filters
+    ├── JP.Sso.Api/         :5199
+    ├── JP.App.Api/         :5299
+    ├── JP.Tools.SeedAdmin/ creates the first admin
+    └── database/           20 tables · 32 procedures · 4 functions · 71 indexes
+                            99_tests/ — 121 assertions across 3 suites
 ```
+
+Each of the seven is its own git repository. `jp-docs` is cloned beside the
+others and is never copied into them — one file, one truth.

@@ -801,7 +801,9 @@ Aakhri assertion sabse zaroori hai: **koi bhi response body `SchoolId` leak na k
 
 ---
 
-### 🔴 2.40 TEEN APPS, EK WORKSPACE (LOCKED — client decision, Phase 2 se pehle)
+### ⚠️ 2.40 TEEN APPS, EK WORKSPACE (SUPERSEDED BY 2.41)
+
+> Ye ek hi Angular workspace tha jisme chaar apps aur do libs the. **2.41 ne ise replace kar diya** — client ne har project ki apni GitHub repo maangi. Yahan isliye chhoda hai kyunki iske andar ke faisle (cross-app guard, storage prefix, menu prefix stripping, per-app reset links) 2.41 mein waise ke waise carry hue hain, aur unka reasoning yahan likha hai.
 
 Client ne admin, school aur teacher ke liye alag-alag UI maange. **Sirf frontend restructure** — backend, APIs, database sab wahi ke wahi.
 
@@ -894,6 +896,116 @@ Admin ko **reset-password route** bhi mila. Sirf forgot-password dead end hai: m
 | public-site | **4500** |
 
 Chaaron `angular.json` mein declared, dono APIs ke CORS allow-list mein, aur `scripts/serve.mjs` `NG_FORCE_TTY=0` set karta hai. Chaar apps ke saath stale dev server **normal case** hai, unlucky nahi — isliye busy port ka loud error pehle se zyada zaroori hai.
+
+---
+
+### 🔴 2.41 SAAT REPOSITORIES (LOCKED — client decision 2026-08-08)
+
+Client ne har frontend project alag GitHub repository mein maanga. Ye 2.40 (ek workspace) ko **replace** karta hai.
+
+```
+D:\Projects\
+├── jp-docs\      ← PROJECT_MEMORY, HOW_TO_RUN, DB_TABLE_STRUCTURE, screenshots
+├── jp-shared\    Angular library → GitHub Packages
+├── jp-admin\     :4200
+├── jp-school\    :4300
+├── jp-teacher\   :4400
+├── jp-public\    :4500
+└── jp-backend\   dono APIs + JP.Core/Domain/Infrastructure + saare DB scripts
+```
+
+Sibling folders, koi parent nahi. Har ek apni independent git repo.
+
+#### 🔴 BACKEND EK HI REPO REHTA HAI — ye dobara mat kholo
+
+`JP.Core`, `JP.Domain` aur `JP.Infrastructure` ko **dono** APIs reference karti hain. APIs ko alag karne ka matlab hota in teeno ko NuGet packages banana, aur phir har backend change ek **version-bump → build → publish → consume** cycle ban jaata.
+
+Frontend ye afford kar leta hai kyunki **`npm link` ek saaf local escape hatch hai**: development mein app seedha library ki working copy pe point karta hai aur change bina kisi publish ke flow ho jaata hai. **C# mein iska koi utna hi saaf equivalent nahi hai** — repo boundary ke paar `ProjectReference` supported workflow nahi hai, aur local NuGet feed uska ghatiya substitute hai.
+
+Dono APIs deploy bhi saath hi hoti hain, to alag karne se **kuch milta nahi** aur har change pe ek publish step **lag jaata**.
+
+#### jp-docs kyun hai
+
+Saat repos ka matlab saat sessions jo alag-alag samajh se shuru kar sakte hain. `PROJECT_MEMORY.md` wahi rokta hai.
+
+⚠️ **Use kisi doosri repo mein copy MAT karo.** Teen copies ek hafte mein teen versions ban jaati hain, aur us file ki poori value yahi hai ki wo **ek** hai. Baaki har repo ka README yahan point karta hai: jp-docs sibling ke roop mein clone hogi, aur kaam shuru karne se pehle PROJECT_MEMORY padhi jaayegi.
+
+#### GitHub Packages
+
+Package: **`@tarun1515/jp-shared`** (npm scope lowercase hota hai; GitHub owner `Tarun1515` hai).
+
+- `publishConfig` → `https://npm.pkg.github.com`
+- `.npmrc.example` committed hai, **`.npmrc` gitignored** — token file mein nahi, `${GITHUB_TOKEN}` env var se aata hai
+- `.github/workflows/publish.yml` sirf **version tag** pe chalta hai, aur publish se pehle **fail** kar deta hai agar tag, `package.json` aur `JP_SHARED_VERSION` teeno match na karein
+
+⚠️ **GitHub Packages private package ke liye unauthenticated request pe 404 deta hai, 401 nahi.** Yaani `@tarun1515/jp-shared` pe "not found" ka matlab das mein se nau baar "not authorised" hota hai. Ye README aur `.npmrc.example` dono mein likha hai kyunki ye har naye machine pe ek baar zaroor lagega.
+
+#### 🔴 Do modes — LINK vs PUBLISH
+
+Active design work ke dauraan har change pe publish karna **unworkable** hai.
+
+| | DEVELOPMENT | RELEASE |
+|---|---|---|
+| command | `npm run link:shared` | `npm run update:shared` |
+| kya hota hai | sibling working copy pe symlink | published version install |
+| change flow | turant, bina publish | version bump + tag + publish |
+| kab | jab bhi kuch ban raha ho | CI, ya doosri machine |
+
+Kaunse mode mein ho? `cd jp-docs && npm run check-versions` — wo har app ke aage `linked` ya `installed` likhta hai.
+
+#### 🔴 `preserveSymlinks: true` — ye HATANA mat
+
+Ye migration ke dauraan actually hua, aur exactly wahi shakal mein jaisa client ne warn kiya tha.
+
+Linked/symlinked library apna khud ka `node_modules/@angular/core` resolve karti hai → app ke paas **Angular ki do copies** → har injection token fail:
+
+```
+NG0203: The `InjectionToken JP_APP_IDENTITY` token injection failed.
+`inject()` function must be called from an injection context...
+```
+
+Message **dependency injection** pe ungli uthata hai, jabki wajah **module resolution** hai — isiliye ye log ka aadha din kha jaata hai. Fix: har app ke `angular.json` build options mein `"preserveSymlinks": true`. Chaaron mein set hai.
+
+#### 🔴 Drift — teen detections
+
+Chaar apps, chaar `node_modules`, chaar independent copies. Ek bug fix karo, teen apps update karo, chautha bhool jao — aur wo app hafton tak bug leke chalta rahega, **perfectly cleanly build karte hue**. Pata tab chalega jab user batayega.
+
+Ye rok nahi sakte — yehi us independence ki keemat hai jo structure deta hai. To use **sekondon mein dikhne wala** banaya:
+
+1. `jp-shared` apna version `JP_SHARED_VERSION` mein stamp karta hai
+2. har app bootstrap pe wo version log karta hai (**dev mode only**)
+3. `jp-docs/scripts/check-versions.mjs` chaaron ko saath dikhata hai, stale ya linked flag karta hai, aur drift pe **non-zero exit** deta hai
+
+`npm run version:bump` `package.json` aur `version.ts` dono ek saath badalta hai — warna check do numbers compare karta jo aapas mein toh mil jaate par kisi asliyat se nahi.
+
+#### Cross-app login guard (2.40 se carry hua)
+
+Teeno apps ek hi SSO API se authenticate karte hain, to school owner teacher app pe **successfully** sign in kar sakta hai — token asli, app galat. Bina handle kiye: khaali sidebar, blank page, aur banda samjhega product toota hai.
+
+`utype` claim **login ke baad** aur **bootstrap pe** check hota hai. Mismatch pe: **local** sign-out, phir saaf batao kiska account hai aur kahan jaana hai, chalte hue link ke saath. Target URLs `environment.ts` se, hardcoded nahi.
+
+⚠️ **Security boundary NAHI hai** — token valid rehta hai aur server use maanega. Ye wayfinding hai; access server ke permission checks rokte hain (2.6, 2.39).
+
+#### Token storage
+
+`TokenStorageService` prefix `JP_APP_IDENTITY` se leta hai — `jp.admin.accessToken`, `jp.school.accessToken`. Subdomains waise hi isolate karte hain; prefix isliye hai ki wo isolation **deployment decision pe depend na kare**.
+
+#### Master data screens jp-admin mein, config-driven
+
+Alag MDM app nahi. Ye screens ek super admin mahine mein do baar use karta hai — uske liye paanchvi app, deployment aur `node_modules` cost hai, benefit nahi.
+
+Saari 17 master tables ka shape ek hi hai (`Code`, `Name`, `DisplayOrder`, `Is_Active`), to **ek config-driven component** sab handle karega, 17 milti-julti screens nahi. Nayi master add karna ek dictionary entry banega, nayi screen nahi.
+
+Geography ko apni alag screen milegi — usme parent cascade aur bulk import chahiye, jo generic manager ko absorb karne ki koshish nahi karni chahiye.
+
+#### Parallel sessions — discipline, tooling nahi
+
+1. Har session apni repo + `jp-docs` sibling. Pehla kaam: `../jp-docs/PROJECT_MEMORY.md` padho.
+2. **`jp-shared` ek waqt mein ek session.** Concurrent edits conflict karenge aur har app apni copy ke against theek build karta rahega — conflict tab tak invisible jab tak mehnga na ho jaaye.
+3. Shared badle to: baaki sessions pause → change → build → har app re-link/update → `check-versions` → resume.
+4. **`PROJECT_MEMORY.md` bhi ek waqt mein ek session likhega.** Do sessions progress log mein append karenge to ek doosre ko clobber kar denge.
+
+2 aur 4 discipline hain, tooling nahi. Deadline pressure mein sabse pehle yehi tootenge — isiliye version check aur git history maujood hain.
 
 ---
 
