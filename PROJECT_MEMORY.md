@@ -1679,5 +1679,5 @@ Dono ke liye ek hi discipline:
 - **`@angular/animations` hataana mat** — koi code use nahi karta, par
   `ignoreUnusedDeps` band hone ki wajah se build usse maangta hai.
 
-Dono HOW_TO_RUN §3.4 aur §3.5 mein detail se hain.
+Dono HOW_TO_RUN §3.5 aur §3.6 mein detail se hain.
 
