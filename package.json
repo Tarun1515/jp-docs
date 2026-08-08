@@ -1,0 +1,14 @@
+{
+  "name": "jp-docs",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Project memory, schema reference and run instructions for Staffroom India. Cloned as a sibling of every other repository.",
+  "scripts": {
+    "check-versions": "node scripts/check-versions.mjs",
+    "bootstrap": "node scripts/bootstrap.mjs"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Tarun1515/jp-docs.git"
+  }
+}
