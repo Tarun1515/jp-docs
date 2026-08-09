@@ -1498,6 +1498,30 @@ ke teeno flows bhi multi-app hain, to suite ka ghar wahi rehna chahiye.
 - Flows ko chalane ke liye `jp-shared` :4999 chahiye. Suite ko wo bhi start
   karna hoga, ya CI step mein.
 
+
+### G10. 2C suite RowVersion branch tak nahi pahunchti
+
+`USP_ProcessApprovalAction` ka concurrency check **kaam karta hai** — 2026-08-09
+ki independent verification mein isolate karke confirm kiya (2.46 ka correction
+note dekho).
+
+Par **test suite us branch tak pahunchti hi nahi.** Ek level configure hai, to
+har successful action request ko complete kar deta hai aur doosri koshish
+`INVALID_STATUS` pe ruk jaati hai — RowVersion compare hone se pehle.
+
+**Kya add karna hai:** `001_test_approval_engine.sql` mein ek case jo
+- apne transaction ke andar request type 1 ko do-level banaye
+  (level 1 `IsFinalLevel = 0`, ek naya level 2 `IsFinalLevel = 1`)
+- submit kare, level 1 pe approve kare — status Pending rehna chahiye,
+  `CurrentApprovalLevel = 2`, `IsCompleted = 0`
+- phir stale RowVersion se approve kare — `CONCURRENCY_CONFLICT` aana chahiye,
+  koi trail row nahi banni chahiye
+
+Ye multi-level advancement ko bhi cover kar lega, jo abhi suite mein bilkul
+untested hai (MVP ek hi level seed karta hai).
+
+⚠️ Ye **bug nahi hai** — coverage gap hai. Engine sahi hai; suite uska saboot
+nahi de rahi.
 ---
 
 ### 2.45 `jp_mdm` — PHASE 2A BUILD NOTES
@@ -1647,6 +1671,33 @@ return karte hain — 500 nahi.
 
 Test: do admins same RowVersion se act karte hain, doosra haar jaata hai aur
 **trail mein uski koi row nahi banti**.
+
+> ⚠️ **CORRECTION — 2026-08-09, independent verification.**
+>
+> Upar likha check **sahi hai**, par jo test uske liye likha gaya tha wo use
+> **actually chhoo hi nahi raha tha.**
+>
+> Ek hi level configure hone ki wajah se koi bhi successful approve request ko
+> **complete** kar deta hai. To doosri koshish **status check** pe hi ruk jaati
+> hai (`INVALID_STATUS` — "already approved"), aur RowVersion ki tulna tak
+> control pahunchta hi nahi. Suite ka concurrency assertion pass ho raha tha,
+> par **jis wajah se claim kiya gaya tha us wajah se nahi.**
+>
+> Isolate karke verify kiya — rolled-back transaction mein request type 1 ko
+> do-level banaya, level 1 approve kiya (status Pending hi raha, RowVersion 2,
+> `IsCompleted = 0`), phir stale RowVersion se approve kiya:
+>
+> ```
+> Status  Code                   Message
+> 0       CONCURRENCY_CONFLICT   Someone else has already actioned this request.
+> ```
+>
+> Trail row nahi bani, level 2 hi raha. **RowVersion check kaam karta hai.**
+> Side effect: multi-level advancement bhi asli mein verify ho gaya — wo
+> single-level seed pe dead code nahi hai.
+>
+> 🔴 Jo abhi bhi missing hai: **suite mein aisa koi case nahi jo RowVersion
+> branch tak pahunche.** Dekho G10.
 
 #### Multi-level engine, chahe abhi ek hi level ho
 
@@ -1976,6 +2027,7 @@ naya Code, agla free Id, kuch renumber mat karo.
 | 2026-08-09 | 2A | **`jp_mdm` database** — 23 masters + 8 transactional + error log = 32 tables, 91 indexes, 29 FKs, 4 IST functions, USP_LogError. Seed limited to the 5 masters we own. Re-run creates zero new objects | ✅ Done |
 | 2026-08-09 | 2C | **Approval engine** — 9 procedures + USP_LogError. RequestNo per-type-per-year counter, idempotent submit, RowVersion concurrency, multi-level engine. 26/26 test assertions | ✅ Done |
 | 2026-08-09 | 2B | **Master data seed** — 18 masters seeded ourselves (client lists never arrived), 5 marked PROVISIONAL. District/city left empty; CityId confirmed nullable so forms degrade to state-only. 2C suite re-verified 26/26 | ✅ Done |
+| 2026-08-09 | 2C | **Independent verification** — fresh throwaway scripts, 9 scenarios incl. 3 genuinely parallel sessions (identical SubmittedOn tick). Sab pass. Ek coverage gap mila: suite RowVersion branch tak nahi pahunchti (G10). Cleanup ke baad counts baseline pe wapas | ✅ Done |
 | — | 2E | Admin screens → `frontend/apps/admin` | ⬜ Next |
 | — | 2F | School screens → `frontend/apps/school` | ⬜ Next |
 
