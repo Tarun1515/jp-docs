@@ -2146,34 +2146,89 @@ hai.
 
 ---
 
-## ▶️ NEXT: PHASE 2A — `jp_mdm` DATABASE
+## ✅ PHASE 2A + 2C COMPLETE — 2026-08-09
 
-Master data ka database. Ye Phase 2 ka pehla step hai.
+| Check | Result |
+|---|---|
+| `jp_mdm` objects | **33 tables · 93 indexes · 10 procedures · 4 functions · 30 FKs** |
+| `run_all.sql` re-run | **zero new objects** |
+| `001_test_approval_engine.sql` | **26 / 26** |
+| Suite leaves behind | **nothing** — request/trail/subject/series counts identical before and after |
 
-### Pehle ye padho
-- **2.39** — organization scope resolution. `OrganizationUid` sirf JWT se.
-  Uska integration test Phase 3 ki definition of done ka hissa hai.
-- **2.42** — frontend structure LOCKED. Start order: `jp-shared` :4999 pehle.
-- **2.11** — SQL Server 2019 syntax only. Koi 2022+ feature nahi.
-- **2.21 / 2.31** — SP error convention aur CATCH ordering.
-- **Section 2A** — known gaps.
+**2A** — 23 masters + 8 transactional + `t_mdm_error_log`, IST helpers,
+`USP_LogError`. Seed limited to the five masters we own. Details in **2.45**.
 
-### Phase 2A ka scope
-17 master tables, sabka shape ek: `Code`, `Name`, `DisplayOrder`,
-`Is_Active` + standard columns (2.4). Geography apni alag shakal rakhta hai —
-usme parent cascade chahiye.
+**2C** — 9 approval procedures. RequestNo from a per-type-per-IST-year counter
+row, idempotent submit, RowVersion checked inside the UPDATE, multi-level engine
+on a single-level seed. Details in **2.46**.
 
-Har table ke liye wahi discipline jo `jp_sso` mein thi:
-1. `00_create_database.sql` idempotent, compat level 150 pinned
-2. Business key pe **filtered unique index** (`WHERE Is_Deleted = 0`)
-3. Har naya file `run_all.sql` mein `:r` se register
-4. Seed data alag `03_seed/` mein
-5. **Test suite usi commit mein**, `99_tests/` mein — proc ka result set
-   badle to temp table bhi
+⚠️ 2C added two objects beyond 2A's 31: `t_mdm_request_number_series` and the
+`RequestNoPrefix` column on `m_mdm_request_types`.
 
-⚠️ Master data ki **screens** jp-admin mein config-driven banengi (2.41), 17
-alag screens nahi. Wo Phase 2E hai, 2A nahi.
+---
 
-🔴 **Phase 2 abhi shuru NAHI karna hai.** Ye section next action likhta hai,
-permission nahi deta.
+## ▶️ NEXT: PHASE 2B — MASTER DATA SEED
 
+🔴 **2B CLIENT PE BLOCKED HAI.** Ye ek scheduling fact hai, kaam ka issue nahi.
+
+### Kya chahiye client se
+
+| Master | Kya chahiye |
+|---|---|
+| Geography | `m_mdm_country` · `m_mdm_state` · `m_mdm_district` · `m_mdm_city` — poori list, aur city ke liye lat/long agar hai to |
+| Education | `m_mdm_board` · `m_mdm_school_type` · `m_mdm_qualification` · `m_mdm_subject` · `m_mdm_designation` · `m_mdm_class_level` · `m_mdm_stream` |
+| Profile | `m_mdm_gender` · `m_mdm_skill` · `m_mdm_language` · `m_mdm_facility` · `m_mdm_experience_range` |
+| Approval | `m_mdm_document_types` — kaunsa document kis request type pe, aur **mandatory hai ya nahi** · `m_mdm_rejection_reasons` |
+
+⚠️ **Guess seed mat karna.** IDs contract hain. Baad mein theek karne ka matlab
+un rows pe data migration hai jinpe tab tak requests, documents aur schools ki
+foreign keys point kar rahi hongi. 2A ne isiliye kuch bhi guess nahi kiya.
+
+### 2B ka discipline (2A jaisa hi)
+1. `03_seed/` mein naya numbered file, MERGE se, kabhi DELETE nahi
+2. `run_all.sql` mein `:r` se register — masters **pehle**, unpe depend karne
+   wale baad mein
+3. Geography apne hierarchy order mein: country → state → district → city
+4. Har file re-runnable — dobara chalane pe zero naye objects
+
+---
+
+## Agar 2B ka data abhi nahi aaya
+
+Ye tab tak ho sakta hai, kyunki inhe seed data nahi chahiye:
+
+**2D — `JP.App.Api` mein approval endpoints.** 2C ke procedures ab maujood
+hain; unpe controllers, request/response contracts aur repository methods
+chahiye. 🔴 **2.39 pehle padho** — `OrganizationUid` sirf JWT se, aur
+`USP_ProcessApprovalAction` ka `IsCompleted` flag API ko batata hai ki ab
+cross-database kaam (jp_app mein school, jp_sso mein user activate) uska hai.
+
+**2E — admin screens (`jp-admin`).** Approval queue, request detail, document
+verify. Ye G6 wala gap bhi band karta hai: abhi school approve karne ke liye
+Swagger se `PUT /api/users/{userUid}/status` chalana padta hai.
+
+**2F — school screens (`jp-school`).** Registration submit + status tracking.
+
+Teeno ke liye 2.42 ka start order lagta hai: **`jp-shared` :4999 pehle**,
+warna app blank page pe boot hogi.
+
+---
+
+## 🔴 Kuch bhi shuru karne se pehle
+
+- **Section 2A (known gaps)** padho — khaas kar **G0: kisi repo ka git remote
+  nahi hai.** Phase 1 aur Phase 2 dono sirf is machine pe hain.
+- **2.39** — organization scope. Uska integration test Phase 3 ki definition of
+  done ka hissa hai.
+- **2.42** — frontend structure LOCKED.
+- **2.11** — SQL Server 2019 syntax only.
+- **2.21 / 2.30 / 2.31** — SP error convention, list-proc rules, CATCH ordering.
+- **2.45 / 2.46** — 2A aur 2C mein kya bana aur kyun.
+
+### Wo do galtiyan jo is phase mein pakdi gayin, dobara mat karna
+1. **Proc ka result set badlo to usi commit mein uske test ka temp table badlo.**
+   `USP_CreatePasswordResetToken` mein `UserTypeId` add hua tha par test ka
+   `#ResetTok` 5 column ka reh gaya — poora suite chalna band ho gaya tha,
+   assertion fail nahi hui thi.
+2. **Test suite ko apne fixtures khud banane chahiye.** `m_mdm_subject` 2B tak
+   khaali hai; suite 900+ id block use karti hai jo asli seed kabhi nahi lega.
