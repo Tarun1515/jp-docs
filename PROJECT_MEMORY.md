@@ -1702,6 +1702,154 @@ Do galtiyan jo build ke dauraan pakdi gayin:
 
 ---
 
+### 2.47 MASTER DATA SEED — PHASE 2B
+
+Client ki lists nahi aayi. Blocked rehna guess karne se zyada mehnga tha, to
+**humne khud seed kiya** — par saaf nishaan ke saath ki kya humara guess hai.
+
+#### 🔴 CODE STABLE HAI, NAME EDITABLE
+
+| | |
+|---|---|
+| `Code` | **Identifier.** FKs isse resolve hoti hain, seed scripts isse match karti hain. **Live hone ke baad kabhi mat badlo.** |
+| `Name` | **Display text.** Client jab chahe badle. |
+
+Client bole "State Board ko State Education Board likho" — wo **ek column ka
+UPDATE** hai, migration nahi. Yehi is rule ka poora point hai.
+
+Codes conventional hain, generated nahi: `CBSE`, `PRT`, `TGT`, `PGT`,
+`MH`. Koi slug nahi, koi sequential number nahi.
+
+#### DisplayOrder jaan-boojh kar set kiya, alphabetical nahi
+
+Ye dropdowns din mein sau baar khulti hain. Alphabetical order har us baar ka
+chhota tax hai.
+
+- **Designation** career order mein: PRT → TGT → PGT → Coordinator → Vice
+  Principal → Principal
+- **Class level** school order mein: Pre-Primary → Sr. Secondary
+- **Qualification** kism ke hisaab se grouped: teaching (1-5), academic (11-17),
+  eligibility tests (21-24)
+- **Subject** faculty ke hisaab se: sciences (1-6), languages (10-20),
+  humanities/commerce (25-33), practical (40-47)
+- **States** alphabetical — yahan alphabetical **sahi** hai, kyunki states ka
+  koi meaningful order hai hi nahi. UTs baad mein alag group.
+
+#### Row counts
+
+| Table | Rows | |
+|---|---|---|
+| `m_mdm_country` | 1 | India |
+| `m_mdm_state` | 36 | 28 states + 8 UTs |
+| `m_mdm_district` | **0** | 🔴 khaali — neeche dekho |
+| `m_mdm_city` | **0** | 🔴 khaali — neeche dekho |
+| `m_mdm_board` | 7 | |
+| `m_mdm_qualification` | 16 | |
+| `m_mdm_subject` | 34 | |
+| `m_mdm_designation` | 10 | |
+| `m_mdm_class_level` | 5 | |
+| `m_mdm_stream` | 4 | |
+| `m_mdm_gender` | 4 | |
+| `m_mdm_experience_range` | 5 | MinMonths/MaxMonths ke saath |
+| `m_mdm_school_type` | 6 | ⚠️ PROVISIONAL |
+| `m_mdm_skill` | 20 | ⚠️ PROVISIONAL |
+| `m_mdm_facility` | 12 | ⚠️ PROVISIONAL |
+| `m_mdm_document_types` | 9 | ⚠️ PROVISIONAL |
+| `m_mdm_rejection_reasons` | 10 | ⚠️ PROVISIONAL |
+| `m_mdm_request_types` | 4 | 2A |
+| `m_mdm_approval_status` | 5 | 2A |
+| `m_mdm_action_types` | 5 | 2A |
+| `m_mdm_payment_modes` | 4 | 2A |
+| `m_mdm_payment_status` | 4 | 2A |
+| `t_mdm_request_levels` | 4 | 2C |
+
+#### ⚠️ Provisional kya hai aur kyun
+
+Har provisional script ke header mein poori list hai. Sabse risky:
+
+🔴 **`m_mdm_document_types.IsMandatory`** — ye decide karta hai ki school
+registration **complete ho paayegi ya nahi.** Galat mandatory = asli
+registrations block. Galat optional = unverifiable schools andar.
+
+Humne sirf wahi mandatory kiya jiske bina verification ho hi nahi sakti:
+- school: Registration Certificate, Authorization Letter
+- teacher: Degree Certificate, ID Proof
+
+`MaxSizeKb = 5120` (5 MB) sab par, extensions `pdf,jpg,jpeg,png`. Dono
+humare number hain — phone se certificate ki photo aasaani se 2 MB paar kar
+jaati hai, isliye kam nahi rakha.
+
+`m_mdm_skill` **poori tarah humari invention** hai — Indian schooling mein
+teaching skills ki koi standard list hai hi nahi.
+
+#### 🔴 DISTRICT AUR CITY KHAALI HAIN — consequence
+
+800+ districts aur hazaaron sheher **dataset** hain, list nahi. Guess kiya hua
+dataset na hone se bura hai: har row FK target ban jaati hai jise baad mein
+replace nahi, **migrate** karna padta.
+
+**2F ke form banane se pehle confirm kiya — koi schema change nahi chahiye:**
+
+```
+t_mdm_school_registration_details.CityId          NULL
+t_mdm_school_registration_details.DistrictId      NULL
+t_mdm_school_registration_details.StateId         NULL
+t_mdm_teacher_registration_details.CurrentCityId  NULL
+t_mdm_teacher_registration_details.CurrentStateId NULL
+```
+
+**Saare nullable hain.** Form **state-only** pe degrade kar sakta hai bina
+kuch tode. Jab tak data nahi aata:
+- State dropdown chalega (36 rows)
+- District/city dropdown **hide** karo, disabled-empty mat dikhao — khaali
+  dropdown "toota hai" padha jaata hai, "abhi nahi hai" nahi
+- Address free-text `AddressLine1/2` + `Pincode` se kaam chalega
+
+⚠️ Phase 3 mein `t_app_teachers` aur `t_app_jobs` pe bhi `CityId` aayegi —
+wahan bhi **nullable** rakhna, warna yehi sawaal dobara khulega.
+
+#### District/city dataset — source aur import plan (abhi banaya NAHI hai)
+
+**Source, preference order mein:**
+1. **LGD (Local Government Directory), lgdirectory.gov.in** — Ministry of
+   Panchayati Raj ka official source. State/district/sub-district/village codes
+   deta hai, CSV export hota hai. **Yehi use karna chahiye** — official codes
+   ka matlab hai humare Code values kisi sarkari cheez se milte hain.
+2. **Census 2011 town/village directory** — zyada granular, par purana.
+3. **India Post pincode dataset** — pincode → district/city mapping, jo
+   address form ke liye alag se useful hai.
+
+⚠️ GitHub pe padi random "indian-cities.json" list mat uthana. Source pata nahi,
+maintain nahi hoti, aur codes kisi cheez se match nahi karte.
+
+**Import script kaisa dikhega:**
+- `jp_mdm/03_seed/008_seed_districts.sql` aur `009_seed_cities.sql`
+- Data `BULK INSERT` ya staging table mein, phir MERGE — 800+ aur hazaaron
+  rows ke liye inline `VALUES` list practical nahi
+- **`StateId` Code se resolve hoga** (`MH`, `TN`), hardcoded id se nahi —
+  wahi pattern jo 003 mein country ke liye hai, aur typo pe THROW
+- `Code` LGD ka official code, ya `<STATE>_<SLUG>` agar LGD code na ho
+- City ke `Latitude`/`Longitude` jahan mile wahan bhare, warna NULL —
+  column pehle se hai, "jobs near me" ke liye migration nahi chahiye
+- Re-runnable, baaki sab seeds ki tarah
+
+#### Re-runnable aur FK-by-Code
+
+Sab MERGE hain, kabhi DELETE nahi. `m_mdm_document_types` aur
+`m_mdm_rejection_reasons` apni `RequestTypeId` **Code se resolve** karte
+hain aur unknown code pe **THROW** karte hain (50032/50033) — typo se orphan
+row nahi banti. Wahi pattern jo menu seed (2.37) mein tha.
+
+Verify: `run_all.sql` do baar chalaya, doosri baar kuch insert nahi hua.
+
+#### 2C test suite — seed ke baad bhi theek hai
+
+Suite apne subject fixtures **901-903** mein banati hai; asli seed **1-47** use
+karta hai. Codes bhi alag (`TEST_MATH` vs `MATHS`). Dobara verify kiya:
+**26/26 pass**, aur subjects/requests/series counts pehle-baad identical.
+
+---
+
 ## 3. SCOPE (Client spec ke against)
 
 ### IN SCOPE — MVP
@@ -1728,12 +1876,32 @@ AI candidate matching · AI resume scoring/generation · Video interview / demo 
 | 2 | Public website MVP mein chahiye ya launch ke baad? (26 dev-days ka farak) | ⏳ Pending |
 | 3 | School branches support karni hai? (spec single address imply karta hai, humne multi-branch design kiya) | ⏳ Pending |
 | 4 | Payment/subscription MVP mein? (point 12 vs point 13 contradiction) | ⏳ Pending |
-| 5 | Master data kaun dega — subjects, qualifications, designations, boards ki official list? | ⏳ **BLOCKING Phase 2 seed** |
+| 5 | Master data — humne khud seed kar diya (2.47). Client ko **reconcile** karna hai, khaas kar provisional wale. Neeche exact list. | 🟡 **Unblocked, par reconciliation pending** |
 | 6 | Email/SMS provider kaunsa? (SendGrid/SES/MSG91) Budget kiska? | ⏳ Pending — abhi plain SMTP behind `IEmailService`, teeno usi ko bolte hain |
 | 7 | Teacher hard gate ya soft verification? (humne soft decide kiya) | ⏳ Pending |
 | 8 | Admin "Settings" screen ka scope kya hai? (spec point 3 mein hai, detail nahi) | ⏳ Pending |
 | 9 | File storage — S3 / Azure Blob / local server? | ⏳ Pending — abhi local disk behind `IFileStorageService`, swap = 1 class |
 | 10 | Domain, hosting, SSL kaun arrange karega? | ⏳ Pending |
+
+#### Q5 — client ko exactly ye reconcile karna hai (2.47)
+
+Phase 2B ne khud seed kar diya taaki kaam na ruke. Jab client ki list aaye to
+**300 rows aankh se diff mat karna** — ye padho:
+
+| Table | Rows | Kitna confident |
+|---|---|---|
+| `m_mdm_board` · `m_mdm_qualification` · `m_mdm_subject` · `m_mdm_designation` · `m_mdm_class_level` · `m_mdm_stream` · `m_mdm_gender` · `m_mdm_state` | 7·16·34·10·5·4·4·36 | ✅ Standard hai. Client shayad sirf **rename** karega |
+| 🔴 `m_mdm_document_types.IsMandatory` | 9 rows | ⚠️ **Sabse risky.** Ye decide karta hai registration complete hogi ya nahi. Client se **line-by-line confirm karao** |
+| `m_mdm_skill` | 20 | ⚠️ Poori tarah humari invention — koi standard list hai hi nahi |
+| `m_mdm_school_type` | 6 | ⚠️ Ownership buckets humne chune. "Minority Institution" shayad alag flag ho, list item nahi |
+| `m_mdm_facility` | 12 | ⚠️ Granularity guess — Science/Computer lab alag rakhe, client ek "Laboratory" chah sakta hai |
+| `m_mdm_rejection_reasons` | 10 | ⚠️ Wording humari. Applicant ko dikhti hai, to client apni bhasha chahega — wo **Name** change hai |
+| `m_mdm_district` · `m_mdm_city` | **0** | 🔴 Seed hi nahi kiya. Dataset chahiye — source aur import plan 2.47 mein |
+
+**Reconcile karne ka tareeka:** `Code` pe match karo. `Name` freely badlo.
+Jo row nahi chahiye: `Is_Active = 0`, **kabhi DELETE nahi** (2.5). Nayi row:
+naya Code, agla free Id, kuch renumber mat karo.
+🔴 **Live Code kabhi mat badlo** — FKs usi se resolve hoti hain.
 
 > Q6 aur Q9 ab **blocking nahi** hain — dono interface ke peeche hain, decision baad mein bhi ho sakta hai bina kuch tode.
 
@@ -1807,6 +1975,7 @@ AI candidate matching · AI resume scoring/generation · Video interview / demo 
 | 2026-08-08 | 1 | **PHASE 1 CLOSE-OUT** — dono APIs clean rebuild 0/0, 121/121 SQL assertions, paanchon frontend prod builds clean, jp_sso 20 tables · 32 procs · 4 functions · 71 indexes. Known gaps section 2A mein likhe. Test 001 toota mila aur fix hua | ✅ Done |
 | 2026-08-09 | 2A | **`jp_mdm` database** — 23 masters + 8 transactional + error log = 32 tables, 91 indexes, 29 FKs, 4 IST functions, USP_LogError. Seed limited to the 5 masters we own. Re-run creates zero new objects | ✅ Done |
 | 2026-08-09 | 2C | **Approval engine** — 9 procedures + USP_LogError. RequestNo per-type-per-year counter, idempotent submit, RowVersion concurrency, multi-level engine. 26/26 test assertions | ✅ Done |
+| 2026-08-09 | 2B | **Master data seed** — 18 masters seeded ourselves (client lists never arrived), 5 marked PROVISIONAL. District/city left empty; CityId confirmed nullable so forms degrade to state-only. 2C suite re-verified 26/26 | ✅ Done |
 | — | 2E | Admin screens → `frontend/apps/admin` | ⬜ Next |
 | — | 2F | School screens → `frontend/apps/school` | ⬜ Next |
 
@@ -2146,7 +2315,7 @@ hai.
 
 ---
 
-## ✅ PHASE 2A + 2C COMPLETE — 2026-08-09
+## ✅ PHASE 2A + 2B + 2C COMPLETE — 2026-08-09
 
 | Check | Result |
 |---|---|
@@ -2167,50 +2336,56 @@ on a single-level seed. Details in **2.46**.
 
 ---
 
-## ▶️ NEXT: PHASE 2B — MASTER DATA SEED
+## ▶️ NEXT: PHASE 2D — `JP.App.Api` APPROVAL ENDPOINTS
 
-🔴 **2B CLIENT PE BLOCKED HAI.** Ye ek scheduling fact hai, kaam ka issue nahi.
+2C ke procedures maujood hain. Ab unpe controllers, contracts aur repository
+methods chahiye.
 
-### Kya chahiye client se
+### 🔴 Pehle 2.39 padho — organization scope
 
-| Master | Kya chahiye |
-|---|---|
-| Geography | `m_mdm_country` · `m_mdm_state` · `m_mdm_district` · `m_mdm_city` — poori list, aur city ke liye lat/long agar hai to |
-| Education | `m_mdm_board` · `m_mdm_school_type` · `m_mdm_qualification` · `m_mdm_subject` · `m_mdm_designation` · `m_mdm_class_level` · `m_mdm_stream` |
-| Profile | `m_mdm_gender` · `m_mdm_skill` · `m_mdm_language` · `m_mdm_facility` · `m_mdm_experience_range` |
-| Approval | `m_mdm_document_types` — kaunsa document kis request type pe, aur **mandatory hai ya nahi** · `m_mdm_rejection_reasons` |
+`OrganizationUid` **sirf JWT se**. Koi endpoint `SchoolId`,
+`OrganizationUid` ya `UserId` ko authorization ke liye parameter mein nahi
+leta. `BranchId` request body mein **data** ke roop mein aa sakti hai, par use
+caller ke resolved scope ke against validate karna hoga.
 
-⚠️ **Guess seed mat karna.** IDs contract hain. Baad mein theek karne ka matlab
-un rows pe data migration hai jinpe tab tak requests, documents aur schools ki
-foreign keys point kar rahi hongi. 2A ne isiliye kuch bhi guess nahi kiya.
+### 🔴 `IsCompleted` ka matlab
 
-### 2B ka discipline (2A jaisa hi)
-1. `03_seed/` mein naya numbered file, MERGE se, kabhi DELETE nahi
-2. `run_all.sql` mein `:r` se register — masters **pehle**, unpe depend karne
-   wale baad mein
-3. Geography apne hierarchy order mein: country → state → district → city
-4. Har file re-runnable — dobara chalane pe zero naye objects
+`USP_ProcessApprovalAction` `IsCompleted` return karta hai. Wo **API ka
+signal** hai ki ab cross-database kaam uska hai:
+- `jp_app` mein school banao
+- `jp_sso` mein user activate karo
+
+Ye kaam procedure mein **mat** karna — 2.2 cross-DB writes API layer mein rakhta
+hai, aur teen databases ka distributed transaction wahi coupling hai jo 2.2
+rokta hai.
+
+### Endpoints jo chahiye
+`USP_SubmitApprovalRequest` · `USP_GetApprovalRequestList` (paged, 2 result
+sets) · `USP_GetApprovalRequestById` (**5 result sets**, `QueryMultipleAsync`) ·
+`USP_ProcessApprovalAction` · `USP_ResubmitApprovalRequest` ·
+`USP_SaveRequestDocument` · `USP_VerifyDocument` ·
+`USP_GetPendingCountsByType` · `USP_GetMaster`
+
+### Discipline
+- `Response<T>` envelope, strict layering (2.3)
+- Repositories `internal` rehte hain — password hash wale types API project se
+  name hi nahi kiye ja sakte
+- `USP_GetApprovalRequestById` ke 5 result sets ka matlab ek dedicated
+  response DTO hai, na ki 5 alag calls
 
 ---
 
-## Agar 2B ka data abhi nahi aaya
-
-Ye tab tak ho sakta hai, kyunki inhe seed data nahi chahiye:
-
-**2D — `JP.App.Api` mein approval endpoints.** 2C ke procedures ab maujood
-hain; unpe controllers, request/response contracts aur repository methods
-chahiye. 🔴 **2.39 pehle padho** — `OrganizationUid` sirf JWT se, aur
-`USP_ProcessApprovalAction` ka `IsCompleted` flag API ko batata hai ki ab
-cross-database kaam (jp_app mein school, jp_sso mein user activate) uska hai.
+## Uske baad
 
 **2E — admin screens (`jp-admin`).** Approval queue, request detail, document
-verify. Ye G6 wala gap bhi band karta hai: abhi school approve karne ke liye
-Swagger se `PUT /api/users/{userUid}/status` chalana padta hai.
+verify. Ye **G6 gap band karta hai**: abhi school approve karne ke liye Swagger
+se `PUT /api/users/{userUid}/status` chalana padta hai.
 
 **2F — school screens (`jp-school`).** Registration submit + status tracking.
+⚠️ District/city dropdown **hide** karna hai jab tak dataset na aaye (2.47) —
+khaali dropdown "toota hai" padha jaata hai.
 
-Teeno ke liye 2.42 ka start order lagta hai: **`jp-shared` :4999 pehle**,
-warna app blank page pe boot hogi.
+Dono ke liye 2.42 ka start order: **`jp-shared` :4999 pehle**.
 
 ---
 
