@@ -1524,6 +1524,56 @@ untested hai (MVP ek hi level seed karta hai).
 nahi de rahi.
 ---
 
+### G11. Orchestration retry ka koi endpoint nahi
+
+Cross-DB orchestration **idempotent hai** — provisioning `SourceRequestUid` pe
+key karti hai, activation ab already-Active ko success maanti hai. Par use
+**dobara chalane ka koi API tareeka nahi**: request already Approved hai, to
+`POST /api/approvals/{id}/action` `INVALID_STATUS` de kar refuse karta hai.
+
+Abhi recovery sirf `USP_ProvisionSchoolFromApproval` seedha call kar ke hoti
+hai — jo kaam karta hai (verify kiya) par operator ko SQL access chahiye.
+
+**Kya chahiye:** `POST /api/approvals/{id}/retry-orchestration`,
+verification permission ke peeche, jo `IApprovalOrchestrationService.RunAsync`
+dobara chalaye. Phase 8 ise `USP_FindOrphanedApprovals` ke saut scheduled
+check se jod sakta hai.
+
+⚠️ Ye code ka bug nahi, **missing surface** hai. Orchestration retry-safe hai;
+usse trigger karne ka rasta nahi hai.
+
+### G12. Teacher profile — Phase 3 ko DO kaam karne hain, ek nahi
+
+Aaj ek teacher signup karta hai aur **turant Active** ho jaata hai (2.9), par
+uski koi profile row kahin nahi banti — kyunki `t_app_teachers` exist hi nahi
+karti.
+
+Phase 3 ko dono karne hain:
+
+1. **`t_app_teachers` banao**, aur signup pe profile create karna wire karo
+2. 🔴 **Backfill karo** — har us teacher ke liye jo table banne se pehle
+   register hua
+
+Sirf (1) kiya to Phase 1-2 ke dauraan signup kiye har teacher ke paas active
+account hoga bina profile ke, aur ye **Phase 5 mein ek null reference** ban kar
+saamne aayega, na ki ek obvious missing row ban kar.
+
+Teacher verification approval abhi `NOT_IMPLEMENTED_YET` type ka failed
+outcome deta hai (2.48) — approval record ho jaata hai, `IsVerified` set nahi
+hota, kyunki set karne ko row hi nahi hai.
+
+### G13. Virus scanning nahi hai
+
+Upload validation content ko sniff karti hai — `.exe` ko `.pdf` naam de kar
+bhejne wala attack ruk jaata hai. Par **ek malicious PDF asli PDF hi hota hai**
+aur har check pass kar jaayega.
+
+Hook `DocumentService.UploadAsync` mein marked hai: **validation ke baad,
+storage se pehle**, aur reject kar sakne wala.
+
+⚠️ `SaveAsync` ke baad **mat** rakhna — disk pe pada file wo file hai jo serve
+ho sakti hai.
+
 ### 2.45 `jp_mdm` — PHASE 2A BUILD NOTES
 
 32 tables (23 masters + 8 transactional + `t_mdm_error_log`), 91 indexes,
@@ -1901,6 +1951,182 @@ karta hai. Codes bhi alag (`TEST_MATH` vs `MATHS`). Dobara verify kiya:
 
 ---
 
+### 2.48 `JP.App.Api` — PHASE 2D ENDPOINTS AND CROSS-DB ORCHESTRATION
+
+Masters, approvals aur documents ke endpoints. Build **0 warning 0 error**.
+
+#### 🔴 Cross-DB orchestration — distributed transaction NAHI hai
+
+Approval complete hone par teen kaam hote hain, teen alag databases mein, **teen
+alag commits**:
+
+1. `jp_sso` — user Active + role grant
+2. `jp_app` — school create
+3. email queue
+
+2.2 kehta hai ye API layer mein ho. Sahi trade hai — MSDTC teeno databases ko
+permanently couple kar deta — par iska ek natija hai jise **handle karna padta
+hai, umeed nahi**: step 1 pass ho kar step 2 fail ho sakta hai, aur tab ek
+**Active user reh jaata hai bina profile ke**, jo sign in kar leta hai aur
+khaali shell pe girta hai.
+
+Teen cheezein isse survivable banati hain:
+
+**1. Ordering.** User pehle activate hota hai, school baad mein. Ulta karte to
+failure ek aisi school chhodta jisme koi sign in hi nahi kar sakta — dono taraf
+se invisible. Is tarah failure kam se kam **pahunch mein** hai: user exist karta
+hai aur shikayat kar sakta hai.
+
+**2. Idempotency.** Har step dobara chal sakta hai. Provisioning
+`SourceRequestUid` pe key karti hai (filtered unique index), activation ek fixed
+state pe transition hai, email queue hoti hai.
+
+**3. Loud failure.** Step 2 fail hone par `🔴 PARTIAL COMPLETION` Error log
+hota hai — `RequestNo`, `RequestId`, `UserId` ke saath — aur response mein
+`orchestrationCompleted = false` + `orchestrationError` jaata hai.
+
+⚠️ **HTTP 200 aata hai, 500 nahi.** Approval sach mein hua hai aur usse
+un-happen nahi kiya ja sakta (wo doosre database mein commit ho chuka). 500
+bolna jhooth hota. **Client ko `orchestrationCompleted` padhna hai, sirf status
+code nahi.**
+
+Safety net: `USP_FindOrphanedApprovals` — complete ho chuke approvals jinki
+school nahi bani.
+
+#### Verification — chaaron proofs, asli output
+
+| Proof | Result |
+|---|---|
+| (a) approval response | `orchestrationCompleted: false` + `orchestrationError` |
+| (b) log line | `🔴 PARTIAL COMPLETION. Approval REG-SCH-2026-00003 (RequestId 89): user 41 is ACTIVE but provisioning threw.` |
+| (c) reconciliation | teeno orphan requests mile, `REG-SCH-2026-00003` sahit |
+| (d) retry | pehli baar `School created.`, doosri baar `ALREADY_PROVISIONED`, **total schools = 1** |
+
+Step 2 ko `sp_rename` se genuinely tod kar test kiya — mock se nahi.
+
+#### 🔴 Verification ne teen asli bug pakde
+
+**1. `JP.App.Api` ke paas `Sso` connection string thi hi nahi.**
+Sirf `Mdm` aur `App`. Activation `InvalidOperationException: no connection
+string for the 'Sso' database` pe girta tha. Cross-DB orchestration API layer
+mein hai, to API ko **har us database ka connection chahiye jise wo orchestrate
+karta hai** — sirf apne ka nahi. `appsettings.json` mein add kiya, comment ke
+saath.
+
+**2. Activation idempotent nahi thi — aur isse retry hamesha ke liye toot
+jaata.** `USP_UpdateUserStatus` no-op transition ko `BUSINESS_RULE_VIOLATED`
+deta hai (admin ke do baar button dabane ke liye sahi, yahan galat). Matlab:
+step 1 pass + step 2 fail wale case ka **retry step 1 pe hi ruk jaata aur kabhi
+provision tak pahunchta hi nahi.** Orphan permanent ho jaata.
+Fix: `UpdateUserStatusForApprovalAsync` pehle current status padhta hai aur
+target pe pehle se hone par success return karta hai — message match kar ke
+nahi, kyunki message display text hai, contract nahi.
+
+**3. Retry ka koi API endpoint hai hi nahi.** Orchestration idempotent hai par
+use dobara chalane ka koi tareeka nahi — approval already Approved hai to
+`/action` refuse karta hai. Abhi retry sirf procedure seedha call kar ke hota
+hai. **G11 dekho.**
+
+#### 🔴 Teacher branch provision NAHI karti — jaan-boojh kar
+
+2.9: school ke liye approval activation ka **gate** hai, to profile approval par
+banti hai. Teacher ka account **signup se hi Active** hai — verification ek
+**badge** hai pehle se maujood profile par, gate nahi.
+
+To teacher branch ek **explicit branch** hai jo:
+- kuch provision nahi karti
+- school path pe fall through nahi karti
+- **failed outcome return karti hai**, success nahi
+
+Jo kaam hua hi nahi uske liye success bolna wahi orphan problem ek layer upar
+dobara bana deta — aur us baar reconcile karne ko kuch nahi hota.
+`t_app_teachers` Phase 3 hai. **G12 dekho.**
+
+#### File upload — har upload ko hostile maana
+
+`UploadValidator` mein chaar checks, har ek isliye ki baaki teen alag-alag
+bypass ho sakte hain:
+
+1. **Extension** — `m_mdm_document_types.AllowedExtensions` se, constant se nahi
+2. **🔴 Magic bytes** — content extension se match kare. Iske bina `.exe` ko
+   `.pdf` naam de kar sab kuch pass kar jaata. **Verify kiya**: `MZ` header wali
+   `evil.pdf` reject hui
+3. **Size** — `MaxSizeKb` usi row se, aur bytes uss cap tak hi padhi jaati hain
+4. **Storage name GUID hai** — client ka filename kabhi path nahi banta, to
+   `../../web.config` ke jaane ko jagah hi nahi. Verify kiya: disk pe
+   `f7d9e371...pdf`, `FileName=real.pdf` sirf metadata
+
+MIME **sniff** kiya hua store hota hai, `Content-Type` header se nahi — wo
+client input hai.
+
+⚠️ **Virus scanning abhi nahi hai.** Hook `DocumentService.UploadAsync` mein
+marked hai — validation ke baad, storage se pehle. **G13 dekho.**
+
+#### Download — 404, 403 nahi
+
+Non-owner ko `404 NOT_FOUND` milta hai. Document exist karta hai par tumhara
+nahi — ye confirm karna khud ek disclosure hai.
+
+Verify kiya (asli request se, kyunki ye wahi cheez hai jise global exception
+filter galat map kar sakta hai):
+
+| Caller | HTTP |
+|---|---|
+| owner (school) | **200** |
+| doosri school | **404** (`NOT_FOUND`) |
+| admin + permission | **200** |
+
+#### Masters — cache haan, menus ke ulat
+
+`/api/masters/*` pe `Cache-Control` 1 ghanta. `/api/menus` `no-store` hai
+kyunki wo **per-user aur permission-dependent** hai — usse cache karna ek banda
+doosre ka navigation dikha dega. Farak ehtiyat ka nahi, **content ka** hai: ek
+public reference data hai, doosra authorization ka result.
+
+⚠️ `districts`/`cities` **khaali list** dete hain, 404 nahi — form ko state-only
+pe degrade karna hai (2.47). Verify kiya: `HTTP 200`, `data: []`.
+
+#### IDOR
+
+`SubmitApprovalRequest` aur `ApprovalRequestFilter` mein `OrganizationUid`/
+`RequestorUserId` **hai hi nahi** — optional bhi nahi. Dono controller mein
+token se aate hain aur repository ko **alag arguments** ke roop mein jaate hain.
+Jo field aaj ignore hota hai, wo chhe mahine baad koi honour kar leta hai.
+
+Admin `null` scope pe sab dekhta hai; baaki sab apne `OrganizationUid` pe pinned
+hain — koi parameter ise badal nahi sakta.
+
+#### `USP_GetMaster` pe doosra whitelist NAHI
+
+Procedure khud apne CASE se branch chunta hai aur unknown key pe khaali set
+deta hai. Service/controller mein doosri list rakhne ka matlab **do lists jinhe
+agree karna padta** — aur jis din wo disagree karti hain, ya to ek master
+dropdown se gayab ho jaata hai ya koi naya reachable ho jaata hai jo nahi hona
+chahiye. **Ek gate, procedure mein.**
+
+#### Files
+
+```
+JP.Domain/Masters/MasterContracts.cs
+JP.Domain/Approvals/ApprovalContracts.cs
+JP.Infrastructure/Repositories/MdmModels.cs · MasterRepository.cs
+                              ApprovalRepository.cs · ProvisioningRepository.cs
+JP.Infrastructure/Services/MasterService.cs · ApprovalService.cs
+                           DocumentService.cs · ApprovalOrchestrationService.cs
+JP.Infrastructure/Storage/UploadValidator.cs
+JP.App.Api/Controllers/{Masters,Approvals,Documents}Controller.cs
+database/jp_app/01_tables/001_t_app_schools.sql · 002_t_app_error_log.sql
+database/jp_app/04_procedures/000_USP_LogError.sql · 001_provisioning.sql
+database/jp_sso/04_procedures/009_identity_lookup.sql
+database/jp_mdm/04_procedures/005_document_lookup.sql
+```
+
+⚠️ `t_app_schools` **Phase 3 se pull forward** hui — step 2 ko likhne ki jagah
+chahiye thi. Minimum columns; Phase 3 baaki ALTER se add karega, CREATE edit kar
+ke nahi.
+
+---
+
 ## 3. SCOPE (Client spec ke against)
 
 ### IN SCOPE — MVP
@@ -2028,6 +2254,8 @@ naya Code, agla free Id, kuch renumber mat karo.
 | 2026-08-09 | 2C | **Approval engine** — 9 procedures + USP_LogError. RequestNo per-type-per-year counter, idempotent submit, RowVersion concurrency, multi-level engine. 26/26 test assertions | ✅ Done |
 | 2026-08-09 | 2B | **Master data seed** — 18 masters seeded ourselves (client lists never arrived), 5 marked PROVISIONAL. District/city left empty; CityId confirmed nullable so forms degrade to state-only. 2C suite re-verified 26/26 | ✅ Done |
 | 2026-08-09 | 2C | **Independent verification** — fresh throwaway scripts, 9 scenarios incl. 3 genuinely parallel sessions (identical SubmittedOn tick). Sab pass. Ek coverage gap mila: suite RowVersion branch tak nahi pahunchti (G10). Cleanup ke baad counts baseline pe wapas | ✅ Done |
+| 2026-08-09 | 2C | **G10 closed** — two-level fixture suite mein add ki, 30/30 (26 se), level config restore hota hai | ✅ Done |
+| 2026-08-09 | 2D | **JP.App.Api endpoints** — masters/approvals/documents, cross-DB orchestration, upload hardening. Build 0/0. Chaaron step-2 proofs verify kiye. Teen asli bug pakde: Sso connection string missing, activation idempotent nahi thi (retry tod deta), retry endpoint nahi (G11) | ✅ Done |
 | — | 2E | Admin screens → `frontend/apps/admin` | ⬜ Next |
 | — | 2F | School screens → `frontend/apps/school` | ⬜ Next |
 
@@ -2373,7 +2601,7 @@ hai.
 |---|---|
 | `jp_mdm` objects | **33 tables · 93 indexes · 10 procedures · 4 functions · 30 FKs** |
 | `run_all.sql` re-run | **zero new objects** |
-| `001_test_approval_engine.sql` | **26 / 26** |
+| `001_test_approval_engine.sql` | **30 / 30** (G10 close hone ke baad; pehle 26) |
 | Suite leaves behind | **nothing** — request/trail/subject/series counts identical before and after |
 
 **2A** — 23 masters + 8 transactional + `t_mdm_error_log`, IST helpers,
@@ -2388,56 +2616,55 @@ on a single-level seed. Details in **2.46**.
 
 ---
 
-## ▶️ NEXT: PHASE 2D — `JP.App.Api` APPROVAL ENDPOINTS
+## ✅ PHASE 2D COMPLETE — 2026-08-09
 
-2C ke procedures maujood hain. Ab unpe controllers, contracts aur repository
-methods chahiye.
+Build **0 warning 0 error**. Endpoints live, orchestration verified end to end
+including a deliberately broken step 2. Details **2.48**.
 
-### 🔴 Pehle 2.39 padho — organization scope
+⚠️ Teen naye gaps: **G11** (retry endpoint nahi), **G12** (teacher backfill —
+Phase 3 ke liye zaroori), **G13** (virus scanning).
 
-`OrganizationUid` **sirf JWT se**. Koi endpoint `SchoolId`,
-`OrganizationUid` ya `UserId` ko authorization ke liye parameter mein nahi
-leta. `BranchId` request body mein **data** ke roop mein aa sakti hai, par use
-caller ke resolved scope ke against validate karna hoga.
+---
 
-### 🔴 `IsCompleted` ka matlab
+## ▶️ NEXT: PHASE 2E — ADMIN SCREENS (`jp-admin`)
 
-`USP_ProcessApprovalAction` `IsCompleted` return karta hai. Wo **API ka
-signal** hai ki ab cross-database kaam uska hai:
-- `jp_app` mein school banao
-- `jp_sso` mein user activate karo
+Approval queue, request detail, document verify. Ye **G6 band karta hai**: abhi
+school approve karne ke liye Swagger se call chalani padti hai.
 
-Ye kaam procedure mein **mat** karna — 2.2 cross-DB writes API layer mein rakhta
-hai, aur teen databases ka distributed transaction wahi coupling hai jo 2.2
-rokta hai.
+### Endpoints jo ready hain
+`GET /api/approvals` (paged, oldest-first) · `GET /api/approvals/{id}` ·
+`POST /api/approvals/{id}/action` · `GET /api/approvals/counts` ·
+`GET /api/documents/{id}` · `POST /api/documents/{id}/verify` ·
+`GET /api/masters/bulk`
 
-### Endpoints jo chahiye
-`USP_SubmitApprovalRequest` · `USP_GetApprovalRequestList` (paged, 2 result
-sets) · `USP_GetApprovalRequestById` (**5 result sets**, `QueryMultipleAsync`) ·
-`USP_ProcessApprovalAction` · `USP_ResubmitApprovalRequest` ·
-`USP_SaveRequestDocument` · `USP_VerifyDocument` ·
-`USP_GetPendingCountsByType` · `USP_GetMaster`
+### 🔴 Do cheezein jo UI ko sahi karni hain
 
-### Discipline
-- `Response<T>` envelope, strict layering (2.3)
-- Repositories `internal` rehte hain — password hash wale types API project se
-  name hi nahi kiye ja sakte
-- `USP_GetApprovalRequestById` ke 5 result sets ka matlab ek dedicated
-  response DTO hai, na ki 5 alag calls
+1. **`orchestrationCompleted` padho, sirf HTTP 200 nahi.** 200 ka matlab
+   approval commit hua. Agar `orchestrationCompleted: false` hai to account
+   ya school adhoora hai — admin ko **saaf dikhna chahiye**, warna wo aage badh
+   jaayega aur school owner khaali shell pe girega.
+
+2. **District/city dropdown HIDE karo**, disabled-empty mat dikhao (2.47).
+   Khaali dropdown "toota hai" padha jaata hai, "abhi nahi hai" nahi.
+
+### Start order
+2.42: **`jp-shared` :4999 pehle**, phir `jp-admin` :4200. Saath mein
+`JP.Sso.Api` :5199 aur ab **`JP.App.Api` :5299** bhi.
 
 ---
 
 ## Uske baad
 
-**2E — admin screens (`jp-admin`).** Approval queue, request detail, document
-verify. Ye **G6 gap band karta hai**: abhi school approve karne ke liye Swagger
-se `PUT /api/users/{userUid}/status` chalana padta hai.
-
 **2F — school screens (`jp-school`).** Registration submit + status tracking.
 ⚠️ District/city dropdown **hide** karna hai jab tak dataset na aaye (2.47) —
 khaali dropdown "toota hai" padha jaata hai.
 
-Dono ke liye 2.42 ka start order: **`jp-shared` :4999 pehle**.
+**Phase 3 — `t_app_teachers`.** Do kaam, ek nahi: table banana **aur**
+backfill karna. **G12** padho — sirf table bana dene se har wo teacher jo aaj
+signup kar chuka hai profile ke bina Active reh jaayega, aur ye Phase 5 mein
+null reference ban kar milega.
+
+Sab ke liye 2.42 ka start order: **`jp-shared` :4999 pehle**.
 
 ---
 
@@ -2450,7 +2677,10 @@ Dono ke liye 2.42 ka start order: **`jp-shared` :4999 pehle**.
 - **2.42** — frontend structure LOCKED.
 - **2.11** — SQL Server 2019 syntax only.
 - **2.21 / 2.30 / 2.31** — SP error convention, list-proc rules, CATCH ordering.
-- **2.45 / 2.46** — 2A aur 2C mein kya bana aur kyun.
+- **2.45 / 2.46 / 2.47 / 2.48** — 2A, 2C, 2B aur 2D mein kya bana aur kyun.
+- **2.48** — 🔴 cross-DB orchestration ka koi distributed transaction nahi hai.
+  Approval ka HTTP 200 ka matlab **orchestration succeed hua** nahi hai;
+  har caller ko `orchestrationCompleted` padhna hai.
 
 ### Wo do galtiyan jo is phase mein pakdi gayin, dobara mat karna
 1. **Proc ka result set badlo to usi commit mein uske test ka temp table badlo.**
