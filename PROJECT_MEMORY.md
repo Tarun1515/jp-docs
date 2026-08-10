@@ -1542,36 +1542,24 @@ check se jod sakta hai.
 ⚠️ Ye code ka bug nahi, **missing surface** hai. Orchestration retry-safe hai;
 usse trigger karne ka rasta nahi hai.
 
-### G12. Teacher profile — Phase 3 ko TEEN kaam karne hain, ek nahi
+### G12. Teacher profile — ✅ CLOSED (3B, 2026-08-10)
 
-Aaj ek teacher signup karta hai aur **turant Active** ho jaata hai (2.9), par
-uski koi profile row kahin nahi banti.
+Teeno kaam ho gaye:
 
-⚠️ **Phase 3A ne pehla kaam kar diya:** `t_app_teachers` ab **exist karti
-hai** (2.51). Baaki do — backfill aur `TEACHER_FREE` — 3B hain, aur tab tak ye
-gap khula hai. Table ka ban jaana isse band nahi karta; ab wo khaali hai bajaay
-gayab hone ke.
+1. ✅ `t_app_teachers` bani — Phase 3A (2.51)
+2. ✅ **11 profile backfill hui** — har maujooda teacher account ke liye
+3. ✅ **11 `TEACHER_FREE` subscription** assign hue
 
-Phase 3 ko teeno karne hain:
+Verify: `90_ops/001_verify_account_completeness.sql` ka check A aur check C
+dono **0 rows**.
 
-1. **`t_app_teachers` banao**, aur signup pe profile create karna wire karo
-2. 🔴 **Backfill karo** — har us teacher ke liye jo table banne se pehle
-   register hua
-3. 🔴 **`TEACHER_FREE` assign karo** un sab ko — Phase 2F ke baad har account
-   ka ek plan hota hai (2.50), aur teacher abhi ekmatra apwaad hain
+⚠️ **Signup pe profile banna abhi WIRE NAHI hua.** Backfill purane account
+sambhalta hai; ek naya teacher jo aaj register kare uski profile **fir se nahi
+banegi** — 3B ke baad bana account phir usi gap mein girega jo abhi band hua
+hai. **G21 dekho.**
 
-Sirf (1) kiya to Phase 1-2 ke dauraan signup kiye har teacher ke paas active
-account hoga bina profile ke, aur ye **Phase 5 mein ek null reference** ban kar
-saamne aayega, na ki ek obvious missing row ban kar.
-
-Teacher verification approval abhi `NOT_IMPLEMENTED_YET` type ka failed
-outcome deta hai (2.48) — approval record ho jaata hai, `IsVerified` set nahi
-hota, kyunki set karne ko row hi nahi hai.
-
-⚠️ Teesra kaam Phase 2F ne joda. `TEACHER_FREE` seed ho chuka hai (2.50) par
-use koi assign nahi karta, kyunki teacher ke paas latkane ko profile row hi
-nahi. Sirf pehla kaam karne se har purana teacher **har baar ek naye tareeke
-se** toota rahega.
+⚠️ Profile bhare hue hain par **saara data seeded hai**, asli nahi. **G20
+dekho** — G12 band hone se ye chhupna nahi chahiye.
 
 ### G13. Virus scanning nahi hai
 
@@ -1660,6 +1648,86 @@ rehte hain.
 **Kya chahiye:** `DELETE /api/approvals/draft` jo soft-delete kare. Uske saath
 Phase 8 mein chhode hue draft ki cleanup — sochne ki cheez ye hai ki uske
 documents disk par bhi pade hain.
+
+### G19. Ek Active school account jiski school hai hi nahi
+
+`head@stmarys.edu.in` — Active, `OrganizationUid` maujood, par
+`t_app_schools` mein koi row nahi. Phase 1 mein seed hua tha, approval engine
+se pehle.
+
+3B ne use plan de diya (har account ka ek plan hota hai), par **uski school kabhi
+nahi banegi**: provisioning ek approval request se chalti hai, aur iske peeche
+koi request hai hi nahi.
+
+Aaj asar chhota hai — sign in kar sakta hai, dashboard khaali dikhega. Wahi
+"Active user, kuch peeche nahi" wali shakl jise 2.48 ka orphan section pakadta
+hai, par usse dikhta nahi kyunki wo **completed approvals** dhoondta hai aur yahan
+koi approval hai hi nahi.
+
+**Kya karna hai:** ya to ek registration submit karke normal raste se approve
+karo, ya account hata do. Demo se pehle tay karo — ye wahi account hai jise
+"tenant isolation" dikhane ke liye HOW_TO_RUN suggest karta hai.
+
+### G20. 🔴 Saara teacher data SEEDED hai — asli nahi
+
+Gyaarah teacher profile bhare hue hain aur **har field invented hai**. Naam,
+qualification, experience row, salary, subject, skill, bhasha, preferred
+location — kisi insaan ne kuch nahi bhara.
+
+⚠️ **G12 band hone ka matlab ye nahi ki teacher data asli hai.** "G12 closed"
+padh kar koi ye maan sakta hai, aur isi liye ye alag gap hai.
+
+Phase 4 ya 5 mein jo bhi is data ke against **kaam karta dikhe** — job match,
+search filter, applicant card — wo **hamare gaddhe hue data** ke against kaam kar
+raha hai. Development ke liye theek hai; demo mein isse "asli istemal" bata kar
+dikhana galat hai.
+
+**Seeded accounts (sab `@yopmail.com`):**
+
+```
+tarun@yopmail.com                    Tarun Bhardwaj          95%
+meera.iyer.85999@yopmail.com         Meera Iyer             100%
+arjun.rao.86000@yopmail.com          Arjun Rao               70%
+fatima.sheikh.86001@yopmail.com      Fatima Sheikh           60%
+rohit.kulkarni.86002@yopmail.com     Rohit Kulkarni          65%
+sneha.banerjee.86003@yopmail.com     Sneha Banerjee          55%
+harpreet.gill.86004@yopmail.com      Harpreet Kaur Gill      75%
+vikram.chauhan.86005@yopmail.com     Vikram Singh Chauhan    45%
+lakshmi.nair.86006@yopmail.com       Lakshmi Nair            20%
+imran.qureshi.86007@yopmail.com      Imran Qureshi           10%
+anita.deshmukh21338@yopmail.com      Anita Deshmukh          35%
+```
+
+Password: nau 3B waalon ka `Teacher#2026!`.
+
+**Invented kya hai:** `t_app_teachers` ki har column (`UserUid` chhod kar,
+jo asli account se aayi), aur `t_app_teacher_subjects`,
+`_class_levels`, `_skills`, `_languages`, `_preferred_locations`,
+`_experiences` ki **har row**.
+
+**Asli kya hai:** account khud — email, mobile, password hash, `UserUid` —
+kyunki ye asli registration endpoint se bane (2.52).
+
+⚠️ Go-live se pehle ye sab hatana hai. **Ye list us waqt likhi gayi jab pata
+tha**; baad mein yaad karne ki koshish live database par andaaza lagana hoga.
+
+### G21. Signup par teacher profile abhi bhi nahi banti
+
+3B ne purane account backfill kar diye. Jo **aaj register kare** uski profile
+phir bhi nahi banti — `USP_RegisterTeacher` sirf `jp_sso` mein account banata
+hai, aur koi cheez `t_app_teachers` mein row nahi daalti.
+
+⚠️ Matlab **G12 dobara khulna shuru ho chuka hai**, ek-ek account karke. Aaj ke
+baad bana har teacher wahi backfill maangega jo abhi khatam hua.
+
+**Kya chahiye:** school ki tarah — registration ke baad profile banna wire karo.
+School ke liye ye provisioning karti hai (approval activation ko gate karta hai);
+teacher ke paas approval hai hi nahi (2.9), to profile **registration ke waqt**
+banni chahiye, ya pehle sign-in par.
+
+🔴 Ye 3C ka pehla kaam hai. Verification query
+(`90_ops/001_verify_account_completeness.sql`) chalao — check A abhi 0 hai,
+aur ek naye teacher signup ke baad **1 ho jaayega**. Wahi iska test hai.
 
 ### 2.45 `jp_mdm` — PHASE 2A BUILD NOTES
 
@@ -2808,6 +2876,185 @@ nahi (G12).
 
 ---
 
+### 2.52 BACKFILL AND SEEDED DATA — PHASE 3B
+
+Backfill chala, teacher profiles bhare. **Teeno verification check zero** —
+`90_ops/001_verify_account_completeness.sql`.
+
+#### Jo kami thi aur jo bana
+
+| Kya | Missing | Banaya | Pehle se |
+|---|---|---|---|
+| Teacher profile | 11 | 11 | 0 |
+| Teacher subscription | 11 | 11 | 0 |
+| Head-office branch | **2** | 2 | 1 |
+| School subscription (per org) | 2 | 2 | 1 |
+
+⚠️ **"Pehle check karo, shayad koi na ho" — the ho.** Do school aise mile jinke
+paas head office nahi tha: `Greenwood — Dwarka Campus` aur `Nalanda Vidyalaya`,
+dono 2F se pehle approve hue the. Migration ki zaroorat sach mein thi.
+
+Do organisation ko plan chahiye tha: Greenwood (jiske neeche **do** school hain
+— ek organisation, ek plan, 2.50) aur St Mary's.
+
+⚠️ **St Mary's ek anomaly hai:** Active school account, `OrganizationUid`
+maujood, par **koi school row nahi** — Phase 1 mein seed hua tha, approval engine
+se pehle. Use plan mil gaya (har account ka ek plan hota hai) par uski school
+kabhi nahi banegi, kyunki peeche koi approval request hai hi nahi. **G19 dekho.**
+
+#### 🔴 Backfill ne khud do bug paida kiye — dono ginti se pakde
+
+**1. Table variable ka IDENTITY `DELETE` par reset nahi hota.**
+
+Section 2 ne `@Teachers` ko `DELETE` karke dobara bhar diya. IDENTITY 12 se
+chalta raha, to `WHERE rn = @i` (1..11) kisi row se match nahi hua, `@UserUid`
+mein section 1 ki **aakhri** value padi rahi, aur wahi ek teacher gyaarah baar
+insert hua — ek safal, das 2601.
+
+Pakda kyun gaya: ginti **namumkin** thi. "das teacher ke paas pehle se
+subscription tha" us table mein jisme ek row thi. Isi liye report mein created
+aur already-present dono chapte hain — ek akela "done" ye chhupa leta.
+
+Fix: har section ka apna table variable. Reuse kabhi itna faayda nahi deta.
+
+**2. Pending organisation ko plan dena uski AAGE KI provisioning tod deta.**
+
+`USP_ProvisionSchoolFromApproval` school, head office aur subscription **ek hi
+transaction** mein banata hai, aur uska CATCH 2601 ko "already provisioned"
+padhta hai. Pending org ko abhi plan de dete, to approval ke waqt subscription
+ka insert takraata, **poora transaction rollback** hota — school samet — aur
+procedure null id ke saath success bolta.
+
+Ek school jo approve hua aur bana hi nahi, aur report mein sab theek. **Wahi
+failure jise rokne ke liye 2.48 hai**, ek nayi disha se.
+
+Ab sirf **Active** organisation backfill hoti hain. Pending ko uska plan approval
+ke waqt milta hai — wahi design hai. Pehli (buggy) run mein bane 7 galat
+subscription hata diye gaye.
+
+#### Idempotency ki shakl
+
+2601/2627 = "ho chuka", error nahi — wahi shakl jo `USP_ProvisionSchoolFromApproval`
+use karta hai (2.48). `WHERE NOT EXISTS` **jaan-boojh kar nahi**: wo check-then-act
+hai, wahi race jo is project mein do baar theek ho chuki hai, aur single-threaded
+run par har test pass karte hue bhi galat rehti.
+
+Doosri run: **0 created, har category mein.**
+
+#### ⚠️ Ye script jp_sso padhti hai aur jp_app likhti hai
+
+2.2 application ko rokta hai — matlab chalte hue system ka coupling. Ye
+application code nahi hai: ek baar chalne wali migration, jise operator sqlcmd se
+chalata hai. Gyaarah row backfill karne ke liye API endpoint likhna zyada
+machinery hai, aur wo product mein ek permanent "sabki profile dobara likh do"
+surface chhod jaata.
+
+🔴 Ise application kabhi call na kare. Agar kisi procedure ko ye shakl chahiye,
+wo API layer se jaayegi.
+
+#### Verification query — Phase 8 ka beej
+
+`database/jp_app/90_ops/001_verify_account_completeness.sql`. Teen check, teeno
+**zero honi chahiye**:
+
+```
+A. Active teacher jiski profile nahi          0  PASS
+B. School jiska head office nahi              0  PASS
+C. Active account jiska subscription nahi     0  PASS
+```
+
+⚠️ Check C mein owner **type ke hisaab se badalta hai**: teacher apna khud ka
+owner hai, school ka owner uski **organisation** hai (2.50). Per-user check karte
+to ek school ke doosre bande ko hamesha "missing" batata.
+
+`USP_FindOrphanedApprovals` poochta hai "approval poora hua kya"; ye poochta hai
+"har account saabut hai kya". Phase 8 dono schedule kare.
+
+#### 🔴 SAARA TEACHER DATA SEEDED HAI — koi asli nahi
+
+Gyaarah profile, **har field invented**. Koi insaan ne kuch nahi bhara.
+
+⚠️ Aapne poochha tha ki koi asli account to nahi — **koi nahi**. `tarun@yopmail.com`
+aapka apna test account hai aur aapne kaha ise bhi poora seed karo; baaki das
+maine banaye (ek 2D verification mein, nau 3B mein). **Kisi asli insaan ka
+account chhua nahi gaya, kyunki koi hai hi nahi.**
+
+**G20 dekho** — ye alag gap hai aur G12 ke band hone ke andar chhupna nahi
+chahiye.
+
+#### Completeness — jaan-boojh kar bikhri hui
+
+| % | Kaun | Kya nahi hai |
+|---|---|---|
+| 100 | Meera Iyer | — |
+| 95 | Tarun Bhardwaj | — |
+| 75 | Harpreet Kaur Gill | — |
+| 70 | Arjun Rao | photo |
+| 65 | Rohit Kulkarni | photo; **koi current job nahi** (band experience row) |
+| 60 | Fatima Sheikh | resume, about |
+| 55 | Sneha Banerjee | resume, photo |
+| 45 | Vikram Singh Chauhan | resume, photo, about |
+| 35 | Anita Deshmukh | **koi subject nahi**, skills nahi, salary nahi |
+| 20 | Lakshmi Nair | sirf naam, state aur do subject |
+| 10 | Imran Qureshi | sirf naam aur state |
+
+🔴 Ye shakl jaan-boojh kar hai. Phase 5 ko in sabko render karna hai, aur wo
+tabhi karega jab ye **banate waqt maujood** hon. Ek perfect dataset aisi screen
+paida karta hai jo asli data se takrate hi tootti hai.
+
+Khaas kar teen case jo pakka tootenge agar dhyaan na diya:
+- **Rohit** — koi current job nahi, sirf ek band row. "Currently at ___" khaali.
+- **Anita** — profile hai par subject **ek bhi nahi**. Subject se search karne par
+  isse **nahi** aana chahiye, aur profile screen phir bhi khulni chahiye.
+- **Imran** — naam aur state ke alawa kuch nahi. Har card, har filter, har sort.
+
+#### Coherence — aur ek dava jo galat nikla
+
+Subject, qualification aur designation aapas mein mel khate hain: PGT ke paas
+master's, PRT ke paas B.Ed, M.Sc Physics wali Physics padhati hai, PRT primary
+level par hai.
+
+⚠️ **`TotalExperienceMonths` haath se likha tha aur rows se match nahi kar raha
+tha** — 1 se 13 mahine ka farak. Ab wo **rows se derive hota hai**
+(`DATEDIFF` ka jod, khuli row aaj tak). Sab gyaarah ab match karte hain.
+
+Jo total apne hi evidence se ulta ho, wo aisi cheez hai jo search filter mein
+dikhti hai aur koi samjha nahi paata.
+
+#### Do purani seed galtiyaan bhi theek ki
+
+- **Brightfield Academy** — pata Gurugram, `StateId` 9 (Himachal). Ab 8 (Haryana).
+- **Greenwood — Dwarka Campus** — Dwarka Delhi mein hai, `StateId` Gujarat tha.
+  Ab 32 (Delhi). Registration rows 2E mein theek hui thi par **provisioned school
+  row nahi**, aur 3B ke backfill ne wahi galat state head office mein copy kar di.
+
+⚠️ Teeno baar wahi galti: state id **dekhe bina** likh diya. Seed data mein
+master id kabhi guess mat karo.
+
+#### `m_mdm_language` khaali thi
+
+2B ne 18 master seed kiye, ye unme nahi tha — 3B mein pata chala jab teacher
+languages ko point karne ko kuch nahi mila. 26 bhasha seed ki
+(`03_seed/009_seed_languages.sql`).
+
+**Provisional mark NAHI** — 2.47 wo tab lagata hai jab humne list gaddi ho jispe
+client ki raay hogi. Indian school jin bhashaon mein padhate hain wo tathya hain;
+client ek jod sakta hai, ye nahi kahega ki Marathi is list mein nahi hoti.
+
+#### Files
+
+```
+database/jp_mdm/03_seed/009_seed_languages.sql               (naya)
+database/jp_app/03_seed/001_backfill_phase3b.sql             (naya)
+database/jp_app/90_ops/001_verify_account_completeness.sql   (naya — rakhna hai)
+database/run_all.sql
+```
+
+⚠️ Profile ka data script mein nahi hai — wo ek baar chalaya gaya seed hai. Kaun
+se account seeded hain, **G20** mein list hai.
+
+---
+
 ## 3. SCOPE (Client spec ke against)
 
 ### IN SCOPE — MVP
@@ -2940,6 +3187,7 @@ naya Code, agla free Id, kuch renumber mat karo.
 | 2026-08-10 | 2E | **Admin verification panel** — queue, request detail with an inline PDF/image viewer, dashboard, orphan section. **G11 closed** (retry + reconciliation endpoints). Production build clean, screenshots at 1440 and 375. Chaar asli bug pakde: reject provisioning kar deta tha, multi-word master keys khaali, DateOnly read phenkti thi, detail header mein EntityName nahi | ✅ Done |
 | 2026-08-10 | 2F | **School registration** — 5-step form with a server-side draft, account-status wired to the real request. Three pull-forwards: branches, PAN, plans+subscriptions. Provisioning now writes three rows in one transaction under one guard. 🔴 No Aadhaar number is stored anywhere, by decision. Whitelist misses are logged. Full flow verified end to end | ✅ Done |
 | 2026-08-10 | 3A | **jp_app tables** — 12 new + 2 ALTER for the columns 2D/2F deferred. jp_app now 16 tables · 63 indexes · 15 FKs · 47 checks. Re-run creates zero new objects. Guard test 17/17: duplicate profile, duplicate bridge and all four CHECKs refuse; soft-delete re-add and two-roles-one-school are allowed | ✅ Done |
+| 2026-08-10 | 3B | **Backfill + seeded profiles** — 11 teacher profiles, 11 teacher plans, 2 head-office branches, 2 org plans. All three completeness checks return 0. **G12 closed.** Two bugs the counts caught: a table variable's IDENTITY not resetting on DELETE, and giving a pending org a plan (which would have broken its future provisioning). Teacher data is entirely seeded — G20 | ✅ Done |
 | — | 2E | Admin screens → `frontend/apps/admin` | ⬜ Next |
 | — | 2F | School screens → `frontend/apps/school` | ⬜ Next |
 
@@ -3348,31 +3596,41 @@ nahi hai.
 
 ---
 
-## ▶️ NEXT: PHASE 3B — BACKFILL
+## ✅ PHASE 3B COMPLETE — 2026-08-10
 
-🔴 **Teen kaam, ek nahi** (G12):
+Backfill chala aur **teeno completeness check zero** hain. 11 teacher profile,
+11 teacher plan, 2 head-office branch, 2 org plan. Details **2.52**.
 
-1. `t_app_teachers` mein har us teacher ke liye profile banao jo table banne
-   se **pehle** register hua
-2. signup pe profile banna **wire karo**, taaki agla teacher backfill ka
-   intezaar na kare
-3. un sab ko **`TEACHER_FREE` assign karo** — 2F ke baad har account ek plan
-   par hota hai (2.50), aur teacher ekmatra apwaad bache hain
+**G12 CLOSED** — teeno kaam ho gaye.
 
-### Jo 3A ne 3B ke liye tayyar kiya
+⚠️ Teen naye gap: **G19** (Active school jiski school nahi), **G20** (saara
+teacher data seeded hai, asli nahi), **G21** (signup par profile abhi bhi nahi
+banti — G12 ek-ek account karke dobara khulega).
 
-`UQ_t_app_teachers_UserUid` (filtered) ka matlab hai backfill **dobara chalane
-layak** hai: doosri run duplicate profile nahi bana sakti, wo refuse hogi. Isi
-tarah `UQ_t_app_subscriptions_OneActivePerOwner` doosra plan nahi banne dega.
+---
 
-⚠️ Dono guard **refuse** karte hain, chup-chaap skip nahi karte. 3B ko duplicate
-ko error ki tarah nahi, "pehle se ho chuka" ki tarah handle karna hoga — wahi
-shakl jo `USP_ProvisionSchoolFromApproval` ne li thi (2.48).
+## ▶️ NEXT: PHASE 3C — TEACHER PROFILE API
 
-### Kitne teacher hain
+🔴 **Pehla kaam G21 hai**, feature nahi: signup par profile banna wire karo,
+warna aaj ke baad bana har teacher wahi backfill maangega jo abhi khatam hua.
 
-`jp_sso.t_sso_users` mein `UserTypeId = 3` waale. Shuru karne se pehle gino
-— aur backfill ke baad wahi ginti `t_app_teachers` mein honi chahiye.
+Uske baad profile ka apna API: padho, likho, subject/skill/bhasha/location
+bridges, experience rows, documents.
+
+### Jo 3A/3B se ready hai
+Saari table, saare guard (`UQ_t_app_teachers_UserUid` ek account ek profile),
+gyaarah bhare hue profile jinki completeness **jaan-boojh kar bikhri hui hai**
+(2.52) — 10% se 100% tak.
+
+### 🔴 Aadhe bhare profile ke against banao, poore ke against nahi
+Teen case jo pakka todenge agar unhe dekha na jaaye:
+- **Rohit Kulkarni** — koi current job nahi, sirf ek band experience row
+- **Anita Deshmukh** — profile hai, **subject ek bhi nahi**
+- **Imran Qureshi** — sirf naam aur state
+
+### Verification
+Har change ke baad `90_ops/001_verify_account_completeness.sql` chalao. Teeno
+check zero rehni chahiye.
 
 ---
 
