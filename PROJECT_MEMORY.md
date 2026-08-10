@@ -1542,17 +1542,19 @@ check se jod sakta hai.
 ⚠️ Ye code ka bug nahi, **missing surface** hai. Orchestration retry-safe hai;
 usse trigger karne ka rasta nahi hai.
 
-### G12. Teacher profile — Phase 3 ko DO kaam karne hain, ek nahi
+### G12. Teacher profile — Phase 3 ko TEEN kaam karne hain, ek nahi
 
 Aaj ek teacher signup karta hai aur **turant Active** ho jaata hai (2.9), par
 uski koi profile row kahin nahi banti — kyunki `t_app_teachers` exist hi nahi
 karti.
 
-Phase 3 ko dono karne hain:
+Phase 3 ko teeno karne hain:
 
 1. **`t_app_teachers` banao**, aur signup pe profile create karna wire karo
 2. 🔴 **Backfill karo** — har us teacher ke liye jo table banne se pehle
    register hua
+3. 🔴 **`TEACHER_FREE` assign karo** un sab ko — Phase 2F ke baad har account
+   ka ek plan hota hai (2.50), aur teacher abhi ekmatra apwaad hain
 
 Sirf (1) kiya to Phase 1-2 ke dauraan signup kiye har teacher ke paas active
 account hoga bina profile ke, aur ye **Phase 5 mein ek null reference** ban kar
@@ -1561,6 +1563,11 @@ saamne aayega, na ki ek obvious missing row ban kar.
 Teacher verification approval abhi `NOT_IMPLEMENTED_YET` type ka failed
 outcome deta hai (2.48) — approval record ho jaata hai, `IsVerified` set nahi
 hota, kyunki set karne ko row hi nahi hai.
+
+⚠️ Teesra kaam Phase 2F ne joda. `TEACHER_FREE` seed ho chuka hai (2.50) par
+use koi assign nahi karta, kyunki teacher ke paas latkane ko profile row hi
+nahi. Sirf pehla kaam karne se har purana teacher **har baar ek naye tareeke
+se** toota rahega.
 
 ### G13. Virus scanning nahi hai
 
@@ -1619,6 +1626,36 @@ aur admin ki nazar se gayab rahegi.
 
 Phase 3 branches ke saath: ya teesra tab, ya Schools tab ko dono types dikhane
 do. Doosra shayad sahi hai — verify karne wala kaam ek jaisa hai.
+
+### G17. Ek document replace karne ke liye poora form khulta hai
+
+Resubmit-required par account-status sahi document ka naam aur reason dikhati
+hai, par "Replace the document" **poore registration form ke document step** par
+le jaata hai.
+
+Kaam ho jaata hai — upload wahi hai, versioning proc sambhalta hai (naya version
+banta hai, purana rehta hai) — par jise ek file dobara bhejni hai use paanch-step
+form dikhta hai jo pehle hi bhara hua hai. Wo "kya mujhe sab dobara karna hai?"
+padha jaata hai.
+
+**Kya chahiye:** `/account/documents` (abhi `comingSoon` hai) ek chhoti screen
+bane jisme sirf wahi document ho jo wapas aaya hai, uska reason, aur ek upload.
+
+⚠️ Chhota kaam, par ye us screen par hai jahan school pehle se pareshan hai.
+
+### G18. Draft discard karne ka koi tareeka nahi
+
+Draft `StatusId 8` wali request hai, aur ek user ka ek hi draft hota hai. Use
+**mitane ka koi rasta nahi** — na UI mein, na API mein.
+
+Aaj ka asar chhota hai: agla save usi draft ko overwrite karta hai, to koi
+phansta nahi. Par "sab mita kar naye sire se shuru karo" wala option nahi hai,
+aur chhode hue draft hamesha ke liye `t_mdm_approval_requests` mein baithe
+rehte hain.
+
+**Kya chahiye:** `DELETE /api/approvals/draft` jo soft-delete kare. Uske saath
+Phase 8 mein chhode hue draft ki cleanup — sochne ki cheez ye hai ki uske
+documents disk par bhi pade hain.
 
 ### 2.45 `jp_mdm` — PHASE 2A BUILD NOTES
 
@@ -2374,6 +2411,214 @@ defined` boot par, kyunki remote ka bundle host ke runtime mein load hota hai.
 
 ---
 
+### 2.50 SCHOOL REGISTRATION — PHASE 2F
+
+`jp-school` mein paanch-step registration form + account-status ko asli data se
+joda. Teeno frontend production build **clean**. Poora flow end to end verify
+kiya: register → draft → upload → submit → admin approve → school sign in.
+
+#### 🔴 TEEN PULL-FORWARD, ek hi wajah se
+
+**Provisioning IS PHASE mein hoti hai.** Jo cheez school ke exist karte hi honi
+chahiye, wo usi transaction mein banni chahiye. Baad mein add karne ka matlab
+beech mein approve hue har school ke liye **backfill** — wahi gap jo teacher
+profiles ke liye pehle se hai (G12), aur use teen baar banane ka koi faayda
+nahi.
+
+| Aage kheecha | Kyun abhi |
+|---|---|
+| `t_app_school_branches` | Har school ko din se ek head office chahiye |
+| PAN — registration + school | Registration pe liya jaata hai, provisioning ke paar bachna chahiye |
+| `m_mdm_plans` + `t_app_subscriptions` | Har account ko din se ek plan chahiye — koi null state nahi |
+
+**Teen INSERT, ek guard, ek transaction.** School, uski head-office branch aur
+uska subscription — teeno `SourceRequestUid` wale idempotency guard ke **andar**,
+uske bagal mein nahi.
+
+⚠️ Bahar rakhne par retry school ko dhoondh kar chhod deta aur **doosri head
+office + doosra subscription** bana deta. Us waqt kuch shikayat nahi karta;
+school ke paas do address aur do plan ho jaate, aur jise baad mein pata chalta
+use ye tay karne ka koi tareeka nahi hota ki sahi kaun sa tha.
+
+Do aur guard database mein: `UQ_..._OneHeadOffice` (per school) aur
+`UQ_..._OneActivePerOwner` (per organisation).
+
+⚠️ PlanId **API resolve karti hai**. Plans `jp_mdm` mein hain, subscriptions
+`jp_app` mein, aur dono join nahi kar sakte (2.2) — to API plan padh kar id
+provisioning ko deti hai. Plan na mile to provisioning **rukti hai**, school
+bina plan ke nahi banti: "har account ka ek plan hota hai" tabhi sach hai jab
+code exception banane se mana kar de.
+
+#### 🔴 AADHAAR NUMBER KAHIN NAHI — aur ye jaan-boojh kar hai
+
+**Teacher ke liye Aadhaar number ka field NAHI banaya, aur aage bhi nahi
+banana.**
+
+Aadhaar number store karna Aadhaar Act aur UIDAI rules ke tehat restricted hai.
+Private entity aam taur par bina specific authorisation ke poora number retain
+nahi kar sakti, aur penalty lagti hai. Asli verification ke liye UIDAI-authorised
+KYC provider chahiye — jo hum nahi hain.
+
+**Iski jagah:** `m_mdm_document_types` mein IdProof pehle se hai. Teacher chunta
+hai ki wo kaun sa government photo ID de raha hai — Aadhaar, PAN, Voter ID,
+Passport ya Driving Licence — aur document upload karta hai. **Koi identity
+number store hi nahi hota.**
+
+⚠️ Agar client khaas taur par Aadhaar number capture karne ko kahe, wo unka
+legal faisla hai aur **likhit mein, unki apni legal advice ke saath** confirm
+hona chahiye. Zubaani request par implement mat karna.
+
+#### 🔴 DRAFT ek REQUEST hai, alag table nahi
+
+Form paanch step + document uploads ka hai. School ko beech mein chhod kar wapas
+aana **safe hona chahiye** — adhoora form aur upload ki hui files kho dena
+matlab wo wapas aate hi nahi.
+
+Seedha design ek drafts table hota JSON blob ke saath. **Kaam nahi karta**, aur
+wajah documents hain: upload `RequestId` se judta hai, to pehli file store hone
+se pehle ek request row honi hi chahiye. JSON draft ko apna parallel document
+store chahiye hota, aur phir submit pe unhe asli request pe migrate karna — ek
+step jo school ko "ho gaya" bolne ke **baad** fail ho sakta hai.
+
+To draft hi request hai, `StatusId 8 (DRAFT)` mein — jo `m_mdm_approval_status`
+mein hamesha se tha aur ab tak kisi ne use nahi kiya. Documents pehle upload se
+hi usse judte hain aur kabhi hilte nahi.
+
+⚠️ `UQ_..._OnePendingPerEntity` `StatusId = 1` par filtered hai, to draft usse
+takraate nahi — isi wajah se ye index ko chhue bina chalta hai.
+
+⚠️ Draft ko **asli RequestNo nahi milta**. Wo per-type-per-year counter se aata
+hai, aur draft ke waqt allocate karne ka matlab har us bande ke liye ek number
+jala dena jo form khol kar chala gaya — us sequence mein permanent gaps jise log
+poora maante hain. To draft `DRAFT-000123` apne sequence se leta hai, aur asli
+number **submit pe** milta hai.
+
+#### PAN — optional, dono taraf format-checked
+
+`t_mdm_school_registration_details` aur `t_app_schools` dono par, taaki
+provisioning ke paar bache.
+
+⚠️ **Nullable, aur nullable hi rahega.** Kai chhote school ke paas signup ke waqt
+PAN haath mein nahi hoga, aur jis field ko admin baad mein maang sakta hai uspe
+registration rokna jitni mehnat bachata hai usse zyada sign-up gawaata hai.
+Format check hota hai **jab value di ho** — AAAAA9999A, uppercased — uska na hona
+error nahi hai.
+
+Client aur server dono par wahi regex. Client sakht hota to wo PAN reject karta
+jo API maan leti.
+
+#### Whitelist ka silent miss ab log hota hai
+
+`USP_GetMaster` unknown key par khaali list deta hai. Table names dhoondhne wale
+ke liye ye sahi hai — par yahi cheez school-type mismatch (2.49) ko hafton
+invisible rakhe hue thi.
+
+**Response bilkul waisa hi hai.** Ek `@Recognised` OUTPUT parameter add hua, aur
+service unknown key par **warning log karti hai jisme key ka naam hota hai**.
+Caller ko kuch nahi pata chalta; humein turant pata chal jaata hai.
+
+Warning, error nahi: response sahi hai, aur jo alert internet se aane wale har
+probe pe bajta hai wo ek din mein band kar diya jaata hai.
+
+Verify kiya: `GET /api/masters/not-a-real-master` → `200 []`, aur log mein
+`Master key not-a-real-master is not in USP_GetMaster's whitelist.`
+
+#### Form ne khud teen cheezein pakdi
+
+**1. Document types generic master se aa rahe the — aur wahan rules hote hi
+nahi.** Generic shape Id/Code/Name/DisplayOrder/ParentId hai; `IsMandatory`,
+`MaxSizeKb` aur `AllowedExtensions` teeno gir jaate hain. Natija: **kuch bhi
+required mark nahi hota tha**, "ye abhi baaki hai" wala gate khaali upload step
+par chup-chaap pass ho jaata tha, aur size hint padha nahi — **banaya** gaya tha.
+Fix: `/api/masters/bulk`, jo `DocumentTypeDto` deta hai (2.48).
+
+**2. Select ke placeholder ke liye explicit `null` chahiye.** Form
+`schoolTypeId` ko `undefined` par shuru karta tha, aur `[ngValue]="null"` wale
+option se wo match nahi karta — to naye form ke dropdown **khaali** dikhte the,
+"Choose…" ke bina. Wo "list load nahi hui" padha jaata hai, "kisi ne chuna nahi"
+nahi.
+
+**3. Account-status ka right panel khaali tha.** Shell mein `authPanel` slot
+hamesha se hai; login aur register use bharte hain, ye page nahi bharta tha — to
+1440 pe intezaar ke baare mein ek page ke bagal mein aadhi screen khaali dark
+thi. Ab wahan wo sawaal ka jawab hai jo us haalat mein banda sach mein poochh
+raha hota hai.
+
+#### Account-status ab wo waada nibhata hai
+
+Phase 1D ki copy kehti hai: *"If we do, this page will name exactly which one and
+why."* Wo page pehle poora `?code=` se render hota tha — account ke baare mein
+sach, registration ke baare mein chup.
+
+Ab school ki apni request load hoti hai aur **uska asli status decide karta
+hai** kya likha jaayega. Code sirf un states ke liye fallback hai jinke peeche
+koi request hoti hi nahi — suspended, locked.
+
+Resubmit-required par screen **document ka naam, reason aur reviewer ke apne
+shabd** dikhati hai. Reject par wahi, par **koi resubmit button nahi** — jo
+faisla yahan se palta nahi ja sakta uske paas madad-jaisa dikhta button us
+insaan ki aakhri baaki cheez zaya karta hai: ek aur koshish karne ki icchha.
+
+#### Form ne jo jaan-boojh kar NAHI poochha
+
+**Branch list.** Verification school-level hai, form pehle hi paanch step ka
+hai, aur jis school ne abhi product use karne ka faisla nahi kiya wo us waqt
+baarah campus ginwane nahi baithega. Ek radio poochhta hai — ek campus ya kai —
+jo sirf ek **UI flag** hai: dashboard baad mein kya dikhaye, data ki shakl nahi.
+Branch management Phase 3 hai, approval ke baad.
+
+**Price ke baare mein kuch bhi.** Pricing final nahi hai, public FAQ khud kehta
+hai, aur registration ke dauraan dikha number wo hai jispe humein pakda jaayega.
+
+#### Verification — asli endpoints ke against
+
+| Check | Result |
+|---|---|
+| draft steps mein save, phir resume | `DRAFT-000002`, PAN `ABCDE1234F`, 2 documents |
+| malformed PAN | `400` — "It is ten characters: five letters, four digits, then a letter" |
+| districts / cities khaali | `200 []` dono — form state-only pe degrade karta hai |
+| unknown master key | `200 []` + server par named warning |
+| submit | `REG-SCH-2026-00009` |
+| submit dobara | `400` "already been submitted" |
+| admin approve | `200`, `orchestrationCompleted: true` |
+| school + branch + subscription | **teeno bane**, ek approval se |
+| retry | schools/branches/subs `1/1/1` → `1/1/1` |
+| school sign in | `200` |
+
+#### Files
+
+```
+database/jp_app/01_tables/003_t_app_school_branches.sql        (naya)
+database/jp_app/01_tables/004_t_app_subscriptions.sql          (naya)
+database/jp_app/01_tables/001_t_app_schools.sql                (PanNumber)
+database/jp_app/04_procedures/001_provisioning.sql             (teen insert, ek guard)
+database/jp_mdm/01_tables/035_m_mdm_plans.sql                  (naya, + subscription status)
+database/jp_mdm/01_tables/029_t_mdm_school_registration_details.sql (PanNumber)
+database/jp_mdm/03_seed/008_seed_plans.sql                     (naya — do free plan, koi price nahi)
+database/jp_mdm/04_procedures/007_registration_drafts.sql      (naya — save/get/submit)
+database/jp_mdm/04_procedures/008_plans.sql                    (naya)
+database/jp_mdm/04_procedures/004_documents_masters.sql        (@Recognised)
+jp-backend/JP.Infrastructure/Repositories/PlanRepository.cs    (naya)
+jp-backend/JP.Infrastructure/Services/{ApprovalService,MasterService,ApprovalOrchestrationService}.cs
+jp-backend/JP.App.Api/Controllers/ApprovalsController.cs       (draft endpoints)
+jp-shared/src/core/models/approval.model.ts                    (jp-admin se yahan aaya)
+jp-school/src/app/core/registration.service.ts                 (naya)
+jp-school/src/app/features/account/registration/*              (naya)
+jp-school/src/app/features/account/account-status/*            (asli data se juda)
+```
+
+⚠️ **Approval models ab `jp-shared/models` mein hain.** Wo jp-admin ke andar the;
+2F ne jp-school ko usi flow ka doosra sira diya, aur ek C# contract ki do
+hath-se-rakhi copies wahi drift hai jiske khilaf unhi files ka header chetavani
+deta hai. Ek copy, dono app usse import karte hain.
+
+⚠️ **Operational, 2.49 se sakht:** dev server chalte hue `ng build
+--configuration production` **mat** chalao. Dono ek hi federation artifacts
+likhte hain, aur host boot par `ReferenceError: ngDevMode is not defined` de kar
+girta hai. Dev server band karo, build karo, phir dev server dobara chalao.
+
+---
+
 ## 3. SCOPE (Client spec ke against)
 
 ### IN SCOPE — MVP
@@ -2504,6 +2749,7 @@ naya Code, agla free Id, kuch renumber mat karo.
 | 2026-08-09 | 2C | **G10 closed** — two-level fixture suite mein add ki, 30/30 (26 se), level config restore hota hai | ✅ Done |
 | 2026-08-09 | 2D | **JP.App.Api endpoints** — masters/approvals/documents, cross-DB orchestration, upload hardening. Build 0/0. Chaaron step-2 proofs verify kiye. Teen asli bug pakde: Sso connection string missing, activation idempotent nahi thi (retry tod deta), retry endpoint nahi (G11) | ✅ Done |
 | 2026-08-10 | 2E | **Admin verification panel** — queue, request detail with an inline PDF/image viewer, dashboard, orphan section. **G11 closed** (retry + reconciliation endpoints). Production build clean, screenshots at 1440 and 375. Chaar asli bug pakde: reject provisioning kar deta tha, multi-word master keys khaali, DateOnly read phenkti thi, detail header mein EntityName nahi | ✅ Done |
+| 2026-08-10 | 2F | **School registration** — 5-step form with a server-side draft, account-status wired to the real request. Three pull-forwards: branches, PAN, plans+subscriptions. Provisioning now writes three rows in one transaction under one guard. 🔴 No Aadhaar number is stored anywhere, by decision. Whitelist misses are logged. Full flow verified end to end | ✅ Done |
 | — | 2E | Admin screens → `frontend/apps/admin` | ⬜ Next |
 | — | 2F | School screens → `frontend/apps/school` | ⬜ Next |
 
@@ -2889,48 +3135,65 @@ hota hai, par user ko suspend/reactivate karna abhi bhi Swagger hai.
 
 ---
 
-## ▶️ NEXT: PHASE 2F — SCHOOL SCREENS (`jp-school`)
+## ✅ PHASE 2F COMPLETE — 2026-08-10
 
-Registration submit + status tracking. Doosri taraf ka wahi flow jo 2E ne abhi
-banaya.
+Teeno frontend production build **clean**. Registration form, server-side draft,
+account-status asli data par. Details **2.50**.
 
-### Jo 2E se ready mila
-`POST /api/approvals/submit` (idempotent — double-click `alreadyPending`
-deta hai, error nahi) · `GET /api/approvals` (apni hi requests, token se
-scoped) · `GET /api/approvals/{id}` · `POST /api/approvals/{id}/resubmit` ·
-`POST /api/documents/upload` · `GET /api/masters/bulk`
+**MILESTONE 1 REACHED** — school signup → admin approve → school active, end to
+end, sab asli endpoints se.
 
-### 🔴 Teen cheezein jo school ki taraf sahi karni hain
+⚠️ Do naye gaps: **G17** (ek document replace karne ke liye poora form),
+**G18** (draft discard nahi hota). **G12** ab teen kaam bolti hai, ek nahi.
 
-1. **Rejection reason ALAG dikhao, remarks se alag.** Dono ab data hain
-   (2.49). Reason batata hai *kya* galat hai, remarks batata hai *kya karna
-   hai* — inhe ek paragraph mein mila dena wo instruction dhundhla deta hai
-   jiske liye school wapas aaya hai.
+---
 
-2. **District/city dropdown HIDE karo**, disabled-empty mat dikhao (2.47).
+## ▶️ NEXT — MILESTONE 1 DEMO, phir Phase 3
 
-3. **Resubmit sirf requestor kar sakta hai** — API isse enforce karti hai
-   (organisation ka koi doosra banda nahi, admin bhi nahi). UI ko wo button us
-   soorat mein dikhana hi nahi chahiye.
+### 🔴 Demo se pehle — chaar cheezein
+
+1. **Jaan-boojh kar gandi demo data saaf karo.** `REG-SCH-2026-00005` (Little
+   Scholars Primary) ko orphan chhoda gaya tha taaki dashboard ka section
+   development mein dikhe. Retry daba do, ya row hata do. Ek toota school demo
+   mein wahi cheez hai jispe sabki nazar jaayegi.
+
+2. **Nayi screenshots.** `screenshots/2e/` aur `2f/` mein jo hain wo asli
+   hain par test data ke saath — Meadowbrook, Hilltop, Silverline. Demo ke liye
+   apna data chuno.
+
+3. **Known gaps dobara padho** (section 2A) aur dekho ki koi cheez sharminda
+   karne wali to nahi. Khaas kar **G0 — kisi repo ka git remote nahi hai.**
+
+4. **Saaf saaf batao kaun si screen asli hai aur kaun si abhi mockup.** Applicants
+   table fixture par chalti hai (G6). Dashboard ke aankde asli hain. Ye demo mein
+   khud batana behtar hai, baad mein poochhe jaane se.
+
+### Phase 3 — `t_app_teachers`, branches, aur profiles
+
+🔴 **G12 teen kaam kehti hai, ek nahi:** table banao, backfill karo, aur
+`TEACHER_FREE` assign karo.
+
+Branches ke saath **G16** band karo — request type 3 ka queue mein tab nahi hai,
+to aaj submit hui branch-add request admin ko dikhti hi nahi.
 
 ### Start order
-2.42: **`jp-shared` :4999 pehle**, phir `jp-school` :4300, saath mein
-`JP.Sso.Api` :5199 aur `JP.App.Api` :5299.
+2.42: **`jp-shared` :4999 pehle**, phir jo app chahiye. `JP.Sso.Api` :5199,
+`JP.App.Api` :5299.
 
-⚠️ `jp-shared` aur host **ek hi build mode** mein — warna boot par
-`ngDevMode is not defined` (2.49).
+⚠️ Dev server chalte hue production build **mat** karo (2.50).
 
 ---
 
 ## Uske baad
 
-**Phase 3 — `t_app_teachers` aur branches.** Do kaam, ek nahi: table banana
-**aur** backfill karna. **G12** padho — sirf table bana dene se har wo teacher
-jo aaj signup kar chuka hai profile ke bina Active reh jaayega, aur ye Phase 5
-mein null reference ban kar milega.
+**Phase 4 — jobs.** Har job ek branch par lagti hai, aur har school ke paas ab
+din se ek head office hai (2.50) — to yahan koi nullable-branch code path nahi
+chahiye.
 
-Branches ke saath **G16** bhi band karna hai: request type 3 ka queue mein koi
-tab nahi hai, to aaj submit hui branch-add request admin ko dikhti hi nahi.
+**Phase 2.5 — entitlement engine.** Features, gating modes, credits,
+`ConsumeAsync`, admin ki feature-gating screen, payment gateway, invoices.
+Table pehle se maujood hai aur **har account ek plan par hai**, to yahan
+reconcile karne ko koi legacy row nahi hogi.
 
 **Phase 6 — do-level offer approval.** 🔴 **G14 pehle padho.** Multi-level
 engine sahi dikhta hai par sirf ek raste se guzara hai; level 2 par reject,
@@ -2949,14 +3212,19 @@ Sab ke liye 2.42 ka start order: **`jp-shared` :4999 pehle**.
 - **2.42** — frontend structure LOCKED.
 - **2.11** — SQL Server 2019 syntax only.
 - **2.21 / 2.30 / 2.31** — SP error convention, list-proc rules, CATCH ordering.
-- **2.45 / 2.46 / 2.47 / 2.48 / 2.49** — 2A, 2C, 2B, 2D aur 2E mein kya bana
-  aur kyun.
+- **2.45 / 2.46 / 2.47 / 2.48 / 2.49 / 2.50** — 2A, 2C, 2B, 2D, 2E aur 2F
+  mein kya bana aur kyun.
 - **2.48** — 🔴 cross-DB orchestration ka koi distributed transaction nahi hai.
   Approval ka HTTP 200 ka matlab **orchestration succeed hua** nahi hai;
   har caller ko `orchestrationCompleted` padhna hai. 2.49 ka
   `describeOutcome()` iski **ekmatra** interpretation hai — doosri mat likhna.
 - **2.49** — reject **kuch provision nahi karta**, aur ye do jagah gated hai.
   Agar teesri jagah orchestration call kar rahe ho, wahi check pehle lagao.
+- **2.50** — 🔴 **kahin bhi Aadhaar NUMBER store mat karna.** Government photo ID
+  ka DOCUMENT liya jaata hai, number nahi. Agar client maange to likhit mein,
+  unki apni legal advice ke saath.
+- **2.50** — provisioning ke teeno insert ek hi idempotency guard ke andar hain.
+  Chautha jodo to wo bhi andar hi jaana chahiye.
 
 ### Wo do galtiyan jo is phase mein pakdi gayin, dobara mat karna
 1. **Proc ka result set badlo to usi commit mein uske test ka temp table badlo.**
