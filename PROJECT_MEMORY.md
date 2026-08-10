@@ -1545,8 +1545,12 @@ usse trigger karne ka rasta nahi hai.
 ### G12. Teacher profile — Phase 3 ko TEEN kaam karne hain, ek nahi
 
 Aaj ek teacher signup karta hai aur **turant Active** ho jaata hai (2.9), par
-uski koi profile row kahin nahi banti — kyunki `t_app_teachers` exist hi nahi
-karti.
+uski koi profile row kahin nahi banti.
+
+⚠️ **Phase 3A ne pehla kaam kar diya:** `t_app_teachers` ab **exist karti
+hai** (2.51). Baaki do — backfill aur `TEACHER_FREE` — 3B hain, aur tab tak ye
+gap khula hai. Table ka ban jaana isse band nahi karta; ab wo khaali hai bajaay
+gayab hone ke.
 
 Phase 3 ko teeno karne hain:
 
@@ -2619,6 +2623,191 @@ girta hai. Dev server band karo, build karo, phir dev server dobara chalao.
 
 ---
 
+### 2.51 `jp_app` TABLES — PHASE 3A
+
+12 nayi table + 2 ALTER script. `jp_app` ab **16 table · 63 index · 15 FK ·
+47 check**. Doosri baar chalane par **zero naya object**.
+
+#### Do ALTER — jo 2D aur 2F ne chhoda tha
+
+CREATE script **edit nahi kiye** (Block D). Unhe edit karna us record ko mita
+deta ki kya aage kheecha gaya aur kya nahi — aur wahi ek cheez hai jo
+pull-forward ko chhe mahine baad review-able banati hai.
+
+**`t_app_schools`** → `IsSuspended`, `SuspendedOn`, `SuspensionReason`
+
+⚠️ Suspension **Is_Deleted bhi nahi aur Is_Active bhi nahi** hai. Is_Deleted
+tombstone hai; Is_Active batati hai ki row aam kaam mein use hoti hai ya nahi;
+IsSuspended ek **faisla** hai jo kisi ne liya, jiske saath wajah aur taareekh
+judi hai — aur teeno mein sirf yahi hai jo school ko kabhi bataya jaata hai.
+Is_Active mein ghol dene se wajah gum ho jaati, jo ekmatra hissa hai jispe
+school kuch kar sakta hai.
+
+**`t_app_school_branches`** → `BranchCode`, `Latitude`, `Longitude`,
+`ContactPerson`
+
+⚠️ **Spec ke `Phone` aur `Email` pehle se maujood hain**, `ContactMobile` aur
+`ContactEmail` naam se — 2F ne unhe `t_app_schools` se match karaya tha jahan
+wahi do baatein pehle se in naamon se thi. **Kuch gaya nahi**, naam alag hai,
+aur ye wala deviation consistent hai: school se uski branch pe jaate hue reader
+ko ek hi convention dikhti hai, do nahi.
+
+`Latitude`/`Longitude` `decimal(9,6)` hain — float nahi (do same coordinate
+unequal compare karte) aur `geography` nahi (spatial index ka koi query abhi
+hai hi nahi; Phase 4 ka "paas ki jobs" in do column par bounding box hai).
+
+#### 🔴 `date` kaun se hue — poori list
+
+Sirf **teen**, aur teeno calendar din hain, instant nahi (2.28):
+
+```
+t_app_teachers.DOB
+t_app_teacher_experiences.FromDate
+t_app_teacher_experiences.ToDate
+```
+
+`VerifiedOn`, `SuspendedOn` aur baaki sab **datetime2 UTC** hain. Kasauti "isme
+time hai ya nahi" nahi hai — **"ye ek din hai, ya ek pal"** hai.
+
+Verify kiya: `DOB` mein `1990-11-02T23:45:00` daala, wapas `1990-11-02` mila.
+
+#### Business keys — kya joda aur kyun
+
+| Table | Key | Kyun |
+|---|---|---|
+| `t_app_teachers` | `TeacherUid` **unfiltered** | Uid dobara kabhi use nahi hota, warna purana URL kisi aur teacher pe khulta |
+| `t_app_teachers` | `UserUid` filtered | 🔴 **ek account, ek profile** — 3B ka backfill isi se dobara chalane layak hai |
+| `t_app_school_users` | `(SchoolId, UserUid)` | Dobara invite karne se doosri membership banti, aur phir role wahi hota jo query pehle padh le |
+| `t_app_school_user_branches` | `(SchoolUserId, BranchId)` | Duplicate se branch list dugni hoti — ek hi campus dropdown mein do baar |
+| `t_app_teacher_subjects` | `(TeacherId, SubjectId)` | Paanchon bridge par wahi niyam |
+| `t_app_teacher_class_levels` | `(TeacherId, ClassLevelId)` | ” |
+| `t_app_teacher_skills` | `(TeacherId, SkillId)` | ” |
+| `t_app_teacher_languages` | `(TeacherId, LanguageId)` | ” |
+| `t_app_teacher_preferred_locations` | `(TeacherId, CityId, StateId)` | Teen column — "jagah" yahan state YA uske andar ki city hai |
+| `t_app_school_facilities` | `(SchoolId, BranchId, FacilityId)` | Teen column — scope (school, branch) hai, akela school nahi |
+| `t_app_school_photos` | `FilePath` filtered | Neeche dekho — aapse thoda alag raay |
+| `t_app_teacher_documents` | `FilePath` filtered | Neeche dekho |
+| `t_app_teacher_experiences` | **koi nahi** | Neeche dekho |
+
+⚠️ **Teen-column wale index NULL par tikte hain.** SQL Server unique index ke
+andar NULL ko **barabar** maanta hai — to `(TeacherId, NULL, Maharashtra)` sirf
+ek baar aa sakta hai, matlab "Maharashtra mein kahin bhi" do baar record nahi
+hoga; par usi state ke andar Pune aur Nagpur alag row rehte hain. Wahi
+`(SchoolId, NULL, FacilityId)` ke liye — school-level claim bhi duplicate se
+bacha hua hai. Ye maana nahi, **test kiya**.
+
+#### Jahan aapse raay alag hai — teen jagah
+
+**1. `t_app_school_photos` — aapne kaha "kuch obvious nahi". Sehmat, par
+`FilePath` par ek key daali.**
+
+Business key sach mein koi nahi: ek hi building ki do photo do jaayaz row hain.
+Par **file** alag baat hai. Storage naam generated GUID hai (2.48), to ek path
+par do row school ke milti-julti tasveerein daalne se nahi ban sakti — sirf ek
+hi upload do baar record hone se, yaani double-click wala case. Aur ye duplicate
+row se zyada bhaari hai: do mein se ek photo delete karne par wo file bhi jaayegi
+jispe doosri abhi tak point kar rahi hai.
+
+**2. `t_app_teacher_documents` — `(TeacherId, DocumentTypeId)` par unique
+JAAN-BOOJH KAR nahi daali.**
+
+Ye sabse obvious key thi aur aaj galat hai. Ek teacher ke paas ek hi type ke do
+jaayaz document ho sakte hain — do degree certificate, do school ke experience
+letter. Pair ko constrain karne ka matlab ek ko soft-delete karke doosre ke liye
+jagah banana, jo **data loss ko data rule ke kapde pehna dena** hai.
+
+Jin type par sach mein ek hi sahi hai — ID proof — wo rule **procedure mein**
+jaayega, jahan "ek current ID proof" ka matlab "purane ko supersede karna" bhi
+ho sakta hai, jo index keh hi nahi sakta.
+
+⚠️ Agar 3D ko history ke saath replace chahiye, jawab ek `Version` column hai
+aur wahi unique index jo `t_mdm_request_documents` use karta hai — is shape par
+unique index nahi.
+
+**3. `t_app_teacher_experiences` — koi unique index nahi.**
+
+Lubhaavni key `(TeacherId, SchoolName, FromDate)` thi. Galat hai: koi banda ek
+hi school mein ek hi mahine se do role rakh sakta hai — part-time subject
+teacher jo sports programme bhi chalata ho — aur unique index use bolta ki uski
+apni history invalid hai. **Test kiya: wo case allow hota hai.**
+
+Rozgaar ki avadhi ka koi natural business key hota hi nahi. Double-submit se
+bachaav wahan hai jahan niyat dikhti hai — procedure mein.
+
+#### Do CHECK jo ek doosre ka aadha kaam karti hain
+
+`t_app_teacher_experiences` par:
+
+```
+(IsCurrent = 1 AND ToDate IS NULL) OR (IsCurrent = 0 AND ToDate IS NOT NULL)
+```
+
+Dono aadhe zaroori hain, alag-alag galti pakadte hain: pehla "abhi bhi yahan
+hoon, 2019 mein chhod diya" rokta hai; doosra ek khatam ho chuki naukri ko
+bina end date ke chalti hui ginne se rokta hai — jo kisi bhi tenure ke jod ko
+chup-chaap galat kar deta.
+
+#### `ProfileCompletionPercent` — plain column, computed nahi
+
+"Complete" ek product faisla hai jo badlega: aaj photo + subjects + ek
+experience, agle quarter resume bhi. Persisted computed column us behes ko
+**schema mein** rakh deta, jahan badalna ek migration hai aur jahan rule us code
+se invisible hai jo use dikhata hai. 3D ise compute karke likhega. Range
+`0..100` par CHECK hai.
+
+#### `RoleInSchool` role table NAHI hai
+
+Roles aur permissions `jp_sso` mein hain — wahi tay karta hai koi kya **kar**
+sakta hai. `RoleInSchool` alag sawaal ka jawab hai: wo **is school ke liye kaun**
+hai. Do log dono jp_sso mein HR permission rakh sakte hain jabki ek is school ka
+owner ho aur doosra ek campus ka viewer.
+
+⚠️ Agar kabhi koi check `RoleInSchool` padh kar tay kare ki action allowed hai
+ya nahi, wo check **galat jagah** hai.
+
+#### `t_app_school_user_branches` — zero row ka matlab "sab branch"
+
+Owner ko har campus ke against likha nahi jaata — uski koi row hoti hi nahi aur
+use sab dikhta hai. Rows kisi ko **saankda** karne ke liye hain.
+
+⚠️ Ulta karne ka matlab hota: har naye campus par har owner ke liye backfill,
+aur jis din ek chhoot gaya us din ek owner chup-chaap ek campus kho deta.
+
+#### Verify
+
+`run_all.sql` mein saare 14 script registered. Pehli run mein sab bana, **doosri
+run mein zero naya object**. Kisi script ko fix nahi karna pada.
+
+Uske upar ek throwaway guard-test (rollback ke andar) — **17/17 pass**: dono
+duplicate-profile aur duplicate-bridge refuse hue, soft-delete ke baad re-add
+allow hua, NULL-equality wala dava dono teen-column index par sach nikla, chaaron
+CHECK ne apni galti pakdi, aur do-role-ek-school wala jaayaz case allow hua.
+
+#### Files
+
+```
+database/jp_app/01_tables/005_alter_t_app_schools_suspension.sql
+database/jp_app/01_tables/006_alter_t_app_school_branches_deferred.sql
+database/jp_app/01_tables/007_t_app_school_photos.sql
+database/jp_app/01_tables/008_t_app_school_facilities.sql
+database/jp_app/01_tables/009_t_app_school_users.sql
+database/jp_app/01_tables/010_t_app_school_user_branches.sql
+database/jp_app/01_tables/011_t_app_teachers.sql
+database/jp_app/01_tables/012_t_app_teacher_subjects.sql
+database/jp_app/01_tables/013_t_app_teacher_class_levels.sql
+database/jp_app/01_tables/014_t_app_teacher_skills.sql
+database/jp_app/01_tables/015_t_app_teacher_languages.sql
+database/jp_app/01_tables/016_t_app_teacher_preferred_locations.sql
+database/jp_app/01_tables/017_t_app_teacher_documents.sql
+database/jp_app/01_tables/018_t_app_teacher_experiences.sql
+database/run_all.sql
+```
+
+⚠️ **Table ban gayi, bhari nahi.** Backfill 3B hai — aur wo teen kaam hai, ek
+nahi (G12).
+
+---
+
 ## 3. SCOPE (Client spec ke against)
 
 ### IN SCOPE — MVP
@@ -2750,6 +2939,7 @@ naya Code, agla free Id, kuch renumber mat karo.
 | 2026-08-09 | 2D | **JP.App.Api endpoints** — masters/approvals/documents, cross-DB orchestration, upload hardening. Build 0/0. Chaaron step-2 proofs verify kiye. Teen asli bug pakde: Sso connection string missing, activation idempotent nahi thi (retry tod deta), retry endpoint nahi (G11) | ✅ Done |
 | 2026-08-10 | 2E | **Admin verification panel** — queue, request detail with an inline PDF/image viewer, dashboard, orphan section. **G11 closed** (retry + reconciliation endpoints). Production build clean, screenshots at 1440 and 375. Chaar asli bug pakde: reject provisioning kar deta tha, multi-word master keys khaali, DateOnly read phenkti thi, detail header mein EntityName nahi | ✅ Done |
 | 2026-08-10 | 2F | **School registration** — 5-step form with a server-side draft, account-status wired to the real request. Three pull-forwards: branches, PAN, plans+subscriptions. Provisioning now writes three rows in one transaction under one guard. 🔴 No Aadhaar number is stored anywhere, by decision. Whitelist misses are logged. Full flow verified end to end | ✅ Done |
+| 2026-08-10 | 3A | **jp_app tables** — 12 new + 2 ALTER for the columns 2D/2F deferred. jp_app now 16 tables · 63 indexes · 15 FKs · 47 checks. Re-run creates zero new objects. Guard test 17/17: duplicate profile, duplicate bridge and all four CHECKs refuse; soft-delete re-add and two-roles-one-school are allowed | ✅ Done |
 | — | 2E | Admin screens → `frontend/apps/admin` | ⬜ Next |
 | — | 2F | School screens → `frontend/apps/school` | ⬜ Next |
 
@@ -3148,43 +3338,51 @@ end, sab asli endpoints se.
 
 ---
 
-## ▶️ NEXT — MILESTONE 1 DEMO, phir Phase 3
+## ✅ PHASE 3A COMPLETE — 2026-08-10
 
-### 🔴 Demo se pehle — chaar cheezein
+`jp_app` ki baaki saari table ban gayin: **16 table · 63 index · 15 FK ·
+47 check**. Doosri run par zero naya object. Details **2.51**.
 
-1. **Jaan-boojh kar gandi demo data saaf karo.** `REG-SCH-2026-00005` (Little
-   Scholars Primary) ko orphan chhoda gaya tha taaki dashboard ka section
-   development mein dikhe. Retry daba do, ya row hata do. Ek toota school demo
-   mein wahi cheez hai jispe sabki nazar jaayegi.
+⚠️ **Table khaali hain.** `t_app_teachers` ab exist karti hai — usme koi row
+nahi hai.
 
-2. **Nayi screenshots.** `screenshots/2e/` aur `2f/` mein jo hain wo asli
-   hain par test data ke saath — Meadowbrook, Hilltop, Silverline. Demo ke liye
-   apna data chuno.
+---
 
-3. **Known gaps dobara padho** (section 2A) aur dekho ki koi cheez sharminda
-   karne wali to nahi. Khaas kar **G0 — kisi repo ka git remote nahi hai.**
+## ▶️ NEXT: PHASE 3B — BACKFILL
 
-4. **Saaf saaf batao kaun si screen asli hai aur kaun si abhi mockup.** Applicants
-   table fixture par chalti hai (G6). Dashboard ke aankde asli hain. Ye demo mein
-   khud batana behtar hai, baad mein poochhe jaane se.
+🔴 **Teen kaam, ek nahi** (G12):
 
-### Phase 3 — `t_app_teachers`, branches, aur profiles
+1. `t_app_teachers` mein har us teacher ke liye profile banao jo table banne
+   se **pehle** register hua
+2. signup pe profile banna **wire karo**, taaki agla teacher backfill ka
+   intezaar na kare
+3. un sab ko **`TEACHER_FREE` assign karo** — 2F ke baad har account ek plan
+   par hota hai (2.50), aur teacher ekmatra apwaad bache hain
 
-🔴 **G12 teen kaam kehti hai, ek nahi:** table banao, backfill karo, aur
-`TEACHER_FREE` assign karo.
+### Jo 3A ne 3B ke liye tayyar kiya
 
-Branches ke saath **G16** band karo — request type 3 ka queue mein tab nahi hai,
-to aaj submit hui branch-add request admin ko dikhti hi nahi.
+`UQ_t_app_teachers_UserUid` (filtered) ka matlab hai backfill **dobara chalane
+layak** hai: doosri run duplicate profile nahi bana sakti, wo refuse hogi. Isi
+tarah `UQ_t_app_subscriptions_OneActivePerOwner` doosra plan nahi banne dega.
 
-### Start order
-2.42: **`jp-shared` :4999 pehle**, phir jo app chahiye. `JP.Sso.Api` :5199,
-`JP.App.Api` :5299.
+⚠️ Dono guard **refuse** karte hain, chup-chaap skip nahi karte. 3B ko duplicate
+ko error ki tarah nahi, "pehle se ho chuka" ki tarah handle karna hoga — wahi
+shakl jo `USP_ProvisionSchoolFromApproval` ne li thi (2.48).
 
-⚠️ Dev server chalte hue production build **mat** karo (2.50).
+### Kitne teacher hain
+
+`jp_sso.t_sso_users` mein `UserTypeId = 3` waale. Shuru karne se pehle gino
+— aur backfill ke baad wahi ginti `t_app_teachers` mein honi chahiye.
 
 ---
 
 ## Uske baad
+
+**MILESTONE 1 DEMO — abhi bhi baaki hai.** School signup → admin approve →
+school active poora chalta hai. Dikhane se pehle: jaan-boojh kar orphan chhodi
+gayi `REG-SCH-2026-00005` saaf karo, nayi screenshots lo, known gaps dobara
+padho (khaas kar **G0**), aur saaf batao kaun si screen asli hai aur kaun si
+abhi mockup (applicants table fixture par hai — G6).
 
 **Phase 4 — jobs.** Har job ek branch par lagti hai, aur har school ke paas ab
 din se ek head office hai (2.50) — to yahan koi nullable-branch code path nahi
