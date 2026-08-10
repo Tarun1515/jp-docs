@@ -1574,6 +1574,52 @@ storage se pehle**, aur reject kar sakne wala.
 ⚠️ `SaveAsync` ke baad **mat** rakhna — disk pe pada file wo file hai jo serve
 ho sakti hai.
 
+### G14. Multi-level approval — aadha hi verify hua hai
+
+Independent verification ne ye **saabit** kiya: level advancement configuration
+padhti hai, ek level maan kar nahi chalti. Do level configure karne par level 1
+approve karne ke baad request **Pending rahi, `IsCompleted = 0`**, aur level
+aage badh gaya.
+
+Jo **untested** hai, kyunki MVP har jagah ek hi level configure karta hai:
+
+- level 2 par **reject** — poori request reject hoti hai, ya level 1 par wapas?
+- level 2 par **request-resubmit** — level 1 se dobara shuru, ya level 2 se?
+- **per-level permission scoping** — level 2 ka approver level 1 action kar
+  sakta hai?
+- **teen ya usse zyada** level
+
+Inmein se koi bhi tab tak maayne nahi rakhta jab tak Phase 6 do-level offer
+approval nahi laata. Us din **sab** maayne rakhte hain.
+
+🔴 Jo bhi ye uthaye: **ye cases pehle likho.** Engine sahi *dikhta* hai, par
+aaj tak sirf ek raste se guzara hai.
+
+### G15. "Assigned to" filter sirf "mujhe" hai
+
+Queue ka server-side filter ek `AssignedToUserId` leta hai. Screen ke paas
+sirf ek id hai jiska wo bharosa kar sakti hai — jo banda use kar raha hai — to
+filter **"Assigned to me"** checkbox hai, admin ka dropdown nahi.
+
+Dropdown ke liye admin users ka list endpoint chahiye. `JP.Sso.Api` ke paas
+user list hai; usse admin-type users par filter kar ke expose karna baaki hai.
+
+⚠️ **"Unassigned"** abhi express hi nahi ho sakta: proc
+`(@P IS NULL OR ApproverUserId = @P)` use karta hai, aur NULL ka matlab
+"sab" hai — "jinka koi nahi" nahi. Us filter ko alag flag chahiye hoga.
+
+### G16. Branch-add (request type 3) ka koi tab nahi
+
+Queue mein do tab hain: Schools (type 1) aur Teachers (type 2). **Type 3 —
+add branch — kahin nahi dikhti.**
+
+Aaj koi banati nahi (branches Phase 3 hain), par orchestrator use type 1 ki
+tarah handle **karta hai**, matlab ek branch-add request submit ho sakti hai
+aur admin ki nazar se gayab rahegi.
+
+Phase 3 branches ke saath: ya teesra tab, ya Schools tab ko dono types dikhane
+do. Doosra shayad sahi hai — verify karne wala kaam ek jaisa hai.
+
 ### 2.45 `jp_mdm` — PHASE 2A BUILD NOTES
 
 32 tables (23 masters + 8 transactional + `t_mdm_error_log`), 91 indexes,
@@ -2127,6 +2173,207 @@ ke nahi.
 
 ---
 
+### 2.49 ADMIN VERIFICATION PANEL — PHASE 2E
+
+`jp-admin` mein verification queue, request detail aur dashboard. Production
+build **clean**. Do naye endpoint jo **G11 band karte hain**.
+
+#### 🔴 G11 CLOSED — orphan ab ek button hai, DBA ka kaam nahi
+
+`POST /api/approvals/{id}/retry-orchestration` + `GET /api/approvals/orphaned`.
+
+Pehle: orchestration idempotent thi par usse chalane ka koi rasta nahi tha.
+Ek partial completion ka matlab tha — school approve ho gaya, use kar nahi
+sakta, aur theek karne ke liye kisi ko **SQL access** chahiye.
+
+Ab dashboard pe sabse upar ek section hai: kaun toota hai, **kitni der se
+toota hai**, aur Retry. Empty hone par **section render hi nahi hota** — "0
+problems" wala panel furniture ban jaata hai, aur furniture dikhna band ho
+jaata hai. Section ka aa jaana hi alarm hai.
+
+⚠️ Reconciliation **teacher verification ko chhodti hai** (`RequestTypeId IN
+(1,3)`). Wo design se kuch provision nahi karti (2.9), to har approved teacher
+request hamesha ke liye "orphan" dikhti — aur ek hamesha-galat list wo list hai
+jise koi nahi kholta. Ek mahine mein asli orphan page 3 pe do sau jhooth ke
+neeche hota.
+
+Retry `RowVersion` nahi maangta, jaan-boojh kar: approval ko haath hi nahi
+lagta — na action row, na status change. Sirf uske **baad ka kaam** dobara
+chalta hai, aur wo idempotent hai. Do admin dabayein to kaam do baar chalega
+aur converge kar jaayega.
+
+#### 🔴 Verification ne CHAAR asli bug pakde — teeno 2D/2C ke the
+
+**1. Reject karne se school BAN JAATA THA.**
+`ProcessActionAsync` `IsCompleted` par orchestrate karti thi. Rejection bhi
+request ko complete karti hai — to reject karne par user activate hota tha aur
+school create hoti thi. Wahi natija jise rokne ke liye reject exists karta hai,
+aur kisi screen pe iska koi nishaan nahi.
+
+Pakda kaise: admin UI se ek request reject ki, phir `jp_app` mein school padi
+mili.
+
+Fix **do gate**: service `NewStatusId = Approved` check karti hai, aur
+orchestrator khud bhi refuse karta hai. Do isliye ki ek pehle hi miss ho chuka
+hai, aur galti ka daam error message nahi — chupchaap ban gaya school hai.
+
+Saath mein semantics theek ki: `orchestrationCompleted` ab **"kuch adhoora nahi
+bacha"** kehta hai. Rejection aur level-advance dono ke liye `true`, kyunki
+dono mein karne ko kuch tha hi nahi. Pehle `false` aata tha, jo ek theek-thaak
+rejection par partial-completion warning jala deta — aur jo warning jhooth
+bolti hai wo us din dismiss hoti hai jis din sach hoti hai.
+
+**2. Multi-word master key har jagah KHAALI list de raha tha.**
+`USP_GetMaster` `SCHOOL_TYPE` expect karta hai; client `/api/masters/school-type`
+bhejta hai. `UPPER()` se `SCHOOL-TYPE` banta tha — kisi branch se match nahi,
+`200` ke saath khaali list. **Har multi-word master ka dropdown chup-chaap
+khaali tha**, na error, na log.
+
+Fix procedure mein: `UPPER(REPLACE(@MasterCode, '-', '_'))`. API mein map
+karne se 2.48 ka "ek gate" wala niyam tootta — do lists jinhe agree karna
+padta.
+
+**3. `DateOnly` padhne par har call phenkti thi.**
+Teacher ki DOB `date` column hai aur C# mein `DateOnly` (2.28). Dapper us
+conversion ko nahi jaanta, to `Error parsing column (DOB=… - DateTime)`.
+
+⚠️ Ye **write ke BAAD** hota tha: request submit hui, commit hui, phir
+RequestNo padhne wali read gir gayi — applicant ko us cheez ka error mila jo
+sach mein ho chuki thi, aur uska retry idempotency guard se takra gaya.
+Fix: `DateOnlyTypeHandler` + `TimeOnlyTypeHandler`, startup pe registered.
+
+**4. Detail header mein `EntityName` tha hi nahi.**
+List proc deta hai, detail proc nahi. Screen ka title school ke naam ki jagah
+"School registration" dikha raha tha. Ek contract, do procedures — dono ko
+poore contract par agree karna hai.
+
+#### 🔴 Screen jo sabse zyada maayne rakhti hai
+
+Approve HTTP **200** deta hai chahe uske baad ka kaam fail ho jaaye (2.48).
+To UI `orchestrationCompleted` padhti hai, status code nahi — aur ye kaam
+**`describeOutcome()` mein ek jagah** hota hai, taaki doosri interpretation
+paida hi na ho.
+
+Chaar outcome, aur teen mein se koi bhi toast nahi:
+
+| Kya hua | Kaise dikhta hai |
+|---|---|
+| Sab theek | success toast, banner nahi — kaam khatam hai, jagah nahi maangta |
+| **Partial completion** | 🔴 **rukne wala banner** + Retry. Toast bilkul nahi |
+| Teacher verification | neela "Decision recorded" — **system error nahi** |
+| Level advance | "next level pe gaya", approved nahi |
+
+Success path **sabse aakhir mein** hai. `if (ok) success() else …` likhna wahi
+tareeka hai jisse failure "Approved" wale toast ke peeche chala jaata hai.
+
+Verify kiya asli fail karwa kar (`sp_rename`, mock se nahi). Admin ko ye dikha:
+
+> **Approved — but the account is not usable yet**
+> REG-SCH-2026-00006 is approved and that decision is final. What did not
+> finish is the work that follows it: The account was activated but the school
+> record could not be created. … Until this is retried, the school can sign in
+> and will find an empty workspace.
+
+Retry dabaya → school ban gayi. Screenshot `screenshots/2e/`.
+
+⚠️ Retry **detail screen par bhi** hai, sirf banner par nahi. Orphan list se
+aane wale ke paas banner hota hi nahi — usne Approve dabaya hi nahi tha.
+
+#### Queue — ek work queue, report nahi
+
+Default order **oldest first, SQL mein** (2C). `WaitingDays` bhi server se —
+galat clock wali machine warna dashboard se disagree karti ki sabse purana
+kaun hai.
+
+Attention pattern **applicants table se udhaar**, naya nahi banaya: 3+ din wali
+row par red **margin rule**, aur usi row ka Waiting column shabdon mein wahi
+baat kehta hai. Rang reinforcement hai, akela carrier kabhi nahi. Ek product,
+ek grammar.
+
+Sorting 2C ke proc mein add ki — **paanch column, CASE whitelist se**, dynamic
+SQL nahi. Chuna hua column pehle, phir hamesha `SubmittedOn, RequestId` neeche:
+warna same second wali do rows refresh par page badal leti hain aur koi row
+chhoot jaati hai.
+
+⚠️ `waitingDays` **ulta** sort hota hai (`SubmittedOn DESC`) — sabse lamba
+intezaar sabse purani submission hai.
+
+Tabs asli **routes** hain, signal nahi: back button, bookmark aur seeded menu
+rows teeno kaam karte hain.
+
+#### Document viewer — PDF aur image, dono inline
+
+Download kar ke padhna verification ka sabse bada friction hai, aur wahi cheez
+hai jisse log bina dekhe batch-approve karte hain.
+
+File `Authorization` header maangti hai, aur browser `<img>`/`<iframe>` ke
+liye header bhejta hi nahi — to blob HttpClient se aata hai aur object URL ban
+kar element ko milta hai.
+
+🔴 **Har object URL revoke hota hai** — document badalne par aur destroy par.
+Ek reviewer ek baithak mein pachaas request dekhta hai; pachaas pinned PDF
+matlab tab ghisatne lagta hai bina kisi wajah ke jo screen par dikhe.
+
+⚠️ Aur ek trap jo pehli baar mein lag gayi thi: effect ke andar **object URL
+wala signal padhna** us signal par dependency bana deta hai. Fetch ke baad set
+karne se effect dobara chalta, wo abhi bana URL revoke karta, phir se fetch —
+hamesha, khaali viewer aur zero error ke saath. Ab bookkeeping ek plain field
+mein hai, signal sirf template ke liye.
+
+Download `SKIP_LOADER` ke saath jaata hai: paanch document dekhne ke liye
+paanch baar poori screen black-out karna viewer ko download se bura bana deta
+hai. Panel ka apna skeleton hai.
+
+#### Rejection reason ab DATA hai, prose nahi
+
+`t_mdm_request_approvals.RejectionReasonId` add hui (+ FK, + index INCLUDE, +
+existing DB ke liye guarded ALTER). Pehle sirf `Remarks` thi.
+
+"Kitni registration authorisation letter galat hone se fail hoti hain" wo sawal
+hai jo business poochhega, aur free text grep karna uska jawab nahi hai. 2F ko
+bhi school ko reason **alag se** dikhana hai, note se alag.
+
+Reject dialog reason **maangta** hai, aur textarea ka placeholder us reason ke
+hisaab se badalta hai — code par keyed (stable, 2.47), name par nahi:
+
+> DOC_MISMATCH → "Which detail does not match? e.g. the certificate says
+> 'Greenwood Public School' and the form says 'Greenwood School'."
+
+Khaali textarea "rejected" paida karta hai, aur uske baad ek phone call.
+`OTHER` chunne par note **compulsory** ho jaata hai — reason khud kuch nahi
+kehta, to note ko kehna padega.
+
+⚠️ Reject ka confirm button **laal** hai, primary nahi. Jis laal button ne
+dialog khola usi ke jawab mein hara button rakhna wahi confusion hai jise
+confirm step rokne ke liye hai.
+
+#### Files
+
+```
+jp-backend/JP.Domain/Approvals/ApprovalContracts.cs        (OrphanedApprovalDto, trail reason)
+jp-backend/JP.Infrastructure/Data/DateOnlyTypeHandler.cs   (naya)
+jp-backend/JP.Infrastructure/Repositories/{ApprovalRepository,MdmModels}.cs
+jp-backend/JP.Infrastructure/Services/{ApprovalService,ApprovalOrchestrationService}.cs
+jp-backend/JP.App.Api/Controllers/ApprovalsController.cs
+database/jp_mdm/01_tables/026_t_mdm_request_approvals.sql  (RejectionReasonId)
+database/jp_mdm/04_procedures/002_approval_action.sql      (reason persist)
+database/jp_mdm/04_procedures/003_approval_reads.sql       (sort + EntityName)
+database/jp_mdm/04_procedures/004_documents_masters.sql    (key normalise)
+database/jp_mdm/04_procedures/006_reconciliation.sql       (naya)
+jp-shared/src/core/models/lookup.model.ts                  (6 naye master keys)
+jp-admin/src/app/core/{approval.models,approval.service,document.service,orchestration-outcome}.ts
+jp-admin/src/app/features/verification/queue/verification-queue.component.*
+jp-admin/src/app/features/verification/detail/{request-detail,document-viewer,request-trail}.component.*
+jp-admin/src/app/features/dashboard/{dashboard,orphaned-approvals}.component.*
+jp-admin/src/app/app.routes.ts
+```
+
+⚠️ **Operational:** `jp-shared` aur uske hosts **ek hi build mode** mein hone
+chahiye. Production remote + dev host = `ReferenceError: ngDevMode is not
+defined` boot par, kyunki remote ka bundle host ke runtime mein load hota hai.
+
+---
+
 ## 3. SCOPE (Client spec ke against)
 
 ### IN SCOPE — MVP
@@ -2256,6 +2503,7 @@ naya Code, agla free Id, kuch renumber mat karo.
 | 2026-08-09 | 2C | **Independent verification** — fresh throwaway scripts, 9 scenarios incl. 3 genuinely parallel sessions (identical SubmittedOn tick). Sab pass. Ek coverage gap mila: suite RowVersion branch tak nahi pahunchti (G10). Cleanup ke baad counts baseline pe wapas | ✅ Done |
 | 2026-08-09 | 2C | **G10 closed** — two-level fixture suite mein add ki, 30/30 (26 se), level config restore hota hai | ✅ Done |
 | 2026-08-09 | 2D | **JP.App.Api endpoints** — masters/approvals/documents, cross-DB orchestration, upload hardening. Build 0/0. Chaaron step-2 proofs verify kiye. Teen asli bug pakde: Sso connection string missing, activation idempotent nahi thi (retry tod deta), retry endpoint nahi (G11) | ✅ Done |
+| 2026-08-10 | 2E | **Admin verification panel** — queue, request detail with an inline PDF/image viewer, dashboard, orphan section. **G11 closed** (retry + reconciliation endpoints). Production build clean, screenshots at 1440 and 375. Chaar asli bug pakde: reject provisioning kar deta tha, multi-word master keys khaali, DateOnly read phenkti thi, detail header mein EntityName nahi | ✅ Done |
 | — | 2E | Admin screens → `frontend/apps/admin` | ⬜ Next |
 | — | 2F | School screens → `frontend/apps/school` | ⬜ Next |
 
@@ -2626,43 +2874,67 @@ Phase 3 ke liye zaroori), **G13** (virus scanning).
 
 ---
 
-## ▶️ NEXT: PHASE 2E — ADMIN SCREENS (`jp-admin`)
+## ✅ PHASE 2E COMPLETE — 2026-08-10
 
-Approval queue, request detail, document verify. Ye **G6 band karta hai**: abhi
-school approve karne ke liye Swagger se call chalani padti hai.
+Production build **clean**. Verification queue, request detail with documents
+open inline, and the admin dashboard. Details **2.49**.
 
-### Endpoints jo ready hain
-`GET /api/approvals` (paged, oldest-first) · `GET /api/approvals/{id}` ·
-`POST /api/approvals/{id}/action` · `GET /api/approvals/counts` ·
-`GET /api/documents/{id}` · `POST /api/documents/{id}/verify` ·
-`GET /api/masters/bulk`
+**G11 closed** — an orphaned approval is a button now, not a DBA.
 
-### 🔴 Do cheezein jo UI ko sahi karni hain
+⚠️ Teen naye gaps: **G14** (multi-level sirf aadha verify hua),
+**G15** (assigned-to sirf "mujhe"), **G16** (branch-add ka tab nahi).
 
-1. **`orchestrationCompleted` padho, sirf HTTP 200 nahi.** 200 ka matlab
-   approval commit hua. Agar `orchestrationCompleted: false` hai to account
-   ya school adhoora hai — admin ko **saaf dikhna chahiye**, warna wo aage badh
-   jaayega aur school owner khaali shell pe girega.
+⚠️ Ab bhi khula: **G6** ka aadha hissa — school ko *approve* karna ab UI se
+hota hai, par user ko suspend/reactivate karna abhi bhi Swagger hai.
+
+---
+
+## ▶️ NEXT: PHASE 2F — SCHOOL SCREENS (`jp-school`)
+
+Registration submit + status tracking. Doosri taraf ka wahi flow jo 2E ne abhi
+banaya.
+
+### Jo 2E se ready mila
+`POST /api/approvals/submit` (idempotent — double-click `alreadyPending`
+deta hai, error nahi) · `GET /api/approvals` (apni hi requests, token se
+scoped) · `GET /api/approvals/{id}` · `POST /api/approvals/{id}/resubmit` ·
+`POST /api/documents/upload` · `GET /api/masters/bulk`
+
+### 🔴 Teen cheezein jo school ki taraf sahi karni hain
+
+1. **Rejection reason ALAG dikhao, remarks se alag.** Dono ab data hain
+   (2.49). Reason batata hai *kya* galat hai, remarks batata hai *kya karna
+   hai* — inhe ek paragraph mein mila dena wo instruction dhundhla deta hai
+   jiske liye school wapas aaya hai.
 
 2. **District/city dropdown HIDE karo**, disabled-empty mat dikhao (2.47).
-   Khaali dropdown "toota hai" padha jaata hai, "abhi nahi hai" nahi.
+
+3. **Resubmit sirf requestor kar sakta hai** — API isse enforce karti hai
+   (organisation ka koi doosra banda nahi, admin bhi nahi). UI ko wo button us
+   soorat mein dikhana hi nahi chahiye.
 
 ### Start order
-2.42: **`jp-shared` :4999 pehle**, phir `jp-admin` :4200. Saath mein
-`JP.Sso.Api` :5199 aur ab **`JP.App.Api` :5299** bhi.
+2.42: **`jp-shared` :4999 pehle**, phir `jp-school` :4300, saath mein
+`JP.Sso.Api` :5199 aur `JP.App.Api` :5299.
+
+⚠️ `jp-shared` aur host **ek hi build mode** mein — warna boot par
+`ngDevMode is not defined` (2.49).
 
 ---
 
 ## Uske baad
 
-**2F — school screens (`jp-school`).** Registration submit + status tracking.
-⚠️ District/city dropdown **hide** karna hai jab tak dataset na aaye (2.47) —
-khaali dropdown "toota hai" padha jaata hai.
+**Phase 3 — `t_app_teachers` aur branches.** Do kaam, ek nahi: table banana
+**aur** backfill karna. **G12** padho — sirf table bana dene se har wo teacher
+jo aaj signup kar chuka hai profile ke bina Active reh jaayega, aur ye Phase 5
+mein null reference ban kar milega.
 
-**Phase 3 — `t_app_teachers`.** Do kaam, ek nahi: table banana **aur**
-backfill karna. **G12** padho — sirf table bana dene se har wo teacher jo aaj
-signup kar chuka hai profile ke bina Active reh jaayega, aur ye Phase 5 mein
-null reference ban kar milega.
+Branches ke saath **G16** bhi band karna hai: request type 3 ka queue mein koi
+tab nahi hai, to aaj submit hui branch-add request admin ko dikhti hi nahi.
+
+**Phase 6 — do-level offer approval.** 🔴 **G14 pehle padho.** Multi-level
+engine sahi dikhta hai par sirf ek raste se guzara hai; level 2 par reject,
+resubmit aur per-level permission ke test us kaam se **pehle** likhne hain.
 
 Sab ke liye 2.42 ka start order: **`jp-shared` :4999 pehle**.
 
@@ -2677,10 +2949,14 @@ Sab ke liye 2.42 ka start order: **`jp-shared` :4999 pehle**.
 - **2.42** — frontend structure LOCKED.
 - **2.11** — SQL Server 2019 syntax only.
 - **2.21 / 2.30 / 2.31** — SP error convention, list-proc rules, CATCH ordering.
-- **2.45 / 2.46 / 2.47 / 2.48** — 2A, 2C, 2B aur 2D mein kya bana aur kyun.
+- **2.45 / 2.46 / 2.47 / 2.48 / 2.49** — 2A, 2C, 2B, 2D aur 2E mein kya bana
+  aur kyun.
 - **2.48** — 🔴 cross-DB orchestration ka koi distributed transaction nahi hai.
   Approval ka HTTP 200 ka matlab **orchestration succeed hua** nahi hai;
-  har caller ko `orchestrationCompleted` padhna hai.
+  har caller ko `orchestrationCompleted` padhna hai. 2.49 ka
+  `describeOutcome()` iski **ekmatra** interpretation hai — doosri mat likhna.
+- **2.49** — reject **kuch provision nahi karta**, aur ye do jagah gated hai.
+  Agar teesri jagah orchestration call kar rahe ho, wahi check pehle lagao.
 
 ### Wo do galtiyan jo is phase mein pakdi gayin, dobara mat karna
 1. **Proc ka result set badlo to usi commit mein uske test ka temp table badlo.**
