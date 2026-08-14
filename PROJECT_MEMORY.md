@@ -1649,24 +1649,17 @@ rehte hain.
 Phase 8 mein chhode hue draft ki cleanup — sochne ki cheez ye hai ki uske
 documents disk par bhi pade hain.
 
-### G19. Ek Active school account jiski school hai hi nahi
+### G19. Active school bina school ke — ✅ CLOSED (3C, 2026-08-10)
 
-`head@stmarys.edu.in` — Active, `OrganizationUid` maujood, par
-`t_app_schools` mein koi row nahi. Phase 1 mein seed hua tha, approval engine
-se pehle.
+`head@stmarys.edu.in` ab **asli raste se** registered aur approved hai —
+`REG-SCH-2026-00013` — apni school, head office, plan aur owner row ke saath.
 
-3B ne use plan de diya (har account ka ek plan hota hai), par **uski school kabhi
-nahi banegi**: provisioning ek approval request se chalti hai, aur iske peeche
-koi request hai hi nahi.
+Brief ne do vikalp diye the: account saaf karo, ya doc badal do. Dono nuksaan
+seemit karna the. Teesra chuna: **gap hi khatam** — jo ab mumkin tha kyunki 2F ne
+draft/submit banaya aur 3C ne provisioning ko owner likhna sikhaya.
 
-Aaj asar chhota hai — sign in kar sakta hai, dashboard khaali dikhega. Wahi
-"Active user, kuch peeche nahi" wali shakl jise 2.48 ka orphan section pakadta
-hai, par usse dikhta nahi kyunki wo **completed approvals** dhoondta hai aur yahan
-koi approval hai hi nahi.
-
-**Kya karna hai:** ya to ek registration submit karke normal raste se approve
-karo, ya account hata do. Demo se pehle tay karo — ye wahi account hai jise
-"tenant isolation" dikhane ke liye HOW_TO_RUN suggest karta hai.
+HOW_TO_RUN wahi account naam karta hai aur ab wo sach mein tenant isolation
+dikhata hai. Details **2.53**.
 
 ### G20. 🔴 Saara teacher data SEEDED hai — asli nahi
 
@@ -1711,23 +1704,43 @@ kyunki ye asli registration endpoint se bane (2.52).
 ⚠️ Go-live se pehle ye sab hatana hai. **Ye list us waqt likhi gayi jab pata
 tha**; baad mein yaad karne ki koshish live database par andaaza lagana hoga.
 
-### G21. Signup par teacher profile abhi bhi nahi banti
+### G21. Signup par teacher profile — ✅ CLOSED (3C, 2026-08-10)
 
-3B ne purane account backfill kar diye. Jo **aaj register kare** uski profile
-phir bhi nahi banti — `USP_RegisterTeacher` sirf `jp_sso` mein account banata
-hai, aur koi cheez `t_app_teachers` mein row nahi daalti.
+`AuthService.RegisterTeacherAsync` ab account banne ke turant baad profile +
+`TEACHER_FREE` banati hai.
 
-⚠️ Matlab **G12 dobara khulna shuru ho chuka hai**, ek-ek account karke. Aaj ke
-baad bana har teacher wahi backfill maangega jo abhi khatam hua.
+Asli signup se verify kiya: check A pehle **0**, ek teacher register karne ke
+baad bhi **0**.
 
-**Kya chahiye:** school ki tarah — registration ke baad profile banna wire karo.
-School ke liye ye provisioning karti hai (approval activation ko gate karta hai);
-teacher ke paas approval hai hi nahi (2.9), to profile **registration ke waqt**
-banni chahiye, ya pehle sign-in par.
+⚠️ Failure signup ko **fail nahi karti** — account doosre database mein commit ho
+chuka hota hai, aur "registration failed" bolna us bande ko duplicate-email wale
+retry mein bhej deta. Loud log + verification query safety net hain. Details
+**2.53**.
 
-🔴 Ye 3C ka pehla kaam hai. Verification query
-(`90_ops/001_verify_account_completeness.sql`) chalao — check A abhi 0 hai,
-aur ek naye teacher signup ke baad **1 ho jaayega**. Wahi iska test hai.
+### G22. Scope resolver ek convention hai, enforcement nahi
+
+`dbo.fn_VisibleBranches` ek hi jagah hai jahan branch scope tay hota hai, aur
+har school-scoped procedure usse **join** karti hai — jo sabse aasan raasta bhi
+hai (2.53).
+
+Par **SQL Server mein kuch bhi** aage kisi list proc ko apna `EXISTS` haath se
+likhne se **nahi rokta**. Aur wahi haath se likhi copy wo jagah hai jahan IDOR
+rehta hai: ek school ka HR doosre campus ke applicant padh raha hai, bina kisi
+error ke.
+
+Abhi jo hai:
+- ye function `t_app_school_user_branches` ka **ekmatra** reader hai, to us
+  table ka doosra reader search karte hi dikh jaata hai;
+- 3C ki suite mein **15 negative assertion** hain.
+
+**Kya chahiye:** har naye school-scoped procedure ke saath uska apna negative
+case — "bina assign wale campus ke liye ZERO row" — usi commit mein. Aur Phase 8
+mein ek check jo `t_app_school_user_branches` ke readers ginta hai; ek se zyada
+hone par review.
+
+⚠️ Ye "shayad kabhi" wala gap nahi hai. Phase 4 (jobs) aur Phase 5
+(applications) dono is resolver par khadi hain, aur wahin sabse zyada rows hain
+jinhe galat banda dekh sakta hai.
 
 ### 2.45 `jp_mdm` — PHASE 2A BUILD NOTES
 
@@ -3055,6 +3068,257 @@ se account seeded hain, **G20** mein list hai.
 
 ---
 
+### 2.53 SCHOOL AND BRANCH PROCEDURES — PHASE 3C
+
+10 procedure + 2 function + 2 provisioning procedure. Suite **41/41**, jisme
+**negative case 15/15**. Build **0 warning 0 error**. 2C suite abhi bhi 30/30.
+
+#### 🔴 G21 band — signup ab profile banata hai
+
+`AuthService.RegisterTeacherAsync` account banne ke **turant baad**
+`ITeacherProvisioningService` chalati hai: profile + `TEACHER_FREE`, ek
+transaction mein.
+
+Asli signup se verify kiya: check A pehle **0**, ek teacher register karne ke
+baad bhi **0**, aur log mein
+`Teacher 614b6efa… provisioned: profile 61, plan TEACHER_FREE`.
+
+⚠️ **Ye cross-DB write hai aur 2.48 wali shakl leti hai** — ordering (account
+pehle, profile baad mein, taaki failure **pahunch mein** rahe), idempotency
+(`UserUid` par filtered unique, 2601 = ho chuka), loud failure.
+
+🔴 **Failure signup ko fail NAHI karti.** Account doosre database mein commit ho
+chuka hai. Throw karne ka matlab hota "registration failed" ek aise account ke
+liye jo maujood hai — aur unka retry duplicate-email par girta, unke paas ek
+aisa account reh jaata jiske baare mein unhe bataya gaya ki wo hai hi nahi.
+Missing profile recoverable aur detectable hai; ek banda jo na register kar sake
+na retry, dono nahi.
+
+⚠️ `JP.Sso.Api` ko ab `App` aur `Mdm` connection string mili hain. Yahi niyam 2D
+ne banaya tha jab `JP.App.Api` ko `Sso` mili: **jo API cross-database
+orchestrate karti hai use har us database ka connection chahiye**. Vikalp tha
+signup ke raste par `JP.App.Api` ko HTTP call — jo us service ke slow ya restart
+hone par signup hi tod deta, yaani jis samasya ko theek kar rahe hain usse badi.
+
+#### 🔴 `t_app_school_users` KHAALI thi — koi feature nahi, neenv
+
+3A ne table banayi, 2D/2F ki provisioning ne usme **kabhi kuch likha hi nahi**.
+Zero row.
+
+Aur scope resolver wahi table padhta hai. Matlab har school-scoped query **har
+user ke liye khaali** aati — branch list, aur Phase 4 se job aur applicant list
+bhi. Wo "query toot gayi" jaisa dikhta, "row missing hai" jaisa nahi, aur galat
+file mein dhoonda jaata.
+
+Ab provisioning **chautha insert** karti hai (owner, `RoleInSchool = 1`) usi
+guard aur usi transaction ke andar. Chaaron maujooda school ke liye backfill
+chala.
+
+#### 🔴 Scope resolver — inline table-valued function
+
+```
+RoleInSchool = 1 (Owner)  ->  school ki saari branch. Link row ki zaroorat NAHI.
+warna                     ->  sirf t_app_school_user_branches mein jo hain.
+```
+
+**Kyun inline TVF, procedure nahi:**
+
+1. **Join ho sakta hai.** `INNER JOIN dbo.fn_VisibleBranches(...)` list proc
+   likhne wale ke liye sabse aasan raasta hai. Procedure join nahi hota — har
+   caller ko `INSERT..EXEC` karke temp table banana padta, jo itni ragad hai ki
+   koi na koi haath se do-line `EXISTS` likh deta. **Wahi haath se likhi copy wo
+   jagah hai jahan bug rehta hai.**
+2. **Inline hai, multi-statement nahi.** Optimiser ise calling query mein khol
+   kar cost karta hai; multi-statement TVF uske liye black box hota hai aur bade
+   jobs table par uska andaaza aam taur par galat hota hai.
+3. **Fail closed.** Anjaan user, soft-deleted membership, doosre school ka user —
+   teeno **zero row** dete hain, sab nahi.
+
+⚠️ **Aage koi list proc apna version likhne se kaise ruke — seedhi baat: SQL
+Server mein kuch nahi rokta.** Jo hai wo ye:
+- ye function `t_app_school_user_branches` ka **ekmatra** reader hai, to us table
+  ka doosra reader search mein turant dikh jaata hai;
+- suite negative case assert karti hai, aur har naye school-scoped proc se
+  ummeed hai ki wo apna negative case uske bagal mein jode.
+
+Ye **test ke saath ek convention** hai, enforcement nahi. Saaf bola ja raha hai
+taaki koi ise usse mazboot na samjhe jitni ye hai.
+
+⚠️ Alag se `fn_IsSchoolMember` — "ye tumhara school hai kya", "kaun se campus"
+nahi. Jis school ki koi branch hi na ho, uske owner ko apni profile se rokna
+galat hota agar dono ek hi function mein hote.
+
+#### Negative case — asli test
+
+15 assertion, sab **ZERO** maangti hain, "kam" nahi:
+
+| Kaun | Kya maanga | Mila |
+|---|---|---|
+| Branch HR | bina assign wala campus | **0** |
+| Branch HR | doosra bina assign wala campus | **0** |
+| School A ka HR | school B | **0** |
+| School B ka **owner** | school A | **0** |
+| Bina membership wala user | school A | **0** |
+| Soft-deleted link | apna campus | **0** |
+| Deactivated membership | apna campus | **0** |
+| `USP_GetBranchList` | ajnabi | **0** |
+| Branch HR | bina assign wale campus ko **edit** | `NOT_FOUND` |
+| Branch HR | bina assign wale campus ko **delete** | `NOT_FOUND` |
+| Ajnabi | school profile update | `NOT_FOUND` |
+
+Sirf resolver sahi hona kaafi nahi — isliye list proc, save proc aur delete proc
+teeno par alag se assert kiya, kyunki asli sawaal ye hai ki **procedure use
+karte bhi hain ya nahi.**
+
+#### 🔴 Bridge-sync pattern — ek baar tay, 3D wahi follow karega
+
+Caller **poora set** bhejta hai; procedure current se diff karta hai, naya
+INSERT karta hai, gaya hua **soft-delete** karta hai.
+
+**Delete-all-then-reinsert kyun nahi:**
+
+1. **Identity churn.** Har save par har row ko naya Id — aur jo bhi kabhi bridge
+   row ko point karega (moderation note, audit entry, future FK) wo **chup-chaap**
+   tootega, us save par jisme kuch badla hi nahi tha.
+2. **No-op save poora rewrite ban jaata.** Form khol kar bina kuch chhue Save
+   dabane se gyaarah row delete aur gyaarah insert. Sabka naya `CreatedOn`, to
+   "ye school ne library kab jodi" ka jawab "jab aakhri baar Save daba" ho jaata.
+3. **Soft-delete niyam.** Is database mein kuch bhi DELETE nahi karta. Rebuild ke
+   liye hard-delete karne wala pattern us ek niyam ka apwaad maangta hai jiska
+   koi apwaad nahi hai.
+
+Diff se ulta kaam bhi muft milta hai: hataya hua dobara jodne par **tombstone
+wapas ho jaata hai**, nayi row nahi banti — jo filtered unique index expect hi
+karta hai.
+
+Verify kiya: 3 add = 3 insert · **no-op save = 0/0/0** · ek hataana = 1
+soft-delete · dobara jodna = **restored 1, added 0** · aur poore chakkar ke baad
+**row ke Id wahi ke wahi**.
+
+⚠️ Photos ise **nahi** follow karte, jaan-boojh kar: photo ke saath **file** hoti
+hai. Bridge row soft-delete karne ka kuch kharcha nahi; photo hatane par disk par
+orphan file bachti hai, aur baad mein dobara jodna ek **naya upload** hai, revive
+nahi. Isliye teen explicit action — ADD / REORDER / DELETE.
+
+#### Public profile — alag procedure, flag nahi
+
+`USP_GetSchoolPublicProfile` apni procedure hai, `@IsPublic` flag wali ek nahi.
+
+Ek procedure + flag ek bhoole hue column ki doori par hai, aur bhoolna **baad
+mein** hota hai — jab koi own-view ke SELECT mein column jodta hai aur flag ke
+baare mein sochta hi nahi, kyunki flag chalis line upar hai. Do procedure is
+tarah drift nahi kar sakti: yahan column jodna use **publish karne ka jaan-boojh
+kar kiya kaam** hai.
+
+Nahi lautta: `PanNumber`, `OrganizationUid`, `SuspensionReason`, `RowVersion`,
+internal contacts. Aur `IsSuspended` **chhupaya nahi — enforce kiya**: suspended
+school kuch bhi nahi lautati, ek flag nahi jise caller honour kare.
+
+⚠️ Ye assertion procedure ke **metadata** ke against hai
+(`sys.dm_exec_describe_first_result_set`), value ke against nahi. Column jo aaj
+maujood par NULL hai, wo column hai jise koi agle mahine bhar dega.
+
+⚠️ Suspended/unverified wali do assertion **mirrored** hain — procedure ke
+predicate ko dohrati hain, uske output ko nahi, kyunki `INSERT..EXEC` **saare**
+result set capture karta hai aur ye proc chaar deta hai (Msg 213 — aur yahi wajah
+hai ki 2.30 tests mein `INSERT..EXEC` mana karta hai). **Ye is file ki sabse
+kamzor do assertion hain**: filter delete kar dene par bhi pass hongi. Isse
+chhupaya nahi ja raha; asli suraksha upar wala column-level check hai, aur Phase
+4 ka HTTP test jo suspended school par 404 maangega.
+
+#### `USP_DeleteBranch` — teen inkaar, teeno alag Code ke saath
+
+1. **Head office nahi hat sakti.** Har school ke paas hamesha kam se kam ek
+   branch honi chahiye — wahi invariant hai jis par Phase 4/5 khadi hai.
+   `UQ_..._OneHeadOffice` "zyada se zyada ek" enforce karta hai; ye "kam se kam
+   ek". Dono alag hain aur dono chahiye.
+2. **Jobs / applications** — ⚠️ **abhi likh diya, jaan-boojh kar unreachable.**
+   `t_app_jobs` aur `t_app_applications` Phase 4/5 hain. Niyam ye **nahi** hai ki
+   "delete kar do aur FK ko bolne do" — FK tab bolega jab school ko bataya ja
+   chuka hoga ki campus chala gaya, aur message ek constraint ka naam hoga.
+   Exact block comment mein likha hai, replace karne ke liye taiyaar.
+   🔴 Ise warning mein mat badalna: application kisi ke apply karne ka **record**
+   hai, aur school ke reorganise karne se wo record khatam nahi hota.
+3. **RowVersion conflict.**
+
+Har inkaar ka apna Code aur apna message hai — ek hi "cannot delete" UI ko
+andaaza lagane par majboor karta, aur kam se kam ek case mein wo galat hota.
+
+Delete hone par uski **link rows bhi** soft-delete hoti hain: warna sirf us campus
+par scoped banda ek gayab branch ki taraf ishara karta member reh jaata, aur
+resolver branch ke through join karta hai — to use chup-chaap kuch nahi dikhta,
+bina kisi ishare ke ki kyun.
+
+#### 🔴 Asli flow chalane se do PRODUCTION bug nikle
+
+G19 theek karte waqt St Mary's ko asli raste se guzara — draft, upload, submit,
+approve. Orchestration ne **`school provisioned` log kiya aur school bani hi
+nahi thi.**
+
+**Bug 1 — CATCH bina dekhe `ALREADY_PROVISIONED` bol raha tha.**
+
+Transaction ke andar ka **koi bhi** 2601 "school pehle se hai" padha jaata tha.
+Par duplicate **subscription** se aaya tha, rollback ne school bhi le liya, aur
+proc ne phir bhi `Status = 1` diya. Orchestration ne "school provisioned" log kar
+diya.
+
+**Ye theek wahi failure hai jise rokne ke liye 2.48 likha gaya tha** — us procedure
+ke andar se jiske baare mein wo decision hai. Fix: CATCH `ALREADY_PROVISIONED`
+tabhi bol sakta hai jab school **dikh rahi ho**; na dikhe to duplicate kahin aur
+ka tha aur ye asli failure hai.
+
+**Bug 2 — ek maujooda organisation ke neeche DOOSRI school provision ho hi nahi
+sakti thi.**
+
+Subscription organisation ki hoti hai (2.50) aur index ek allow karta hai. To
+group ki doosri school par subscription insert 2601 deta aur poora transaction —
+school samet — le doobta.
+
+Ye edge case nahi hai: **registration form khud poochhta hai "ek campus ya kai"**,
+aur Greenwood ke paas pehle se ek organisation mein do school hain. Ab
+subscription tabhi banti hai jab org ke paas nahi hai, aur uske apne TRY/CATCH ke
+saath, taaki race haarne wala apni school na khoye.
+
+⚠️ Dono bug **sirf isliye mile ki asli registration asli raste se chalayi aur
+phir row dhoondhi.** Suite pass ho rahi thi. Yahi 2.44 wali baat hai, naye
+kapdon mein.
+
+#### G19 — teesra rasta chuna
+
+Brief ne do vikalp diye: account saaf karo, ya doc badal do. **Dono nuksaan
+seemit karna hai.** Teesra ye tha ki gap hi khatam kar do — aur ab wo mumkin hai,
+kyunki 2F ne draft/submit banaya aur 3C ne provisioning ko owner likhna sikhaya.
+
+St Mary's ab asli raste se registered aur approved hai:
+`REG-SCH-2026-00013`, apni school, apna head office, apna plan, apna owner row.
+HOW_TO_RUN wahi account naam karta hai aur ab wo **sach mein** tenant isolation
+dikhata hai, khaali shell mein sign in karne ke bajaye.
+
+#### Files
+
+```
+database/jp_app/04_procedures/002_provisioning_accounts.sql   (naya)
+database/jp_app/04_procedures/003_scope_resolver.sql          (naya)
+database/jp_app/04_procedures/004_school_profile.sql          (naya)
+database/jp_app/04_procedures/005_school_photos_facilities.sql (naya)
+database/jp_app/04_procedures/006_branches.sql                (naya)
+database/jp_app/04_procedures/001_provisioning.sql            (owner insert + 2 bug fix)
+database/jp_app/03_seed/002_backfill_phase3c_owners.sql       (naya)
+database/jp_app/99_tests/001_test_school_branch.sql           (naya — 41 assertion)
+jp-backend/JP.Infrastructure/Services/TeacherProvisioningService.cs  (naya)
+jp-backend/JP.Infrastructure/Repositories/AppProvisioningRepository.cs (naya)
+jp-backend/JP.Infrastructure/Services/{AuthService,ApprovalOrchestrationService}.cs
+jp-backend/JP.Infrastructure/Repositories/{UserRepository,IUserRepository,ProvisioningRepository}.cs
+jp-backend/JP.Sso.Api/appsettings.json                        (App + Mdm connections)
+```
+
+⚠️ `002_backfill_phase3c_owners.sql` `run_all.sql` mein **comment out** hai:
+ye `USP_ProvisionSchoolOwner` EXEC karti hai jo neeche 04_procedures mein banti
+hai. Khaali database par yahan chalane se wo procedure hi nahi milti. Wajah file
+ke saath likhi hai; rebuild ke baad haath se chalani hai.
+
+---
+
 ## 3. SCOPE (Client spec ke against)
 
 ### IN SCOPE — MVP
@@ -3188,6 +3452,7 @@ naya Code, agla free Id, kuch renumber mat karo.
 | 2026-08-10 | 2F | **School registration** — 5-step form with a server-side draft, account-status wired to the real request. Three pull-forwards: branches, PAN, plans+subscriptions. Provisioning now writes three rows in one transaction under one guard. 🔴 No Aadhaar number is stored anywhere, by decision. Whitelist misses are logged. Full flow verified end to end | ✅ Done |
 | 2026-08-10 | 3A | **jp_app tables** — 12 new + 2 ALTER for the columns 2D/2F deferred. jp_app now 16 tables · 63 indexes · 15 FKs · 47 checks. Re-run creates zero new objects. Guard test 17/17: duplicate profile, duplicate bridge and all four CHECKs refuse; soft-delete re-add and two-roles-one-school are allowed | ✅ Done |
 | 2026-08-10 | 3B | **Backfill + seeded profiles** — 11 teacher profiles, 11 teacher plans, 2 head-office branches, 2 org plans. All three completeness checks return 0. **G12 closed.** Two bugs the counts caught: a table variable's IDENTITY not resetting on DELETE, and giving a pending org a plan (which would have broken its future provisioning). Teacher data is entirely seeded — G20 | ✅ Done |
+| 2026-08-10 | 3C | **School + branch procedures** — 10 procs, the scope resolver, the bridge-sync pattern. Suite 41/41 with 15 negative cases. **G21 and G19 closed.** Found t_app_school_users had never been written to — the resolver reads it, so every school-scoped query would have been empty for everybody. Running a real registration then found two production bugs in provisioning: the CATCH claimed ALREADY_PROVISIONED without checking, and a second school under one organisation could not be provisioned at all | ✅ Done |
 | — | 2E | Admin screens → `frontend/apps/admin` | ⬜ Next |
 | — | 2F | School screens → `frontend/apps/school` | ⬜ Next |
 
@@ -3609,28 +3874,43 @@ banti — G12 ek-ek account karke dobara khulega).
 
 ---
 
-## ▶️ NEXT: PHASE 3C — TEACHER PROFILE API
+## ✅ PHASE 3C COMPLETE — 2026-08-10
 
-🔴 **Pehla kaam G21 hai**, feature nahi: signup par profile banna wire karo,
-warna aaj ke baad bana har teacher wahi backfill maangega jo abhi khatam hua.
+School aur branch procedures, scope resolver, bridge-sync pattern. Suite
+**41/41**, negative cases **15/15**. Build 0/0. Details **2.53**.
 
-Uske baad profile ka apna API: padho, likho, subject/skill/bhasha/location
-bridges, experience rows, documents.
+**G21 CLOSED** — signup ab profile banata hai, asli signup se verify kiya.
+**G19 CLOSED** — St Mary's asli raste se registered aur approved.
 
-### Jo 3A/3B se ready hai
-Saari table, saare guard (`UQ_t_app_teachers_UserUid` ek account ek profile),
-gyaarah bhare hue profile jinki completeness **jaan-boojh kar bikhri hui hai**
-(2.52) — 10% se 100% tak.
+⚠️ Ek naya gap: **G22** — scope resolver convention hai, enforcement nahi. Phase
+4 aur 5 dono uspe khadi hain.
 
-### 🔴 Aadhe bhare profile ke against banao, poore ke against nahi
-Teen case jo pakka todenge agar unhe dekha na jaaye:
+---
+
+## ▶️ NEXT: PHASE 3D — TEACHER PROFILE API
+
+Teacher profile ke procedures: padho, likho, aur paanch bridge —
+subjects, class levels, skills, languages, preferred locations — plus experience
+rows aur documents.
+
+### 🔴 Bridge-sync pattern 3C mein likha ja chuka hai — usi ko follow karo
+`USP_SaveSchoolFacilities` reference implementation hai (2.53): poora set bhejo,
+diff karo, naya INSERT, gaya hua soft-delete, **tombstone revive karo, nayi row
+mat banao**. Delete-all-then-reinsert mat likhna — kyun, wo file mein likha hai.
+
+`dbo.IntIdList` table type pehle se hai; paanchon bridge usi ko le sakti hain.
+Languages ko `ProficiencyLevel` chahiye, to uske liye apna type banega.
+
+### 🔴 Aadhe bhare profile ke against banao
+3B ne completeness jaan-boojh kar bikhri chhodi (2.52) — 10% se 100%. Teen case
+jo pakka todenge:
 - **Rohit Kulkarni** — koi current job nahi, sirf ek band experience row
 - **Anita Deshmukh** — profile hai, **subject ek bhi nahi**
 - **Imran Qureshi** — sirf naam aur state
 
 ### Verification
-Har change ke baad `90_ops/001_verify_account_completeness.sql` chalao. Teeno
-check zero rehni chahiye.
+Har change ke baad `90_ops/001_verify_account_completeness.sql` — teeno zero
+rehni chahiye. Aur `99_tests/001_test_school_branch.sql` 41/41.
 
 ---
 

@@ -425,7 +425,7 @@ environment config, never hardcoded.
 | `superadmin@teacherportal.local` | `RyaBs*-L?G9*-xTKM$R4` | Admin | `SUPER_ADMIN` | Full admin sidebar — 12 menus including both nested groups (Verification, Moderation). Approving a pending school |
 | `principal@greenwood.edu.in` | `Greenwood#2027!` | School | `SCHOOL_OWNER` | The complete school sidebar (9 items) and both school screens. Its password was changed mid-flow, which is why it is not `#2026!` |
 | `hr.lead@greenwood.edu.in` | `HrLead#2026!` | School | `HR` | **Permission filtering.** Same organisation as the principal, but 7 menus instead of 9 — no Branches, no Team. Sign in as both back to back; that difference is `USP_GetUserMenus` doing its job |
-| `head@stmarys.edu.in` | `StMarys#2026!` | School | `SCHOOL_OWNER` | **Tenant isolation.** A second organisation. Neither school can see the other's users |
+| `head@stmarys.edu.in` | `StMarys#2026!` | School | `SCHOOL_OWNER` | **Tenant isolation.** A second organisation, with its own school (St Mary's Convent, Bandra), its own head office and its own plan. Neither school can see the other's branches, users or applicants |
 | `tarun@yopmail.com` | *(yours)* | Teacher | `TEACHER` | The teacher portal — 8 menus, no admin or school items |
 
 **There is currently no PENDING school**, so the account-status screen is not
