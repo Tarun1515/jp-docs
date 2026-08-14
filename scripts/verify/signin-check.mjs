@@ -20,7 +20,28 @@ page.on('console', (m) => {
 await page.goto('http://localhost:4300/auth/login', { waitUntil: 'networkidle' });
 
 await page.fill('#loginId', 'principal@greenwood.edu.in');
-await page.fill('#password', 'Greenwood#2027!');
+/*
+  🔴 From the environment, not from this file.
+
+  This script is in a repository that is pushed. A password committed here
+  outlives the decision to remove it — the history keeps it long after the
+  account is gone.
+
+  The value is in local-accounts.md, which is gitignored:
+      $env:JP_SCHOOL_PASSWORD = '...'   # PowerShell
+      JP_SCHOOL_PASSWORD='...' node …   # bash
+*/
+const password = process.env.JP_SCHOOL_PASSWORD;
+
+if (!password) {
+  console.error(
+    'JP_SCHOOL_PASSWORD is not set. The password is in local-accounts.md, which is\n' +
+      'gitignored — see HOW_TO_RUN §4.',
+  );
+  process.exit(1);
+}
+
+await page.fill('#password', password);
 await page.click('button[type="submit"]');
 
 // Condition-based, not a fixed wait: either we land somewhere new, or an error appears.

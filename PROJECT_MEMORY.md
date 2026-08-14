@@ -1691,7 +1691,9 @@ imran.qureshi.86007@yopmail.com      Imran Qureshi           10%
 anita.deshmukh21338@yopmail.com      Anita Deshmukh          35%
 ```
 
-Password: nau 3B waalon ka `Teacher#2026!`.
+Password: `local-accounts.md` mein (gitignored). Ye file push hoti hai, wo
+nahi — repository ki history mein pada password us faisle se zyada jeeta hai jo
+kehta hai ki wo wahan nahi hona chahiye.
 
 **Invented kya hai:** `t_app_teachers` ki har column (`UserUid` chhod kar,
 jo asli account se aayi), aur `t_app_teacher_subjects`,

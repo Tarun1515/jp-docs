@@ -1,3 +1,9 @@
 node_modules/
 .DS_Store
 Thumbs.db
+
+# 🔴 Local development credentials. Never committed.
+#
+# HOW_TO_RUN.md is pushed; this file is what its credentials table points at.
+# A password in a repository's history outlives the decision to remove it.
+local-accounts.md

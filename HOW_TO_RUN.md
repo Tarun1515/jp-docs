@@ -418,15 +418,28 @@ environment config, never hardcoded.
 > ⚠️ These exist **only in your local `jp_sso`**. They are development fixtures.
 > None of them may ever be created in a deployed environment — `JP.Tools.SeedAdmin`
 > is the only sanctioned way to create an administrator anywhere real.
-> If this file is ever shared outside the team, strip this section first.
+> The passwords themselves are no longer in this file — see the note below the
+> table.
 
 | Email | Password | Type | Role | What it demonstrates |
 |---|---|---|---|---|
-| `superadmin@teacherportal.local` | `RyaBs*-L?G9*-xTKM$R4` | Admin | `SUPER_ADMIN` | Full admin sidebar — 12 menus including both nested groups (Verification, Moderation). Approving a pending school |
-| `principal@greenwood.edu.in` | `Greenwood#2027!` | School | `SCHOOL_OWNER` | The complete school sidebar (9 items) and both school screens. Its password was changed mid-flow, which is why it is not `#2026!` |
-| `hr.lead@greenwood.edu.in` | `HrLead#2026!` | School | `HR` | **Permission filtering.** Same organisation as the principal, but 7 menus instead of 9 — no Branches, no Team. Sign in as both back to back; that difference is `USP_GetUserMenus` doing its job |
-| `head@stmarys.edu.in` | `StMarys#2026!` | School | `SCHOOL_OWNER` | **Tenant isolation.** A second organisation, with its own school (St Mary's Convent, Bandra), its own head office and its own plan. Neither school can see the other's branches, users or applicants |
+| `superadmin@teacherportal.local` | see `local-accounts.md` | Admin | `SUPER_ADMIN` | Full admin sidebar — 12 menus including both nested groups (Verification, Moderation). Approving a pending school |
+| `principal@greenwood.edu.in` | see `local-accounts.md` | School | `SCHOOL_OWNER` | The complete school sidebar (9 items) and both school screens |
+| `hr.lead@greenwood.edu.in` | see `local-accounts.md` | School | `HR` | **Permission filtering.** Same organisation as the principal, but 7 menus instead of 9 — no Branches, no Team. Sign in as both back to back; that difference is `USP_GetUserMenus` doing its job |
+| `head@stmarys.edu.in` | see `local-accounts.md` | School | `SCHOOL_OWNER` | **Tenant isolation.** A second organisation, with its own school (St Mary's Convent, Bandra), its own head office and its own plan. Neither school can see the other's branches, users or applicants |
 | `tarun@yopmail.com` | *(yours)* | Teacher | `TEACHER` | The teacher portal — 8 menus, no admin or school items |
+
+> 🔴 **The passwords are in `local-accounts.md`, which is gitignored.**
+>
+> They used to be in this table. This file is pushed to GitHub, and a password
+> in a repository's history stays there long after somebody decides it should
+> not have been — rewriting history is possible and nobody enjoys doing it under
+> pressure.
+>
+> ⚠️ On a new machine that file will not exist. Rebuild the accounts through the
+> real registration endpoints, and create the administrator with
+> `JP.Tools.SeedAdmin --generate`. Instructions are in `local-accounts.md`
+> itself, and repeated in §3 above.
 
 **There is currently no PENDING school**, so the account-status screen is not
 reachable by simply signing in. Two ways to see it:
