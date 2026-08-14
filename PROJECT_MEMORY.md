@@ -1297,22 +1297,21 @@ Har item pe: kya hai, kyun chhoda, aur kahan theek hoga.
 
 ---
 
-### 🔴 G0. SAAT REPOS MEIN SE KISI KA GIT REMOTE NAHI HAI
+### G0. Git remote — ✅ CLOSED (3D, 2026-08-10)
+
+Saaton repo GitHub par hain, saare in sync:
 
 ```
-jp-shared, jp-admin, jp-school, jp-teacher, jp-public, jp-docs, jp-backend
-  -> git remote: (koi nahi)
+jp-backend  jp-shared  jp-admin  jp-school  jp-teacher  jp-public  jp-docs
+      https://github.com/Tarun1515/<name>.git
 ```
 
-Sab kuch **sirf is machine pe** hai. Har commit local hai, kahin push nahi hua.
-Disk gaya to poora Phase 1 gaya — database scripts, dono APIs, chaaron frontend
-projects, aur ye file bhi.
+⚠️ Push se pehle credentials nikaale gaye — `HOW_TO_RUN.md` ke plaintext
+password ab `local-accounts.md` (gitignored) mein hain, aur do aur jagah se
+bhi hataye gaye. Details **2.55**.
 
-**Ye technical gap nahi hai, ye risk hai.** Phase 2 shuru karne se pehle GitHub
-pe saat repos banao aur push karo. `gh` CLI is machine pe install nahi hai, to
-ya to install karo ya repos web se banao aur `git remote add origin` chalao.
-
----
+⚠️ Nayi machine par saaton **sibling folder** hone chahiye: `jp-shared` ke
+tsconfig paths aur SCSS includePaths `../jp-shared` par nirbhar hain (2.42).
 
 ### G1. Design items — Phase 1D review se bache hue
 
@@ -3321,6 +3320,267 @@ ke saath likhi hai; rebuild ke baad haath se chalani hai.
 
 ---
 
+### 2.54 TEACHER PROCEDURES — PHASE 3D
+
+14 procedure + 3 function + 2 table type. Suite **44/44**, jisme
+**A-cannot-touch-B 8/8**. Build 0/0.
+
+#### 🔴 Scope: teacher apni profile ka maalik hai, aur sirf apni
+
+`fn_TeacherIdForUser(@UserUid)` — ek hi jagah jahan UserUid TeacherId banta hai.
+
+Har write **token se** teacher resolve karta hai. Kisi bhi write procedure mein
+**`@TeacherId` parameter hai hi nahi** — "doosre ki profile edit karo" reject
+nahi hota, wo **kaha hi nahi ja sakta**.
+
+Ye suite `sys.parameters` ke against assert hota hai, koshish karke nahi:
+parameter ka **na hona** hi property hai, kisi parameter ka vyavhaar nahi.
+**12 procedure, 0 `@TeacherId`.**
+
+Jahan child row id se address hoti hai (experience, document), id ko resolve hue
+teacher ke against check kiya jaata hai — doosre ki id `NOT_FOUND` deti hai,
+wahi jo na-maujood id deti hai.
+
+⚠️ Scalar function, `fn_VisibleBranches` ki tarah TVF nahi: school ka jawab
+branches ka **set** hai jise join karna padta hai, teacher ka jawab ek row ya
+kuch nahi. TVF yahan `JOIN fn_TeacherIdForUser(...)` ko nyota deta wahan jahan
+imaandaar baat `WHERE TeacherId = @me` hai.
+
+#### 🔴 Contact ki line — teacher ke APPLY karne par khulti hai
+
+School browse karte waqt sab kuch dekh sakta hai jisse tay ho ki is insaan ko
+chahiye ya nahi — aur platform ke bahar sampark ka **koi rasta nahi**.
+
+Contact tab khulta hai jab **teacher ne us school ko apply kiya ho**. School ke
+paise dene par nahi, invite karne par nahi: jab teacher ne **pehla kadam** uthaya
+ho.
+
+Teen wajah, vazan ke kram mein:
+
+1. **Sehmati.** Jisne apply kiya usne tay kiya ki wo school sampark kar sakta
+   hai. Jo sirf search result mein aaya usne kuch tay nahi kiya, aur uska mobile
+   number de dena uski taraf se liya gaya faisla hai.
+2. **Yahi product hai.** Browse par contact de dene ka matlab poora product de
+   dena — school number leta hai, teacher ko phone karta hai, aur uske baad jo
+   hota hai usme hum hain hi nahi. Na application, na offer, na record, na wapas
+   aane ki wajah.
+3. **Isse teacher profile banane par pachhtaata nahi.** Jo naukri dhoondhne
+   resume upload karta hai aur chalees school ke cold call jhelta hai, wo profile
+   dobara update nahi karta — aur doosron ko bhi mana karta hai.
+
+🔴 **RESUME BHI EK CONTACT DETAIL HAI.** Yahi hissa galat hona sabse aasan hai.
+Resume ki pehli teen line mein phone aur email hota hai. Column chhupa kar file
+de dena **natak** hai: school PDF download karta hai aur wahi padh leta hai jo
+procedure ne abhi batane se mana kiya.
+
+To `ResumePath` **sirf** contact procedure deta hai, phone number wale hi unlock
+rule ke tehat. Browse procedure use deta hi nahi — column uske SELECT mein hai
+hi nahi.
+
+**Browse mein kya nahi jaata:** contact, resume, **DOB** (physics padha sakte ho
+ya nahi, ye jaanne ke liye umr nahi chahiye — aur use publish karna age
+discrimination ko ek filter ki doori par le aata hai), UserUid, RowVersion.
+
+**Kya jaata hai, jaan-boojh kar:** naam (naam sampark nahi hai, aur gumnaam row
+par school tay nahi kar sakta), expected salary (teacher ne use **filter ki tarah**
+bhara hai — chhupane se dono ka waqt aise offers par jaata hai jo kabhi chalne
+hi nahi the), current city/state (subject ke baad doosra filter; ye pata nahi
+hai).
+
+**Documents: haqeeqat, file nahi.** School dekh sakta hai ki degree certificate
+maujood hai aur humne verify kiya — file, filename ya path nahi. Yahi kaam ka
+aadha hissa hai ("kisi ne check kiya"), bina har search chalane wale school ko
+kisi ki ID ka scan diye.
+
+⚠️ `fn_TeacherContactUnlocked` **abhi hamesha 0** deta hai, aur ye placeholder
+nahi — `t_app_applications` Phase 5 hai, to aaj kisi ne kisi ko apply kiya hi
+nahi. Phase 5 ka exact replacement comment mein likha hai.
+
+🔴 **Ise invite tak mat badhana.** School ka invite karna school ka pehla kadam
+hai, aur invite platform se hi jaata hai taaki number ki zaroorat na ho. Invite
+par unlock ka matlab hoga ki school sabko invite karke sabka contact khol le —
+jo "koi rule nahi" ke barabar hai.
+
+#### 🔴 Do procedure, flag nahi — 3C wali hi wajah, zyada dhaar ke saath
+
+`@IncludeContact` wala ek procedure ek bhoole hue column ki doori par hai. 3C
+mein jo leak hota wo company ka tax number tha; **yahan ek insaan ka mobile
+number hai.**
+
+To browse procedure ke paas wo column **hain hi nahi**, aur ek jodna use
+**publish karne ka jaan-boojh kar kiya kaam** hai.
+
+⚠️ Contact procedure iska **ulta** karta hai — column maujood hain aur locked
+hone par NULL. Ye deliberate hai: wahan contact **maqsad hi nahi** tha, yahan
+contact hi maqsad hai. Caller `Code` padh kar jaanta hai ki wo asli hain ya nahi.
+
+#### Bridge sync — 3C ka pattern, do jagah alag
+
+Teen plain set (subjects, class levels, skills) bilkul `USP_SaveSchoolFacilities`
+ki tarah (2.53): poora set bhejo, diff karo, naya insert, gaya hua soft-delete,
+**tombstone revive karo**.
+
+**Languages — payload ke saath sync.** Ek chautha case hai jo plain pattern mein
+hota hi nahi: row maujood hai, chahiye bhi hai, par **level badal gaya**. Wo
+**UPDATE** hai. Delete-and-insert karne se us row ko naya Id aur naya CreatedOn
+milta — sirf isliye ki kisi ne dropdown "conversational" se "fluent" kiya, jo is
+table ka sabse aam edit hai.
+
+Chaar counter: removed, restored, **updated**, added. Test assert karta hai ki
+level badalne par `updated 1, added 0` aur **row ka Id wahi rehta hai**.
+
+**Preferred locations — teen column, NULL-equality.** Target ka index
+`(TeacherId, CityId, StateId)` hai aur wo NULL ko **barabar** maanta hai (3A).
+
+⚠️ To har join ko explicit NULL-equality chahiye: `a.CityId = b.CityId` dono NULL
+hone par UNKNOWN hai, matlab plain pattern "Maharashtra mein kahin bhi" ko
+gaayab samajh kar soft-delete karta, phir dobara insert karta — **har save par
+naya Id**, aur usi tombstone se takraav jo usne abhi banaya tha.
+
+Input pehle **deduplicate** hota hai: ek hi jagah do baar bhejna client ka bug
+hai, aur bina dedup ke index poori batch reject karta, duplicate ko nahi.
+
+#### Experiences bridge NAHI hain
+
+Har row ek cheez hai jise teacher likhta, badalta aur hataata hai. 3A ne
+jaan-boojh kar koi unique index nahi diya — ek hi school mein ek hi mahine se do
+role rakhna jaayaz hai (2.51). To diff karne ko kuch hai hi nahi: set sync ko tay
+karna padta ki "wahi experience" kya hai, aur imaandaar jawab ye hai ki sirf
+teacher jaanta hai — jiske liye Id hota hai.
+
+**Test:** do role, ek school, ek hi mahina — **dono accept**.
+
+#### 🔴 DATEDIFF(MONTH) ne har band naukri ek mahina chhoti dikhayi
+
+`DATEDIFF(MONTH, '2020-06-01', '2022-05-31')` = **23**. Us teacher ne **24 mahine**
+kaam kiya. DATEDIFF **boundary crossings** ginta hai, beeta hua waqt nahi — aur
+31 tareekh June mein nahi ghusi.
+
+To har band period ek mahina chhota tha, aur chhe naukri ka career **chhe mahine
+chhota**. Wahi kism ki galti jo 3B ne haath se likhe totals mein pakdi (2.52):
+ek number jo apne hi evidence se ulta hai.
+
+Fix: `ToDate` ko **aakhri kaam ka din** maano, to period `[FromDate, ToDate + 1)`
+ho jaata hai aur DATEDIFF sahi ginta hai. Khuli row aaj tak chalti hai —
+chaalu mahina sach mein poora nahi hua, aur use upar karna wo mahina claim karna
+hoga jo abhi kaam nahi kiya gaya.
+
+⚠️ **Ye suite ne pakda**, do do-saal ke role ke liye 48 assert karke. Procedure
+23+23=46 de raha tha aur andar se consistent tha — sirf duniya se galat.
+
+#### 🔴 ProfileCompletionPercent — niyam aur uska waada
+
+Server par compute hota hai, taaki teacher app, aage ki search ranking aur
+applicant card teeno ek hi baat kahein.
+
+```
+25  resume            school sabse pehle yahi maangta hai
+20  kam se kam ek subject   iske bina teacher search mein milta hi nahi
+15  kam se kam ek experience row
+10  photo
+10  designation + qualification (5 + 5)
+ 8  about me, 40+ character
+ 7  kam se kam ek preferred location
+ 5  class levels
+```
+
+🔴 **Bina resume 75 se upar ja hi nahi sakta.** Yahi weighting ka maqsad hai. Jise
+bina resume ke 100% dikha diya, use system ne bola ki wo taiyaar hai — theek us
+waqt jab school use chhaant dega. 75 dikhana aur "kyun" poochhwana behtar hai.
+
+⚠️ AboutMe **40 character** par gina jaata hai, "khaali nahi hai" par nahi. Ek
+shabd wo field hai jo kisi ne number hilane ke liye bhara, aur use ginna theek
+yahi sikhaata.
+
+Subjects class levels se zyada isliye hain ki school pehle **subject** par search
+karta hai; bina subject row wala teacher us search mein invisible hai chahe baaki
+sab bhara ho.
+
+**Gyaarah seeded profile par natija:**
+
+| % | Kaun | Kya kami |
+|---|---|---|
+| 100 | Harpreet, Meera, Tarun | — |
+| 90 | Arjun, Rohit | photo |
+| 67 | Fatima | resume, about |
+| 65 | Sneha | resume, photo |
+| 57 | Vikram | resume, photo, about |
+| 37 | Anita | **subject ek bhi nahi** — 100 mahine experience ke bawajood |
+| 20 | Lakshmi | sirf do subject |
+| 0 | Imran | naam aur state, aur kuch nahi |
+
+⚠️ **Imran 10% se 0% par aa gaya**, aur maine niyam nahi badla. Naam kisi ko
+hire nahi karwaata; "aapne shuru hi nahi kiya" imaandaar padhna hai. Iska ek
+natija hai: wo G21 wale test signup se alag nahi dikhta, jiska naam khaali string
+hai. Sweekaar kiya, chhupaya nahi.
+
+⚠️ **Anita 100 mahine ke saath 37%** — kyunki bina subject wo dhoondhi hi nahi ja
+sakti. Yahi niyam ka kaam karna hai.
+
+#### Duplicate-key ka dava — 3C wali galti dobara nahi
+
+`USP_SaveTeacherDocument` ka CATCH 2601 ko `ALREADY_UPLOADED` bolne se **pehle
+row dhoondhta hai**. 3C ne `USP_ProvisionSchoolFromApproval` ko bina jaanche
+`ALREADY_PROVISIONED` bolte pakda tha, ek aisi school ke liye jo rollback ho
+chuki thi. Wahi shakl, wahi anushasan: **dekho, phir daava karo.**
+
+#### Files
+
+```
+database/jp_app/04_procedures/007_teacher_profile.sql              (naya)
+database/jp_app/04_procedures/008_teacher_bridges.sql              (naya)
+database/jp_app/04_procedures/009_teacher_experiences_documents.sql (naya)
+database/jp_app/04_procedures/010_teacher_public_profile.sql       (naya)
+database/jp_app/99_tests/002_test_teacher.sql                      (naya — 44 assertion)
+```
+
+---
+
+### 2.55 SAAT REPO GITHUB PAR — G0 BAND
+
+Saaton repo `https://github.com/Tarun1515/<name>` par push ho gaye. Teen din ka
+kaam ab ek machine par nahi hai.
+
+#### 🔴 Push se pehle credentials nikaale
+
+`HOW_TO_RUN.md` mein paanch seeded account ke plaintext password the, jisme ek
+generated superadmin password bhi. Us file ki apni chetavani kehti thi: *"If this
+file is ever shared outside the team, strip this section first."* **Push wahi
+lamha hai**, aur repository ki history mein pada password us faisle se zyada
+jeeta hai jo kehta hai ki wo wahan nahi hona chahiye.
+
+Ab wo `local-accounts.md` mein hain, jo **gitignored** hai. Table mein email aur
+"ye kya dikhata hai" reh gaya, to doc abhi bhi system samjhata hai — sirf raaz
+chale gaye.
+
+⚠️ Do aur bahar mile the, credentials table se alag jagah:
+- `PROJECT_MEMORY.md` ki G20 mein seeded teacher ka password quote tha
+- `scripts/verify/signin-check.mjs` mein ek hardcoded tha — ab
+  `JP_SCHOOL_PASSWORD` environment se padhta hai aur na milne par
+  `local-accounts.md` ki taraf ishara karke rukta hai
+
+`local-accounts.md` khud likhta hai ki nayi machine par accounts **dobara kaise
+banayein** — asli registration endpoints se, aur admin `JP.Tools.SeedAdmin
+--generate` se — kyunki nayi machine par wo file hogi hi nahi, aur us waqt sahi
+jawab dobara banana hai, kisi se chat par password maangna nahi.
+
+#### Remote URLs — nayi machine yahan se shuru kar sakti hai
+
+```
+jp-backend   https://github.com/Tarun1515/jp-backend.git
+jp-shared    https://github.com/Tarun1515/jp-shared.git
+jp-admin     https://github.com/Tarun1515/jp-admin.git
+jp-school    https://github.com/Tarun1515/jp-school.git
+jp-teacher   https://github.com/Tarun1515/jp-teacher.git
+jp-public    https://github.com/Tarun1515/jp-public.git
+jp-docs      https://github.com/Tarun1515/jp-docs.git
+```
+
+⚠️ Saaton **sibling folder** hone chahiye — `jp-shared` ke tsconfig paths aur
+SCSS `includePaths` bhagwan bharose nahi, `../jp-shared` par nirbhar hain (2.42).
+
+---
+
 ## 3. SCOPE (Client spec ke against)
 
 ### IN SCOPE — MVP
@@ -3455,6 +3715,8 @@ naya Code, agla free Id, kuch renumber mat karo.
 | 2026-08-10 | 3A | **jp_app tables** — 12 new + 2 ALTER for the columns 2D/2F deferred. jp_app now 16 tables · 63 indexes · 15 FKs · 47 checks. Re-run creates zero new objects. Guard test 17/17: duplicate profile, duplicate bridge and all four CHECKs refuse; soft-delete re-add and two-roles-one-school are allowed | ✅ Done |
 | 2026-08-10 | 3B | **Backfill + seeded profiles** — 11 teacher profiles, 11 teacher plans, 2 head-office branches, 2 org plans. All three completeness checks return 0. **G12 closed.** Two bugs the counts caught: a table variable's IDENTITY not resetting on DELETE, and giving a pending org a plan (which would have broken its future provisioning). Teacher data is entirely seeded — G20 | ✅ Done |
 | 2026-08-10 | 3C | **School + branch procedures** — 10 procs, the scope resolver, the bridge-sync pattern. Suite 41/41 with 15 negative cases. **G21 and G19 closed.** Found t_app_school_users had never been written to — the resolver reads it, so every school-scoped query would have been empty for everybody. Running a real registration then found two production bugs in provisioning: the CATCH claimed ALREADY_PROVISIONED without checking, and a second school under one organisation could not be provisioned at all | ✅ Done |
+| 2026-08-10 | 3D | **Teacher procedures** — 14 procs, 5 bridge syncs (two of them not plain sets), experiences as entities. Suite 44/44 with 8 A-cannot-touch-B assertions. Contact details lock until the teacher applies, and the resume locks with them. Found DATEDIFF(MONTH) was making every closed job one month short | ✅ Done |
+| 2026-08-10 | — | **All seven repos pushed to GitHub. G0 closed.** Credentials stripped from HOW_TO_RUN, PROJECT_MEMORY and a verify script first — they are in a gitignored local-accounts.md now | ✅ Done |
 | — | 2E | Admin screens → `frontend/apps/admin` | ⬜ Next |
 | — | 2F | School screens → `frontend/apps/school` | ⬜ Next |
 
@@ -3789,8 +4051,7 @@ temp table 5 column ka reh gaya tha. Fix kiya, phir 73/73. Details section 2A
 [HOW_TO_RUN.md](HOW_TO_RUN.md)
 
 🔴 **Known gaps section 2A mein hain. Phase 2 shuru karne se pehle padho** —
-khaas kar **G0: kisi repo ka git remote nahi hai**, sab kuch sirf ek machine pe
-hai.
+⚠️ **G0 ab band hai** — saaton repo GitHub par hain (2.55).
 
 ---
 
@@ -3889,30 +4150,42 @@ School aur branch procedures, scope resolver, bridge-sync pattern. Suite
 
 ---
 
-## ▶️ NEXT: PHASE 3D — TEACHER PROFILE API
+## ✅ PHASE 3D COMPLETE — 2026-08-10
 
-Teacher profile ke procedures: padho, likho, aur paanch bridge —
-subjects, class levels, skills, languages, preferred locations — plus experience
-rows aur documents.
+Teacher procedures poore. Suite **44/44**, jisme **A-cannot-touch-B 8/8**.
+Details **2.54**.
 
-### 🔴 Bridge-sync pattern 3C mein likha ja chuka hai — usi ko follow karo
-`USP_SaveSchoolFacilities` reference implementation hai (2.53): poora set bhejo,
-diff karo, naya INSERT, gaya hua soft-delete, **tombstone revive karo, nayi row
-mat banao**. Delete-all-then-reinsert mat likhna — kyun, wo file mein likha hai.
+**G0 CLOSED** — saaton repo GitHub par, credentials nikaal kar. Details **2.55**.
 
-`dbo.IntIdList` table type pehle se hai; paanchon bridge usi ko le sakti hain.
-Languages ko `ProficiencyLevel` chahiye, to uske liye apna type banega.
+---
 
-### 🔴 Aadhe bhare profile ke against banao
-3B ne completeness jaan-boojh kar bikhri chhodi (2.52) — 10% se 100%. Teen case
-jo pakka todenge:
-- **Rohit Kulkarni** — koi current job nahi, sirf ek band experience row
-- **Anita Deshmukh** — profile hai, **subject ek bhi nahi**
-- **Imran Qureshi** — sirf naam aur state
+## ▶️ NEXT: PHASE 3E — THE API AND THE SCREENS
+
+Database taiyaar hai. Ab `JP.App.Api` ke endpoints aur uske baad screens.
+
+### Endpoints
+School side (2.53) aur teacher side (2.54) ke procedures wire karne hain —
+repository, service, controller, wahi layering jo 2D ne banayi.
+
+### 🔴 Do cheezein jo API ko nibhani hain
+
+1. **`@UserUid` aur `@ViewerSchoolId` sirf TOKEN se.** Koi request model
+   inhe carry na kare — na optional bhi (2.39). Procedures ko is tarah likha gaya
+   hai ki galat teacher ki profile edit karna **kaha hi na ja sake**; ek optional
+   field usse wapas expressible bana degi.
+
+2. **Contact ka rasta ek hi rahe.** `USP_GetTeacherContactForSchool` hi resume
+   aur phone number deta hai (2.54). Agar kabhi koi doosra endpoint
+   `ResumePath` lautaaye, wo unlock rule ke bahar chala gaya.
+
+### Uske baad screens
+`jp-teacher` profile edit (aadhe bhare profile ke against — 2.52 ke Rohit,
+Anita, Imran) aur `jp-school` branch management.
 
 ### Verification
-Har change ke baad `90_ops/001_verify_account_completeness.sql` — teeno zero
-rehni chahiye. Aur `99_tests/001_test_school_branch.sql` 41/41.
+`90_ops/001_verify_account_completeness.sql` teeno zero.
+`99_tests/001_test_school_branch.sql` 41/41.
+`99_tests/002_test_teacher.sql` 44/44.
 
 ---
 
@@ -3921,7 +4194,7 @@ rehni chahiye. Aur `99_tests/001_test_school_branch.sql` 41/41.
 **MILESTONE 1 DEMO — abhi bhi baaki hai.** School signup → admin approve →
 school active poora chalta hai. Dikhane se pehle: jaan-boojh kar orphan chhodi
 gayi `REG-SCH-2026-00005` saaf karo, nayi screenshots lo, known gaps dobara
-padho (khaas kar **G0**), aur saaf batao kaun si screen asli hai aur kaun si
+padho, aur saaf batao kaun si screen asli hai aur kaun si
 abhi mockup (applicants table fixture par hai — G6).
 
 **Phase 4 — jobs.** Har job ek branch par lagti hai, aur har school ke paas ab
@@ -3943,8 +4216,8 @@ Sab ke liye 2.42 ka start order: **`jp-shared` :4999 pehle**.
 
 ## 🔴 Kuch bhi shuru karne se pehle
 
-- **Section 2A (known gaps)** padho — khaas kar **G0: kisi repo ka git remote
-  nahi hai.** Phase 1 aur Phase 2 dono sirf is machine pe hain.
+- **Section 2A (known gaps)** padho. ✅ G0 band ho chuka — saaton repo GitHub
+  par hain (2.55) — par baaki khule gaps wahin hain.
 - **2.39** — organization scope. Uska integration test Phase 3 ki definition of
   done ka hissa hai.
 - **2.42** — frontend structure LOCKED.
