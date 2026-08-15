@@ -1743,6 +1743,30 @@ hone par review.
 (applications) dono is resolver par khadi hain, aur wahin sabse zyada rows hain
 jinhe galat banda dekh sakta hai.
 
+### G23. Ek user, ek school — API abhi doosra keh hi nahi sakti
+
+School ke saare endpoint caller ki membership se school resolve karte hain
+(2.57). Agar kisi ke paas **do** membership hui, service saaf inkaar karti hai —
+pehli utha kar nahi.
+
+Aaj kisi ke paas do nahi hai (verify kiya), par **shakl pehle se maujood hai**:
+Greenwood ke ek hi organisation ke neeche do school hain, aur
+`t_app_school_users` do membership rokta nahi.
+
+⚠️ Jis din ek group apne principal ko dono school par rakhega, uske liye har
+school screen **band** ho jaayegi — ek saaf message ke saath, par band.
+
+**Kya chahiye:** ya to endpoints `schoolId` lein aur membership ke against
+validate karein, ya UI mein ek "active school" switcher ho jo token/session mein
+baithe.
+
+🔴 Pehla wala aasan lagta hai aur **IDOR ka rasta** hai: jis lamhe request
+`schoolId` le sakti hai, har endpoint ko validate karna yaad rakhna padega.
+Doosra wala saaf hai, par usme session state hai.
+
+Faisla tab lena hai jab pehla asli multi-school group aaye — abhi guess karke
+banane se galat wala chun lenge.
+
 ### 2.45 `jp_mdm` — PHASE 2A BUILD NOTES
 
 32 tables (23 masters + 8 transactional + `t_mdm_error_log`), 91 indexes,
@@ -3693,6 +3717,190 @@ design ka faayda hai: rule ek jagah hai, aur use badalne ke liye ek jagah.
 
 ---
 
+### 2.57 PROFILE APIs — PHASE 3E
+
+23 endpoint. Build **0 warning 0 error**. HTTP verification **20/20**, asli
+chalte hue API ke against.
+
+#### 🔴 Contact ka bachaav ab TEEN parat mein hai
+
+3D ne do procedure banaye the (ek flag wale ki jagah). 3E ne wo alagav API tak
+nibhaya, aur uske upar ek cheez jodi jo **comment se zyada mazboot** hai:
+
+| Parat | Kya rokti hai |
+|---|---|
+| **Do procedure** (2.54) | `USP_GetTeacherPublicProfile` mein contact column hai hi nahi |
+| **Do DTO** (3E) | `TeacherBrowseDto` mein `ContactEmail`/`ContactMobile`/`ResumePath`/`Dob` property **hai hi nahi** — null nahi, GAYAB |
+| **`ContactLeakGuard`** (3E) | Startup par reflect karta hai aur **API chalne se mana kar deta hai** agar koi contact-jaisi property aa jaaye |
+
+⚠️ Teesri parat isliye hai ki **comment build fail nahi karta**. Guard karta hai.
+
+**Proof — DTO ko jaan-boojh kar toda:** `ContactMobile` joda, build pass hua,
+aur API start hote hi:
+
+```
+Unhandled exception. System.InvalidOperationException: TeacherBrowseDto declares
+ContactMobile, which a school browsing the teacher database must never receive.
+Contact details and the resume are gated behind GET /api/teachers/{uid}/contact,
+which unlocks only when the teacher applied to that school or accepted its
+invite (PROJECT_MEMORY 2.56, LOCKED)...
+```
+
+Guard `Contact`, `Email`, `Mobile`, `Phone`, `Resume`, `Dob`, `DateOfBirth`,
+`UserUid` — **prefix se** match karta hai, poore naam se nahi, taaki
+`ContactPersonName` bhi pakda jaaye. Exhaustive hona maqsad nahi; **chupke se
+nikalna mushkil** hona maqsad hai.
+
+⚠️ Fatal rakha hai, warning nahi. Jis school ne ek baar teacher ka number padh
+liya, use **un-padha nahi karaya ja sakta** — to failure loud, local aur turant
+honi chahiye.
+
+#### Browse endpoint asli mein kya deta hai
+
+`GET /api/teachers/{uid}/browse` — 24 field, asli response body se:
+
+```
+teacherUid · fullName · photoPath · genderId · qualificationId
+highestQualificationText · designationId · totalExperienceMonths
+currentSchool · lastSchool · expectedSalaryMin · expectedSalaryMax
+currentCityId · currentStateId · aboutMe · isVerified
+profileCompletionPercent
+subjectIds · classLevelIds · skillIds · languages · preferredLocations
+experiences · documents
+```
+
+⚠️ `documents` mein sirf `documentTypeId` aur `isVerified` hai — **haqeeqat,
+file nahi**. "Kisi ne check kiya" wahi kaam ka hissa hai; scan dena nahi.
+
+Verification body ko **text ki tarah** padh kar naam dhoondhti hai, parse karke
+nahi — kyunki serializer ya mapper wo field jod sakta hai jo type ne declare ki
+hi nahi.
+
+#### Contact endpoint — 403, wajah ke saath
+
+```
+403 · "You will see this teacher's contact details once they apply to one of
+your jobs, or accept an invitation from you. Until then you can invite them
+through the platform — they will see your message and can reply."
+```
+
+⚠️ Aaj **har school ke liye** 403 — kyunki applications Phase 5 hain aur invites
+Phase 6, to kisi teacher ne abhi tak sehmati di hi nahi. **Ye sahi jawab hai,
+adhoora nahi.**
+
+Message rasta batata hai, sirf darwaza band hone ki khabar nahi deta. Jo refusal
+sirf "nahi" kehta hai use log bug ya paywall padhte hain, aur ye dono nahi hai.
+
+#### IDOR — 404, 403 nahi
+
+**Branch:** doosre school ki branch maangne par `404 · That campus was not
+found.` Verify kiya. `dbo.fn_VisibleBranches` kuch nahi deta, to procedure kuch
+nahi deta, to service `NotFoundException` phenkti hai.
+
+⚠️ 403 dena **tasdeeq** kar deta ki wo branch maujood hai — wahi disclosure
+jise scoping rokne ke liye bani thi (2.48 wali dalil).
+
+**Teacher:** koi bhi write endpoint `@TeacherId` nahi leta. Jahan route mein id
+hai (experience, document), wo **child row** hai aur procedure use token se
+resolve hue teacher ke against jaanchta hai.
+
+Verify kiya: A ne B ki experience edit karne ki koshish ki → `404`, delete ki →
+`404`, aur **B ki row jyon ki tyon**.
+
+#### School kaun sa hai — token se, request se nahi
+
+`JP.Domain.Schools` ke kisi bhi **request** type mein `SchoolId` ya
+`OrganizationUid` nahi hai. Service `USP_GetSchoolsForUser` se poochhti hai.
+
+Do case jaan-boojh kar alag handle kiye:
+- **koi membership nahi** → 403, aur message us haalat ke liye likha hai
+- **ek se zyada** → saaf inkaar, **pehli utha kar nahi** (G23)
+
+⚠️ **HTTP verification ne yahan ek bug pakda:** teacher `/school/profile` par
+403 to paa raha tha, par message tha *"aapka account abhi kisi school se juda
+nahi — agar aapko abhi approve kiya gaya hai to sign out karke wapas aayein"* —
+jo school user ke liye likha hai aur teacher ke liye bakwaas hai. Refusal sahi
+tha, **wajah galat**. Ab type pehle check hota hai: *"This is a school area.
+Your account is not a school account."*
+
+Yahi wo cheez hai jo support par aati hai aur koi reproduce nahi kar paata.
+
+#### Full-set sync — contract endpoint par likha hai
+
+Paanch teacher endpoint aur school facilities **poora set** lete hain, delta
+nahi. Har ek ke summary mein saaf likha hai, misaal ke saath:
+
+> Sending `[2]` when the teacher already has `[1, 2, 10]` removes 1 and 10.
+
+⚠️ Ye isliye likha hai ki jo client sirf naya subject bhejega aur baaki gayab
+paayega **wo bug file karega — aur theek karega**, agar contract kabhi likha hi
+na gaya ho.
+
+HTTP se verify kiya: `PUT /teacher/subjects {ids:[1]}` ne `1,2` ko `1` kar diya;
+poora set wapas bhejne par `1,2` bahaal.
+
+#### Public school profile — ekmatra bina-auth endpoint
+
+`GET /api/schools/{uid}/public`, `[AllowAnonymous]`. 18 field, **na PAN, na
+organizationUid, na suspensionReason, na rowVersion**.
+
+🔴 **3C ka adhoora test ab poora hua.** Wahan do assertion procedure ke predicate
+ko **mirror** karti thi, uske output ko nahi — kyunki `INSERT..EXEC` chaar result
+set capture nahi kar sakta. Wo SQL suite likh hi nahi sakti thi.
+
+Ab HTTP se:
+- suspended school → **404**
+- unverified (pending) school → **404**
+
+Dono asli request se, asli data ko toggle karke. **Yahi wo test hai jo 3C ne
+maanga tha aur de nahi paaya.**
+
+#### Upload — dobara nahi likha
+
+Logo, photo, resume aur documents chaaron 2D wale `UploadValidator` se guzarte
+hain: extension, **magic bytes**, size, generated GUID naam, path-traversal.
+
+⚠️ Logo/photo/resume ki `m_mdm_document_types` mein row nahi hai — wo master
+approval-request documents ke liye hai. To unki **limits** service mein constant
+hain, par **jaanch wahi** hai. Teacher documents apni limits us row se lete hain
+(2.47).
+
+🔴 Doosra upload path nahi banaya. Do path ka matlab hai ek din unme se ek check
+chhod dega — aur wahi chhodega jise likhna kisi ko yaad nahi.
+
+Virus-scan hook dono jagah usi jagah marked hai: **validation ke baad, storage se
+pehle** (G13).
+
+#### Verification — 20/20, asli HTTP
+
+```
+1. school profile        token se resolve, PAN/suspension own-view mein
+2. public profile        bina auth 200 · suspended 404 · unverified 404
+3. browse body           contact ka koi naam nahi · 24 field chhape
+4. contact               403 + wajah wala message
+5. branch scope          doosre school ki branch 404, 403 nahi
+6. A vs B                edit 404 · delete 404 · B ki row salamat
+                         teacher browse par 403 · teacher school area par 403
+7. full-set sync         [1] ne baaki hata diye · poora set wapas
+```
+
+Script rakhi hai: `jp-docs/scripts/verify/browse-contract.mjs`.
+
+#### Files
+
+```
+jp-backend/JP.Domain/Schools/SchoolContracts.cs                 (naya)
+jp-backend/JP.Domain/Teachers/TeacherContracts.cs               (naya)
+jp-backend/JP.Infrastructure/Repositories/{School,Branch,Teacher}Repository.cs  (naye)
+jp-backend/JP.Infrastructure/Services/{SchoolProfile,Branch,TeacherProfile,TeacherDirectory}Service.cs (naye)
+jp-backend/JP.App.Api/Controllers/{School,Branches,Teacher}Controller.cs (naye)
+jp-backend/JP.App.Api/Startup/ContactLeakGuard.cs               (naya)
+database/jp_app/04_procedures/003_scope_resolver.sql            (USP_GetSchoolsForUser)
+jp-docs/scripts/verify/browse-contract.mjs                      (naya)
+```
+
+---
+
 ## 3. SCOPE (Client spec ke against)
 
 ### IN SCOPE — MVP
@@ -3830,6 +4038,7 @@ naya Code, agla free Id, kuch renumber mat karo.
 | 2026-08-10 | 3D | **Teacher procedures** — 14 procs, 5 bridge syncs (two of them not plain sets), experiences as entities. Suite 44/44 with 8 A-cannot-touch-B assertions. Contact details lock until the teacher applies, and the resume locks with them. Found DATEDIFF(MONTH) was making every closed job one month short | ✅ Done |
 | 2026-08-10 | — | **All seven repos pushed to GitHub. G0 closed.** Credentials stripped from HOW_TO_RUN, PROJECT_MEMORY and a verify script first — they are in a gitignored local-accounts.md now | ✅ Done |
 | 2026-08-10 | — | **2.56 LOCKED — contact unlocks on teacher consent, never on payment.** Resolved the conflict between 3D's contact rule and the monetization plan. Two paths only: applied, or accepted an invite. What is sold is the school's capability. ⚠️ The spec has no ACCEPTED invite status — Phase 6 must add one or path 2 collapses into path 1 | ✅ Done |
+| 2026-08-10 | 3E | **Profile APIs** — 23 endpoints, build 0/0, HTTP verification 20/20. Contact is now protected in three layers, the third being a startup guard that refuses to boot if the browse DTO grows a contact field (proved by breaking it). Closed 3C's two mirrored assertions with real 404s for suspended and pending schools. Found a refusal whose message was written for the wrong kind of user | ✅ Done |
 | — | 2E | Admin screens → `frontend/apps/admin` | ⬜ Next |
 | — | 2F | School screens → `frontend/apps/school` | ⬜ Next |
 
@@ -4272,37 +4481,45 @@ Details **2.54**.
 
 ---
 
-## ▶️ NEXT: PHASE 3E — THE API AND THE SCREENS
+## ✅ PHASE 3E COMPLETE — 2026-08-10
 
-Database taiyaar hai. Ab `JP.App.Api` ke endpoints aur uske baad screens.
+23 endpoint, build **0/0**, HTTP verification **20/20**. Details **2.57**.
 
-### Endpoints
-School side (2.53) aur teacher side (2.54) ke procedures wire karne hain —
-repository, service, controller, wahi layering jo 2D ne banayi.
+Contact ab teen parat se bacha hai, teesri ek startup guard hai jo DTO chaudi
+hone par API ko chalne hi nahi deta — **DTO tod kar sabit kiya**.
 
-### 🔴 Do cheezein jo API ko nibhani hain
+⚠️ Ek naya gap: **G23** — ek user ek hi school par ho sakta hai; API doosra keh
+hi nahi sakti.
 
-1. **`@UserUid` aur `@ViewerSchoolId` sirf TOKEN se.** Koi request model
-   inhe carry na kare — na optional bhi (2.39). Procedures ko is tarah likha gaya
-   hai ki galat teacher ki profile edit karna **kaha hi na ja sake**; ek optional
-   field usse wapas expressible bana degi.
+---
 
-2. **Contact ka rasta ek hi rahe.** `USP_GetTeacherContactForSchool` hi resume
-   aur phone number deta hai (2.54). Agar kabhi koi doosra endpoint
-   `ResumePath` lautaaye, wo unlock rule ke bahar chala gaya.
+## ▶️ NEXT: PHASE 3F — THE SCREENS
 
-3. 🔒 **Contact kabhi bhi paid feature ki tarah expose mat karna (2.56).**
-   Subscription check search par lag sakta hai aur invite ki ginti par — contact
-   par **kabhi nahi**. Wo teacher ki sehmati hai, plan ka feature nahi.
+Database aur API dono taiyaar. Ab `jp-teacher` ka profile edit aur
+`jp-school` ka branch management.
 
-### Uske baad screens
-`jp-teacher` profile edit (aadhe bhare profile ke against — 2.52 ke Rohit,
-Anita, Imran) aur `jp-school` branch management.
+### 🔴 Aadhe bhare profile ke against banao
+3B ne completeness jaan-boojh kar bikhri chhodi (2.52). Teen case jo pakka
+todenge agar unhe dekha na jaaye:
+- **Rohit Kulkarni** — koi current job nahi, sirf ek band experience row
+- **Anita Deshmukh** — profile hai, **subject ek bhi nahi**
+- **Imran Qureshi** — sirf naam aur state, 0%
+
+### 🔴 Full-set semantics UI mein bhi nibhani hai
+Paanchon bridge endpoint poora set lete hain (2.57). Screen ko hamesha **poori
+list** bhejni hai — ek chip hataane par bhi. Sirf naya id bhejne se baaki sab
+mit jaayenge.
+
+### 🔴 Contact kabhi UI mein mat maango
+`/browse` mein contact hai hi nahi. Teacher card par phone/email dikhane ki
+jagah **invite ka button** ho (2.56). Jab tak teacher apply ya accept na kare,
+`/contact` 403 hi dega — aur uska message seedha dikhane layak likha hai.
 
 ### Verification
-`90_ops/001_verify_account_completeness.sql` teeno zero.
-`99_tests/001_test_school_branch.sql` 41/41.
-`99_tests/002_test_teacher.sql` 44/44.
+`90_ops/001_verify_account_completeness.sql` teeno zero ·
+`99_tests/001_test_school_branch.sql` 41/41 ·
+`99_tests/002_test_teacher.sql` 44/44 ·
+`scripts/verify/browse-contract.mjs` 20/20.
 
 ---
 
