@@ -3,12 +3,26 @@
 Everything needed to get this running from a clean machine, and an honest
 statement of what is actually built.
 
-**Status: Phase 1 complete** — 1A (jp_sso schema) · 1B (stored procedures) ·
-1C (`JP.Sso.Api`) · 1D (Angular auth screens + design system).
+**Status: Phase 3 complete** — three databases, both APIs, and the school and
+teacher portals running on real data.
 
-> 🔴 **Read [What is real and what is a mockup](#-what-is-real-and-what-is-a-mockup)
-> before showing this to anyone.** Two screens are populated from a hardcoded
-> file, not from a database, and they are the two that look the most finished.
+- **Phase 1** — `jp_sso`, its procedures, `JP.Sso.Api`, the auth screens and the
+  design system.
+- **Phase 2** — `jp_mdm` and `jp_app`, the approval engine, `JP.App.Api`, the
+  admin verification panel, and school registration.
+- **Phase 3** — the business tables and procedures, the profile APIs, and every
+  school and teacher screen: school profile, campuses, team, teacher profile,
+  and both dashboards.
+
+> ✅ **There are no static mockups left in either portal.** Every screen that
+> renders data now fetches it. See
+> [What is real and what is not built yet](#-what-is-real-and-what-is-not-built-yet)
+> — the honest statement of what exists, which is still the section to read
+> before showing this to anyone.
+
+**Not built yet:** jobs (Phase 4), applications and offers (Phase 5), and the
+rest of the admin console. Those areas say so on screen rather than showing a
+number.
 
 ---
 
@@ -424,8 +438,8 @@ environment config, never hardcoded.
 | Email | Password | Type | Role | What it demonstrates |
 |---|---|---|---|---|
 | `superadmin@teacherportal.local` | see `local-accounts.md` | Admin | `SUPER_ADMIN` | Full admin sidebar — 12 menus including both nested groups (Verification, Moderation). Approving a pending school |
-| `principal@greenwood.edu.in` | see `local-accounts.md` | School | `SCHOOL_OWNER` | The complete school sidebar (9 items) and both school screens |
-| `hr.lead@greenwood.edu.in` | see `local-accounts.md` | School | `HR` | **Permission filtering.** Same organisation as the principal, but 7 menus instead of 9 — no Branches, no Team. Sign in as both back to back; that difference is `USP_GetUserMenus` doing its job |
+| `principal@greenwood.edu.in` | see `local-accounts.md` | School | `SCHOOL_OWNER` | The complete school sidebar (8 items) and every school screen: dashboard, profile, campuses, team |
+| `hr.lead@greenwood.edu.in` | see `local-accounts.md` | School | `HR` | **Permission filtering.** Same organisation as the principal, but fewer menus — no Campuses, no Team. Sign in as both back to back; that difference is `USP_GetUserMenus` doing its job |
 | `head@stmarys.edu.in` | see `local-accounts.md` | School | `SCHOOL_OWNER` | **Tenant isolation.** A second organisation, with its own school (St Mary's Convent, Bandra), its own head office and its own plan. Neither school can see the other's branches, users or applicants |
 | `tarun@yopmail.com` | *(yours)* | Teacher | `TEACHER` | The teacher portal — 8 menus, no admin or school items |
 
@@ -454,9 +468,12 @@ reachable by simply signing in. Two ways to see it:
 
 ## 5. The happy path, click by click
 
-Start four things: `jp-shared` (:4999), `JP.Sso.Api` (:5199), `jp-school`
-(:4300) and `jp-admin` (:4200). This walk-through crosses between two apps,
-which is why both are needed.
+Start six things: `jp-shared` (:4999), **both** APIs — `JP.Sso.Api` (:5199) and
+`JP.App.Api` (:5299) — then `jp-school` (:4300), `jp-admin` (:4200) and
+`jp-teacher` (:4400).
+
+⚠️ `JP.App.Api` was optional when this walk-through only covered sign-in. It is
+not optional now: every dashboard, profile, campus and team screen reads from it.
 
 1. **Register a school** — <http://localhost:4300/auth/register>. Any email, any
    10-digit mobile starting 6–9, a password of 8+ characters. There is no
@@ -468,20 +485,44 @@ which is why both are needed.
    the admin app. Signing in as an administrator on :4300 will succeed and then
    immediately sign you back out with a message pointing here; that is the
    cross-app guard doing its job, not a bug.
-4. Approve the school. There is **no admin UI for this yet**, so use Swagger at
-   <http://localhost:5199/swagger>:
-   `PUT /api/users/{userUid}/status` with
-   `{ "newStatusId": 2, "rowVersion": <current>, "remarks": "Verified" }`.
-   Get the `userUid` and `rowVersion` from `GET /api/users?search=<email>`.
+4. Approve the school **in the admin app** — Verification → Schools. The queue
+   is oldest-first, the row opens into the request with its documents, and
+   Approve provisions the school, its head-office campus and its subscription in
+   one action (2E, 2.49).
+
+   ⚠️ The Swagger route (`PUT /api/users/{userUid}/status`) still works and is
+   still the way to move an account for any other reason, but it is no longer
+   how a school gets approved — the approval decision and the provisioning that
+   follows it belong together.
 5. **Sign in as the school again** on :4300. It is now Active, the sidebar has
-   all 9 school items, and `SCHOOL_OWNER` was granted automatically at approval.
+   all 8 school items, and `SCHOOL_OWNER` was granted automatically at approval.
    The sidebar is rendered from `GET /api/menus`, not from a hardcoded array.
-6. Open **Dashboard** and **Applicants**. ⚠️ Everything on these two screens is
-   hardcoded — see the next section.
-7. **Change your password** via Swagger `POST /api/auth/change-password`, then
+
+   ⚠️ Eight, not nine: Applicants is hidden until Phase 5 (3I). A single-campus
+   school sees seven — Campuses disappears too, which is decision 2.10 applied
+   in the menu as well as the route.
+6. Open **Dashboard**. Every figure on it is fetched: the school's name and
+   verification badge, its head-office campus, its plan, and who is on the
+   account. The **Jobs** and **Applicants** areas show what they will become and
+   say when — they carry no counts, because there is nothing yet to count.
+
+   Then open **School profile**, **Campuses** and **Team**. All three read and
+   write real data (3F, 3G). Each profile section saves on its own, and a save
+   that clashes with somebody else's shows a reload rather than overwriting them.
+
+   ⚠️ **Applicants is no longer routed.** It was a fixture-driven mockup; the
+   component is kept as the design for Phase 5 under
+   `jp-school/src/app/_design-reference/`, and its menu row is hidden until
+   applications exist.
+
+7. **Sign in as a teacher** on **<http://localhost:4400>** and open **Dashboard**
+   and **My profile**. The dashboard shows the completeness meter — which names
+   the single most valuable missing thing and never prints "0%" at somebody who
+   has just started — plus their resume status and plan.
+8. **Change your password** via Swagger `POST /api/auth/change-password`, then
    try to refresh with an old refresh token: it returns 401 and the entire token
    chain is revoked.
-8. **Forgot password** — <http://localhost:4300/auth/forgot-password>. SMTP is
+9. **Forgot password** — <http://localhost:4300/auth/forgot-password>. SMTP is
    disabled in development, so the email is written to
    `jp-backend\JP.Sso.Api\App_Data\mail-drop\*.eml`. Open the newest file, copy
    the `token=` value out of the reset link, and visit
@@ -491,80 +532,85 @@ which is why both are needed.
    at :4400, an administrator's at :4200. That comes from `Auth:PortalBaseUrls`
    keyed by user type, not from one shared base URL.
 
-9. **The public chooser** — <http://localhost:4500/continue?mode=signup>. Two
+10. **The public chooser** — <http://localhost:4500/continue?mode=signup>. Two
    options, school and teacher, each linking into the app you just used.
    `jp-public` needs neither the remote nor the API for this.
 
 ---
 
-## 🔴 What is real and what is a mockup
+## 🔴 What is real and what is not built yet
 
 This is the part that matters when someone is looking over your shoulder.
 
+### ✅ There are no static mockups left
+
+The category that used to sit here — **screens populated from a hardcoded file
+with no HTTP call** — is now **empty**, and that was the point of Phase 3I.
+
+Two screens were in it, and they were the two that looked the most finished:
+the school dashboard and the applicants list, both computing figures from
+`applicant.data.ts`. The dashboard now fetches real data. The applicants
+component is **no longer routed**: it lives in
+`jp-school/src/app/_design-reference/applicants/` as the design Phase 5 builds
+from, its menu row is hidden, and nothing in the app imports it — verified by
+grep and by the absence of its fixture strings from every built chunk.
+
+⚠️ If you are demonstrating this product, there is no longer a screen you have
+to talk around. There are areas that say "not yet", which is a different thing.
+
 ### Fully wired to the API
 
-| Screen | Route | Calls |
-|---|---|---|
-| Sign in | `/auth/login` | `POST /api/auth/login` |
-| Create account | `/auth/register` | `POST /api/auth/register/school` or `/teacher`, then `login` |
-| Forgot password | `/auth/forgot-password` | `POST /api/auth/forgot-password` |
-| Choose a new password | `/auth/reset-password?token=` | `POST /api/auth/reset-password` |
-| Set password from invite | `/auth/accept-invite?token=` | `POST /api/auth/set-password-from-invite` |
-| Enter the code | `/account/verify-otp` | `POST /api/auth/send-otp`, `POST /api/auth/verify-otp` |
-| Sign out | *(header)* | `POST /api/auth/logout` |
-| **The sidebar, everywhere** | | `GET /api/menus` — filtered server-side by user type and permission |
+| Screen | App | Route | Reads |
+|---|---|---|---|
+| Sign in · register · forgot/reset password · invite · OTP | all | `/auth/*` | `JP.Sso.Api` auth endpoints |
+| The sidebar, everywhere | all | | `GET /api/menus` — filtered server-side by user type and permission |
+| **Dashboard** | school | `/dashboard` | `GET /api/dashboard/school` |
+| **School profile** | school | `/profile` | `GET/PUT /api/school/profile`, logo, photos, facilities |
+| **Campuses** | school | `/branches` | `GET/POST/PUT/DELETE /api/branches` |
+| **Team** | school | `/users` | `GET /api/school/team`, invite, role, campus scope, remove |
+| **Dashboard** | teacher | `/dashboard` | `GET /api/dashboard/teacher` |
+| **My profile** | teacher | `/profile` | `GET/PUT /api/teacher/profile` plus nine section endpoints |
+| **Verification queue and request detail** | admin | `/verification/*` | `GET /api/approvals`, actions, documents |
 
-Sign-in has been verified end to end in the browser for admin, school and
-teacher accounts.
+Every one of these has been exercised end to end against running APIs — see
+`scripts/verify/` for the checks and `screenshots/` for what they look like.
 
 ### 🟡 Real page, presentational data
 
 **Account status** (`/account/status`). The routing, the guard and the sign-out
-button are real. But **the verification state it displays is not fetched** — the
-content is chosen from the `?code=` query parameter and the roll's position is a
-constant in the component. It will show "In review" for an account that was
-approved an hour ago. Treat it as a design of the screen, not a live status
-page.
+button are real, but **the verification state it displays is not fetched** — it
+is chosen from the `?code=` query parameter. It will show "In review" for an
+account approved an hour ago. Treat it as a design of the screen, not a live
+status page.
 
-### 🔴 Static mockups — hardcoded data, no API call
+### ⬜ Not built — the areas that say so
 
-| Screen | Route | Reality |
+These render an empty state describing what the section will be, a **disabled**
+action, and one line about when it arrives. **No counts, and no zeros** — a zero
+is a measurement, and there is nothing yet to measure.
+
+| Area | Where | Arrives |
 |---|---|---|
-| **School dashboard** | `/school/dashboard` | Every figure — 50 applicants, the funnel, Latest applications, Open jobs — is computed from `features/school/applicants/applicant.data.ts`. **No HTTP call is made.** |
-| **Applicants list** | `/school/applicants` | All 50 rows come from the same file. Search, filters, sorting and paging run in the browser over that array |
+| Jobs | both dashboards, `/jobs` | Phase 4 |
+| Applicants / applications | both dashboards | Phase 5 |
+| Offers, saved jobs, invitations | teacher and school menus | Phase 5–6 |
+| Most of the admin console | moderation, users, masters, CMS, reports, settings | Phase 6–7 |
 
-Both exist because a dense screen cannot be designed against three rows of
-placeholder text — the direction had to be proven at realistic volume. They are
-accurate as *design*, and completely fictional as *data*.
-
-`applicant.data.ts` carries this warning at the top of the file and is deleted
-the moment `JP.App.Api` exposes the real endpoint. Nothing else about those
-screens changes when it does.
-
-### ⬜ Not built — placeholder page
-
-**26 routes** currently resolve to the shared "coming soon" component: every
-teacher screen, the rest of the school screens (profile, branches, jobs, offers,
-team, notifications), and the entire admin console (verification queues,
-moderation, users, masters, CMS, reports, settings).
-
-They are routed and appear in the sidebar deliberately — the navigation
-structure is the Phase 1 deliverable and the screens land per phase.
+Routes that still resolve to the shared "coming soon" page appear in the sidebar
+deliberately — the navigation structure is settled and the screens land per
+phase.
 
 ### Built and tested, but no UI
 
-`JP.Sso.Api` exposes **21 route methods** (20 business endpoints plus
-`/api/health`). The portal calls **11** of them. The rest work and are covered by
-tests, but are only reachable through Swagger:
+Some endpoints are reachable only through Swagger:
 
-- `GET /api/users`, `POST /api/users/invite`, `PUT /api/users/{uid}/status`, `POST /api/users/{uid}/unlock`
 - `GET /api/roles`, `POST /api/roles`, `GET /api/permissions`
-- `GET /api/auth/me` — defined in `AuthService` but not called by any component yet
-- `GET /api/health`
+- `POST /api/users/{uid}/unlock`, `PUT /api/users/{uid}/status`
+- `GET /api/auth/me` — defined in `AuthService`, not called by any component
+- `GET /api/approvals/orphaned` and the orchestration retry (2E)
 
-Three routes are reachable only by a link from an email or by typing the URL —
-nothing in the UI navigates to them: `/auth/reset-password`,
-`/auth/accept-invite`, `/account/verify-otp`.
+Three routes are reachable only from an email link or by typing the URL:
+`/auth/reset-password`, `/auth/accept-invite`, `/account/verify-otp`.
 
 ---
 

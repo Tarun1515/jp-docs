@@ -63,6 +63,10 @@ Master tables mein additionally: `Code varchar(30)`, `Name nvarchar(150)`, `Disp
 
 **Hard delete kabhi nahi.** Sab soft delete.
 
+🔴 **In columns ko DTO tak bhejte waqt ALIAS zaroori hai** — `Is_Active AS
+IsActive`. Underscore wala naam Dapper se guzarta hi nahi aur **chup-chaap**
+default value de deta hai. Poora niyam **2.61** mein, ghatna **G25** mein.
+
 ### 2.5 API structure
 - **Do API projects:**
   - `JP.Sso.Api` — auth, users, roles, permissions (standalone, alag deploy ho sake)
@@ -254,6 +258,48 @@ Do mechanism hain aur **dono use honge**. Kaunsa kab — ye rule hai:
 - **THROW** sirf tab jab aage badhna hi galat ho — data integrity toot rahi ho
 
 `t_mdm_request_approvals` jaise append-only tables pe integrity violation = THROW, kyunki wahan "gracefully fail" ka koi matlab nahi.
+
+### 🔒 2.61 STANDARD COLUMN ALIASING (LOCKED — 3I, incident G25)
+
+**Har procedure jo koi standard underscore column (`Is_Active`, `Is_Deleted`)
+DTO ko lautaye, use ALIAS karna hoga:**
+
+```sql
+s.Is_Active AS IsActive,   -- 🔴 alias load-bearing hai (2.61)
+```
+
+#### Kyun — aur ye "safai" nahi hai
+
+Dapper column ko property se **naam se** milata hai aur underscore **hataata
+nahi**, jab tak `DefaultTypeMap.MatchNamesWithUnderscores` on na ho. Wo
+jaan-boojh kar **off** hai: wo ek global naam-badalne wala niyam hai jo poore
+system ki har mapping ek saath badal deta.
+
+To `Is_Active` kabhi `IsActive` tak pahunchta hi nahi — **aur kuch fail nahi
+hota**. Property apni default value (`false` / `0`) par reh jaati hai.
+
+⚠️ **Is schema mein underscore wale sirf standard columns hain** (2.4). Yaani ye
+poori class hai — koi doosra column is jaal mein nahi phansega.
+
+#### Ye pehle ho chuka hai
+
+`BranchDto.IsActive` 3E se hamesha `false` aa raha tha jabki row `1` thi.
+**Do phase** invisible raha kyunki kisi screen ne use dikhaya hi nahi tha; 3F ne
+status badge lagayi aur **har campus "Closed"** padhne laga (2.59, G25).
+
+#### Do cheezein zaroori hain, ek kaafi nahi
+
+1. **Procedure mein alias**, comment ke saath ki wo load-bearing hai — warna
+   agla banda "safai" samajh kar hata dega.
+2. **Har phase ki HTTP verification mein kam se kam ek assertion** jo aisi field
+   ke liye **database row aur JSON dono** padhe.
+
+🔴 **SQL test isse kabhi nahi pakdega** — procedure sahi hai, mapping galat hai.
+Aur unit test bhi nahi, kyunki galti Dapper ke andar hai. Sirf ek aisa check
+pakadta hai jo dono taraf dekhe.
+
+⚠️ Ye decision **G25 ko band nahi karta** — G25 wo ghatna hai jo hui, ye wo niyam
+hai jo usse dobara hone se rokta hai. Dono rehte hain.
 
 ### 🆕 2.22 Angular file convention (LOCKED — review fix 1)
 
@@ -1378,16 +1424,32 @@ a11y 100 saaton pages pe.
 - **Domain confirm hona hai.** `environment.production.ts` ka `siteUrl` aur
   `public/sitemap.xml` ka host — dono ek saath badalne hain.
 
-### G6. Mockup hai, asli nahi
+### G6. Mockup hai, asli nahi — ✅ CLOSED (3I, 2026-08-15)
 
-- 🔴 **jp-school ka Dashboard aur Applicants poori tarah static hain.** Saare
-  numbers, applicant names, job titles aur stage counts component mein hardcoded
-  hain. **Koi API call nahi hoti.** Ye Phase 2/3 mein `JP.App.Api` se juden ge.
-  ⚠️ Client demo mein inhe "bana hua" bol kar mat dikhana.
-- **School approve karne ka koi admin UI nahi.** Abhi Swagger se
-  `PUT /api/users/{userUid}/status` chalana padta hai. Phase 2E.
-- **`JP.App.Api` mein koi business endpoint nahi** — sirf health. Phase 1 ka
-  sab kuch `JP.Sso.Api` hai.
+Teeno bullet ab galat hain, aur do to **do phase se** galat thay:
+
+| Kya likha tha | Sach kab se |
+|---|---|
+| "School approve karne ka koi admin UI nahi" | **2E** — verification panel bana (2.49) |
+| "`JP.App.Api` mein koi business endpoint nahi" | **2D** — aur ab 2D/2E/3E/3G/3I milaa kar dozens hain |
+| "Dashboard aur Applicants poori tarah static hain" | **3I** — dashboard asli data par, applicants pahunch se bahar |
+
+#### 3I ne aakhri wala kaise band kiya
+
+- **School dashboard** ab `GET /api/dashboard/school` se aata hai. Sirf wahi
+  dikhata hai jo maujood hai: school, head office, plan, team.
+- **Teacher dashboard** naya bana, wahi shakl.
+- **Applicants** ka route **hata** diya, menu row `IsMenuVisible = 0`, aur
+  component `_design-reference/` mein chala gaya — Phase 5 ka design reference
+  ke taur par, README ke saath. Verify kiya: fixture ka koi string kisi built
+  chunk mein nahi hai.
+
+🔴 **Jobs/applications ke liye ZERO bhi nahi dikhaya.** "0 open jobs" ek
+**maap** hai, aur maapne ko kuch hai hi nahi — `t_app_jobs` Phase 4 mein
+banegi. Dono jagah honest empty state hai: section kya banega, ek disabled
+action, aur ek line ki kab aayega.
+
+Details **2.62**.
 
 ### G7. Operational — inhe jaanna zaroori hai
 
@@ -1821,6 +1883,16 @@ nahi hota — value chup-chaap default (false/0) aa jaati hai.
 🔴 SQL test isse kabhi nahi pakdega: procedure sahi hai, mapping galat hai. Jo
 pakad sakta hai wo ek HTTP assertion hai jo **row aur JSON dono** padhe, ya Phase
 8 mein ek check jo har proc ke output columns ko DTO property se milaaye.
+
+---
+
+✅ **Niyam ban gaya — 3I mein.** Ye gap ab **decision 2.61 (LOCKED)** hai: har
+procedure jo standard column DTO ko de use alias karna hoga, aur har phase ki
+HTTP verification mein kam se kam ek row+JSON dual read hona chahiye.
+
+⚠️ **G25 phir bhi band nahi hai, aur band nahi hoga.** Ye us **ghatna** ka
+record hai — do phase tak chupa hua bug — jo bataata hai ki niyam kyun hai.
+Niyam 2.61 mein rehta hai, ghatna yahan.
 
 ### 2.45 `jp_mdm` — PHASE 2A BUILD NOTES
 
@@ -4547,6 +4619,181 @@ jp-docs/screenshots/3h/                                                       (1
 
 ---
 
+### 2.62 DASHBOARDS ON REAL DATA — PHASE 3I
+
+Do dashboard asli data par, mockup pahunch se bahar, aur **teen documentation
+jhooth** theek. HTTP **27/27**, browser **16/16**, teeno production build 0/0.
+
+#### 🔴 Kya hataya, aur kyun wo khatarnak tha
+
+School ka dashboard aur Applicants **poori tarah static** thay — 50 applicant,
+funnel, "latest applications", open jobs — sab `applicant.data.ts` se.
+**Ek bhi HTTP call nahi.** Aur yehi do screen sabse zyada **bani hui** dikhti
+thi (G6). Client ke saamne yehi combination sabse khatarnak hai.
+
+⚠️ Ye gap G6 mein likha tha aur uske **teen mein se do bullet do phase se galat
+the** — admin approve UI 2E mein bana, JP.App.Api ke endpoints 2D mein. Gap
+file bhi purani ho jaati hai; is phase ne teeno saaf kiye.
+
+#### 🔴 ZERO bhi nahi dikhaya — aur ye faisla hai, kanjoosi nahi
+
+"0 open jobs" mockup ka imaandaar version **nahi** hai. Wo ek **maap** hai, aur
+maapne ko kuch hai hi nahi: `t_app_jobs` Phase 4 mein banegi.
+
+- Zero us school se alag nahi dikhta jisne sach mein kuch post nahi kiya.
+- Aur jis din table aayegi, koi nahi jaan payega ki kaun si screen jhooth bol
+  rahi thi.
+
+To dono jagah **honest empty state** hai: section kya banega, ek **disabled**
+action, aur ek line ki kab aayega. DTO mein aisi koi field hai hi nahi jisme
+number aa sake — jab Phase 4 aayegi, count jodna ek **jaan-boojh kar liya gaya
+kadam** hoga, na ki koi field jo chup-chaap bharne lage.
+
+⚠️ **Disabled control ka ek hi jaayaz istemaal.** 3F/3G ne teen baar likha ki
+greyed button "toota hua" padha jaata hai — head office ka Remove hataya gaya,
+owner row ke controls hataye gaye. Farq saaf hai:
+
+| Haalat | Sahi jawaab |
+|---|---|
+| Action **maujood hai par mana hai** | control **hatao**, wajah likho (3F, 3G) |
+| Action **abhi bana hi nahi** | dikhao **disabled**, aur likho kab aayega (3I) |
+
+Ye farq `UiEmptyStateComponent.actionDisabled` ke comment mein likha hai, taaki
+koi use "aap ye nahi kar sakte" ke liye na use kare.
+
+#### Ek naya read, baaki sab dobara istemaal
+
+| Tile | Kahan se |
+|---|---|
+| School naam, verified, head office, branch count | `GET /api/school/profile` (2.57) |
+| Team ginti aur list | `GET /api/school/team` (2.58) |
+| Teacher naam, %, resume, subjects, experience | `GET /api/teacher/profile` (2.60) |
+| **Plan** | 🆕 `USP_GetCurrentSubscription` + `USP_GetPlanById` |
+
+Sirf plan naya hai, aur uski wajah asli hai: subscription `jp_app` mein hai,
+plan ka **naam** `jp_mdm` mein, aur dono join nahi kar sakte (2.2). Browser se
+teen call ki jagah server par ek — aur "kaunsa Uid subscription ka maalik hai"
+(school ke liye organisation, teacher ke liye user) ek hi jagah rehta hai.
+
+#### ⚠️ Subscription na hona ek HAALAT hai, error nahi
+
+3B ne saat organisation se wo plan hataya tha jo unhe milna hi nahi chahiye tha
+(2.52) — us marammat ne "bina plan wala account" mumkin chhod diya.
+
+Teen haalat, teeno render hoti hain, teeno verify hui:
+- **active** → plan ka naam
+- **inactive** → *"Free — not active"*
+- **row hi nahi** → *"No plan on file"* + "har account ke paas honi chahiye,
+  humse baat karein"
+
+Verification ne row ko sach mein deactivate kiya, phir delete kiya, phir bahaal
+kiya — code path par bharosa karne ke bajaye.
+
+#### 🔴 Meter nikaal kar component banaya — doosri copy nahi banayi
+
+Teacher dashboard ko wahi completeness dikhani thi jo profile screen dikhati hai.
+Do display ka matlab **do niyam** hai: jis din ek "0%" chhaap de ya alag agla
+kadam bataye, ek galat hai aur kisi ko pata nahi kaun sa.
+
+To 3H ka inline meter `<app-profile-meter>` ban gaya. Dono screen use karti
+hain; farq sirf itna ki "Take me there" profile par **scroll** karta hai aur
+dashboard par **navigate** — isliye component section **emit** karta hai, khud
+faisla nahi karta.
+
+Verify kiya: dono screen par `app-profile-meter` ek hi hai, aur 0% wale
+teacher par dashboard ne bhi percentage **nahi** chhapi.
+
+#### Mockup ka kya kiya
+
+- Route **hataya** — `/applicants` ab 404 hai (browser se verify: DOM mein
+  *"404 Page not found"*).
+- Menu row `IsMenuVisible = 0` — menus **data** hain (2.37), to sirf route
+  hataane se har school ko ek aisi sidebar entry milti jo 404 par le jaati.
+  School ke visible menu ab **8** hain, 9 nahi.
+- Component `jp-school/src/app/_design-reference/applicants/` mein, README ke
+  saath: kyun rakha hai, aur Phase 5 mein kya badalna hai.
+
+⚠️ **Delete nahi kiya, aur ye jaan-boojh kar hai.** Dense screen teen row ke
+placeholder par design nahi hoti — 50 row, 8 column, filter bar aur pager par hi
+table ka direction sabit hua tha (margin rule, roll as histogram, ruling instead
+of zebra). Wo kaam abhi bhi sahi hai; Phase 5 usi se banegi.
+
+Verify kiya: fixture ka koi string (`Aarti Deshpande`) **kisi built chunk mein
+nahi** — tree-shaking ne poora nikaal diya.
+
+⚠️ Ek jagah `applicant.data.ts` ka naam bacha hai: naye dashboard component ke
+**comment** mein, ye batane ke liye ki kya hataya gaya. Wo import nahi hai.
+
+#### 2.61 — pehla phase jo apne hi likhe niyam se bandha hai
+
+Is phase ne G25 ko **decision 2.61** banaya: har proc jo standard underscore
+column DTO ko de use alias karna hoga, aur har phase ki HTTP verification mein
+kam se kam ek **row + JSON dual read** hona chahiye.
+
+`USP_GetCurrentSubscription` mein wahi column hai — `Is_Active AS IsActive` —
+to niyam turant apne aap par laga:
+
+```
+database row : Is_Active = 1, PlanId = 1 (Free)
+JSON         : isActive  = true, planName = Free
+```
+
+⚠️ Assertion sirf "dono barabar hain" nahi dekhti — wo **TRUE** hona bhi dekhti
+hai. false-false ka joda barabar to hota hai aur **kuch sabit nahi karta**, jo
+theek wahi surat hai jisme ye bug do phase chhupa raha.
+
+#### Documentation jo is phase ne theek ki
+
+| Kya | Kab se galat tha |
+|---|---|
+| `HOW_TO_RUN` header: "Status: Phase 1 complete" | Phase 2 se |
+| §5 step 4: "school approve karne ka koi admin UI nahi" | 2E se |
+| §5 step 6: "in do screen par sab hardcoded hai" | ab se galat, isi phase ki wajah se |
+| "What is real and what is a mockup" ka poora section | 2D se dheere-dheere |
+| Sidebar "9 items" | 3I se 8 (seeded rows gin kar theek kiya, andaza nahi) |
+| Progress log ki do "⬜ Next" row (2E/2F screens) | dono kab ke ship ho chuki |
+
+⚠️ Section ka naam bhi badla: **"What is real and what is not built yet"** —
+kyunki "mockup" wali kategory ab **khaali** hai, aur file mein wo saaf likha hai.
+
+#### Verification
+
+```
+HTTP     dashboards-3i.mjs 27/27 — dono payload chhap kar, koi job/applicant
+         count nahi, row+JSON dual read, 0% wala teacher, subscription ke teeno
+         haalat (deactivate → delete → bahaal), galat account type par 403
+Browser  screens-3i.mjs 16/16 — dono dashboard 1440 aur 375, empty state mein
+         koi digit nahi, disabled action, /applicants par 404 ka DOM
+```
+
+Screenshots: `jp-docs/design-screens/` — `school-dashboard-{1440,375}`,
+`teacher-dashboard-{1440,375}`, `teacher-dashboard-zero-1440`,
+`applicants-route-removed-1440`.
+
+#### Files
+
+```
+jp-backend/database/jp_app/04_procedures/012_subscription.sql        (naya)
+jp-backend/database/jp_mdm/04_procedures/008_plans.sql               (USP_GetPlanById)
+jp-backend/database/jp_sso/03_seed/005_seed_menus.sql                (applicants hidden)
+jp-backend/JP.Domain/Dashboards/DashboardContracts.cs                (naya)
+jp-backend/JP.Infrastructure/Repositories/SubscriptionRepository.cs  (naya)
+jp-backend/JP.Infrastructure/Services/DashboardService.cs            (naya)
+jp-backend/JP.App.Api/Controllers/DashboardController.cs             (naya)
+jp-shared/src/ui/ui-empty-state/*                                    (actionDisabled, note)
+jp-school/src/app/core/dashboard.service.ts                          (naya)
+jp-school/src/app/features/school/dashboard/*                        (mockup -> asli)
+jp-school/src/app/_design-reference/                                 (applicants + README)
+jp-teacher/src/app/core/dashboard.service.ts                         (naya)
+jp-teacher/src/app/features/teacher/dashboard/*                      (naya)
+jp-teacher/src/app/features/teacher/profile-meter/*                  (3H se nikaala)
+jp-docs/HOW_TO_RUN.md                                               (header, §4, §5, real/mockup)
+jp-docs/scripts/verify/dashboards-3i.mjs                            (naya)
+jp-docs/scripts/verify/screens-3i.mjs                               (naya)
+```
+
+---
+
 ## 3. SCOPE (Client spec ke against)
 
 ### IN SCOPE — MVP
@@ -4688,8 +4935,7 @@ naya Code, agla free Id, kuch renumber mat karo.
 | 2026-08-15 | 3G | **School team** — 4 procedures, 5 endpoints, the team screen, SQL 52/52 (27 negative), HTTP 48/48. The owner cannot be demoted, removed or scoped, by anybody including themselves. A full-set sync never removes a campus the caller could not see — the silent revocation that would have looked like a working save. Closed **G15**; opened **G24** | ✅ Done |
 | 2026-08-15 | 3F | **School profile and campus screens** — 5 sections with their own saves, the gallery, campus CRUD. Found and fixed two silent bugs older than the phase: REORDER sorted by id and discarded the order it was given (2F), and isActive never reached the DTO because Dapper does not strip underscores (3E). Added the media endpoints — nothing could display an uploaded photo before. SQL 144/144, HTTP 37/37 + 48/48, browser 25/25 | ✅ Done |
 | 2026-08-15 | 3H | **Teacher profile screens** — 9 sections, the completion meter that names one next step instead of printing a verdict, the experience timeline, and the five multi-selects. Rebuilt ui-multi-select in jp-shared: nested interactive elements, no keyboard navigation, a panel that never closed, and twenty selections that broke the layout. Added the teacher media endpoints — nothing could display a photo before. HTTP 33/33, browser 21/21, opened as Rohit, Anita and Imran | ✅ Done |
-| — | 2E | Admin screens → `frontend/apps/admin` | ⬜ Next |
-| — | 2F | School screens → `frontend/apps/school` | ⬜ Next |
+| 2026-08-15 | 3I | **Dashboards on real data** — school and teacher dashboards replaced their mockups; the applicants mockup lost its route and menu row and moved to `_design-reference/`. One new read (the subscription) and everything else composed from 3E/3G/3H. **G6 closed** after two of its three bullets had been false since 2D/2E; **G25 promoted to decision 2.61**. HTTP 27/27 including the row+JSON dual read, browser 16/16 | ✅ Done |
 
 ---
 
@@ -5184,6 +5430,23 @@ aur bees selection layout tod deti thi.
 
 ⚠️ Experience ka ganit ab **exact** assert hota hai — pehle ±1 ki chhoot thi, jo
 theek us ek-mahine wale bug ko chhupa deti jise pakadna tha.
+
+---
+
+## ✅ PHASE 3I COMPLETE — 2026-08-15
+
+Dono dashboard asli data par, mockup pahunch se bahar. HTTP **27/27**, browser
+**16/16**. Details **2.62**.
+
+🔴 Jobs/applications ke liye **zero bhi nahi** dikhaya — zero ek maap hai aur
+maapne ko kuch nahi. Honest empty state, disabled action, aur ek line ki kab
+aayega.
+
+✅ **G6 band** — uske teen mein se do bullet do phase se galat thay.
+🔒 **G25 ab decision 2.61** — alias + har phase mein row/JSON dual read.
+
+⚠️ `HOW_TO_RUN.md` ab sach bolti hai: header Phase 3, happy path admin UI se,
+aur "static mockup" wali kategory **khaali**.
 
 ---
 
