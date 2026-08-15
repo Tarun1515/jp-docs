@@ -1792,6 +1792,30 @@ mein, aur girne par **loud**. Tab tak role badalna aadha kaam hai.
 aur dono jagah role sahi set hota hai. **Jis din pehla HR ko Senior HR banaya
 jaayega, us din ye dikhega.**
 
+### G25. Underscore wale column DTO tak nahi pahunchte
+
+`Is_Active`, `Is_Deleted` — standard columns (2.4) aur is schema mein
+**underscore wale sirf yehi** hain. Dapper underscore hataata nahi jab tak
+`DefaultTypeMap.MatchNamesWithUnderscores` on na ho, aur wo **jaan-boojh kar
+off** hai: wo ek global naam-badalne wala niyam hai jo har mapping ek saath
+badal deta.
+
+3F ne ek asli case pakda: `BranchDto.IsActive` hamesha `false` aata tha
+jabki row 1 thi. Do phase invisible raha kyunki kisi screen ne use dikhaya hi
+nahi tha (2.59).
+
+**Ab kya hai:** teeno branch SELECT mein `Is_Active AS IsActive` alias, comment
+ke saath ki wo load-bearing hai, aur HTTP check jo column aur JSON dono padhta
+hai.
+
+⚠️ **Ye class ka fix nahi hai, ek jagah ka fix hai.** Har naya proc jo koi
+standard column DTO ko lautaye usse **alias chahiye**, aur bhoolne par kuch fail
+nahi hota — value chup-chaap default (false/0) aa jaati hai.
+
+🔴 SQL test isse kabhi nahi pakdega: procedure sahi hai, mapping galat hai. Jo
+pakad sakta hai wo ek HTTP assertion hai jo **row aur JSON dono** padhe, ya Phase
+8 mein ek check jo har proc ke output columns ko DTO property se milaaye.
+
 ### 2.45 `jp_mdm` — PHASE 2A BUILD NOTES
 
 32 tables (23 masters + 8 transactional + `t_mdm_error_log`), 91 indexes,
@@ -4145,6 +4169,205 @@ jp-docs/scripts/verify/team-contract.mjs                                       (
 
 ---
 
+### 2.59 SCHOOL PROFILE AND CAMPUS SCREENS — PHASE 3F
+
+Do screen, teen production build 0/0, SQL **144/144**, HTTP **37/37 + 48/48**,
+browser **25/25**, screenshots 1440 aur 375 dono par.
+
+#### 🔴 Do bug jo screen banane se pehle nikle — dono chup-chaap gire the
+
+Ye phase UI ka tha. Do din purane bug pehle nikle, aur dono ki khaasiyat ek hi
+hai: **kuch bhi fail nahi hota tha.**
+
+**1. REORDER reorder karta hi nahi tha (2F se).**
+
+`USP_SaveSchoolPhotos` bare id list leta tha aur position khud
+`ROW_NUMBER() OVER (ORDER BY i.Id)` se nikalta tha — yaani **id ki value se**,
+caller ke bheje kram se nahi. Har reorder insertion order likh deta,
+`Status 1, 'Photos reordered.'` lautata, aur list waisi hi wapas aati — jo **UI
+ka bug lagta hai**.
+
+Badalne se **pehle** jaanch: c, a, b maanga → a, b, c mila.
+
+Ab type `dbo.OrderedIdList (Id bigint, Position int)` hai — position ek **value**
+hai jo caller bhejta hai. Jo kram express hi na ho sake, wo nibhaaya nahi ja
+sakta. 3C ki suite isliye nahi pakad payi kyunki usne sirf "call safal hua"
+dekha tha, **kram nahi**.
+
+**2. `isActive` API se hamesha `false` aata tha (3E se).**
+
+`Is_Active` standard column hai (2.4) aur is schema mein underscore wale **wahi**
+hain. Dapper underscore **nahi hataata** jab tak `MatchNamesWithUnderscores` on
+na ho — aur wo jaan-boojh kar off hai, kyunki wo ek global naam-badalne wala
+niyam hai jo har mapping badal deta.
+
+To `Is_Active` `BranchDto.IsActive` tak pahunchta hi nahi tha. Do phase tak
+invisible raha kyunki **kisi ne use dikhaya hi nahi tha**; 3F ne status badge
+lagayi aur **har campus "Closed"** padhne laga, jabki har row 1 thi.
+
+🔴 Fix `Is_Active AS IsActive` alias hai, teen jagah, comment ke saath ki wo
+**load-bearing** hai. SQL test isse kabhi nahi pakad sakta tha — procedure
+hamesha sahi tha. HTTP check ab column aur JSON dono padhta hai.
+
+#### Media — pehle koi image dikha hi nahi sakta tha
+
+Photo ke paas 2F se `FilePath` tha aur bytes laane ka **koi rasta nahi**.
+`App_Data` static serve nahi hoti — aur honi bhi nahi chahiye: usi root mein
+teacher ke resume aur registration documents hain.
+
+To `GET /api/school/photos/{id}/file` aur `/logo/file` jude, membership-gated
+(`fn_IsSchoolMember`). Jo photo aapki nahi, wo **404** — 403 nahi, kyunki 403 ye
+tasdeeq kar deta ki wo maujood hai.
+
+⚠️ Path kabhi browser tak nahi jaata: client **id** se maangta hai, API path
+resolve karke storage root ke andar hi rakhta hai. Jo client path naam le sakta
+ho, wo koi bhi path naam le sakta hai.
+
+⚠️ URL par Authorization header chahiye, isliye `<img src>` seedha kaam nahi
+karta — gallery blob laa kar object URL banati hai, aur component band hone par
+`revokeObjectURL` karti hai.
+
+#### Section-level save, par RowVersion ek hi
+
+Paanch section, har ek ka apna save aur apni haalat. Par **server ka update
+poori row hai** — ek procedure, ek RowVersion. To har section poora draft bhejta
+hai.
+
+Ye jaan-boojh kar hai: per-section endpoint ka matlab per-section RowVersion
+hota, aur do log alag section edit karke bhi ek doosre ko **chup-chaap
+overwrite** kar dete.
+
+🔴 **Conflict dikhaya jaata hai, nigla nahi.** 409 par section kehta hai ki kisi
+aur ne badla, aur reload ka button deta hai. Naye RowVersion ke saath **retry
+nahi** karta — wahi to "doosre ko chup-chaap overwrite karna" hai, madadgaar
+shakl mein (2E ka niyam).
+
+⚠️ Save ke baad RowVersion **server se dobara padha** jaata hai, locally +1 nahi
+kiya jaata. Wo number server ka hai; aaj sahi andaza kal galat hai.
+
+#### Reorder — arrows, drag nahi
+
+Design system mein drag primitive hai hi nahi. Haath se banaya hua drag jo mouse
+se chale aur keyboard se nahi, **buttons se bura** hota — us bande ke liye jise
+sabse zyada zaroorat hai. ← → tab se pahunchte hain, screen reader bolta hai,
+aur phone par chalte hain jahan scrolling page ke andar drag ek ladai hai.
+
+Optimistic: tiles turant hilti hain, phir save. Fail hone par **wapas purani
+jagah** — jo gallery server se alag kram dikhaye wo agle reload par jhooth bolti
+hai.
+
+#### 🔴 GroupType = 1 — teen jagah, warna faisla sirf kaagaz par hai
+
+2.10 kehta hai single-campus school ko branch UI kabhi na dikhe. Wo **teen alag
+jagah** hai, aur faisla tabhi sach hai jab teeno maanein:
+
+| Jagah | Kaise |
+|---|---|
+| **Menu** | jp_sso menu deta hai aur usne GroupType ka naam bhi nahi suna — to `MenuService.hideRoutes()` (3F mein jp-shared mein joda) se app khud chhupati hai |
+| **Route** | link chhupane se koi URL type karna nahi chhodta — `singleCampusGuard` redirect karta hai |
+| **Screens** | jahan campus column ya picker hai, wahan `isMultiCampus()` pehle poochha jaata hai |
+
+⚠️ **NULL ko multi maana hai.** Jis school ne jawaab hi nahi diya use branches
+milti hain: ek campus wale ko extra menu dikhna chhoti taqleef hai; kai campus
+wale se campus chhupana **wo screen hai jahan wo pahunch hi nahi sakta**.
+
+Verify (browser): groupType 1 par nav mein Branches **nahi**, `/branches` type
+karne par `/profile`, aur wapas 2 karte hi screen laut aayi — **campus jyon ke
+tyon, koi migration nahi**.
+
+#### Cities abhi bhi khaali (2.47) — wahi handling, doosri nahi
+
+Registration form ne jo kiya, wahi: district/city control **chhupe** hote hain
+aur ek line kehti hai kyun. Na spinner jo kabhi rukta nahi, na khaali dropdown —
+dono "form toota hai" padhe jaate hain, aur khaali disabled dropdown wo cheez hai
+jise log baar-baar click karte hain.
+
+#### Head office — marked, disabled nahi
+
+Uski row par **Remove button hai hi nahi**, ek marked rule aur ek line hai:
+*"Head office — kept for as long as the school exists."* Greyed button "toota
+hua" padha jaata hai aur phir bhi click hota hai — wahi dalil jo 3G ki owner row
+par thi. Ek product, ek tarika "ye row structural hai" kehne ka.
+
+🔴 **Refusal ka rasta abhi bana hai, tab nahi jab wo chalega.** `USP_DeleteBranch`
+mein jobs/applications wali refusal 3C se likhi hai aur Phase 4 tak pahunch se
+baahar hai. Screen server ka **message** dikhati hai, apna nahi — do jagah do
+version rakhne ka matlab hai ek din galat wala dikhega.
+
+Verify kiya: head office delete → 400 + wo message jo seedha dikhane layak hai.
+
+#### Lat/long — plain pair, map picker nahi
+
+Map picker behtar control hai aur **is phase ka kaam nahi**: "jobs near me"
+Phase 4 hai aur abhi hai hi nahi. Picker banana us feature se pehle uska
+interface banana hota. Fields batate hain kis liye hain, aur khaali chhode ja
+sakte hain.
+
+#### Design system mein kya joda (2.23 ke tehat)
+
+| Kya | Kyun |
+|---|---|
+| `MenuService.hideRoutes()` | server permission tay karta hai; app ka apna data kya bemani banata hai wo alag sawaal hai |
+| `unsavedChangesGuard` | ⚠️ native `confirm()` — router guard ko **synchronously** jawaab dena hota hai, warna wo page ke baare mein poochh raha hoga jo user chhod chuka |
+| `.form-control--sm` | dense jagah ke liye. **Font 16px hi** — usse chhota karne par iOS Safari page zoom kar deta hai aur wapas nahi karta |
+
+#### "Campuses", "Branches" nahi
+
+Screen, copy aur school ki apni zubaan — sab campus kehte hain. Sidebar
+"Branches" keh raha tha, seed row badal di. **Route `/branches` hi hai** — label
+badalne ke liye har saved link todna galat sauda hai.
+
+#### Verification
+
+```
+SQL       001 48/48 (20 neg, ismein naya photos section) · 002 44/44 · 003 52/52
+HTTP      profile-branches.mjs 37/37 — save→reload→compare, 409, full-set,
+          gallery order wapas padh kar, head-office refusal, GroupType dono taraf
+Browser   screens-3f.mjs 25/25 — paanch section, owner-jaisi head office row
+          (sirf Edit), district/city gayab, nav se Branches gayab, /branches
+          redirect, 375 par 0px overflow
+```
+
+Screenshots: `jp-docs/screenshots/3f/` — profile (1440, 375), gallery
+mid-reorder, branch list, branch form (1440, 375), head-office refusal,
+single-campus nav.
+
+⚠️ Verification scripts ab **jo banate hain wahi hataate hain**. Pehle
+`team-contract.mjs` apna campus chhod deta tha, aur 3F ke screenshot ke waqt
+demo school par **do "North Wing"** thay. Jo script apne hi kachre ko verify
+karne lage, wo verify kuch nahi karti.
+
+⚠️ Login limiter (5/minute per IP) verification ko rok deta tha. Script ab 429
+par **rukti hai, girti nahi** — limiter apna kaam kar raha hai, aur uski shikayat
+API ka bug dhoondhne bhej deti.
+
+#### Files
+
+```
+jp-backend/database/jp_app/04_procedures/005_school_photos_facilities.sql (OrderedIdList, CAPTION, media paths)
+jp-backend/database/jp_app/04_procedures/004_school_profile.sql           (IsActive alias)
+jp-backend/database/jp_app/04_procedures/006_branches.sql                 (IsActive alias + kyun)
+jp-backend/database/jp_app/99_tests/001_test_school_branch.sql            (+7 photo assertions)
+jp-backend/database/jp_sso/03_seed/005_seed_menus.sql                     (Branches -> Campuses)
+jp-backend/JP.Domain/Schools/SchoolContracts.cs                           (SavePhotoCaptionRequest)
+jp-backend/JP.Infrastructure/Repositories/SchoolRepository.cs             (ordered TVP, media paths)
+jp-backend/JP.Infrastructure/Services/SchoolProfileService.cs             (caption, OpenPhoto/OpenLogo)
+jp-backend/JP.App.Api/Controllers/SchoolController.cs                     (caption + 2 media endpoints)
+jp-shared/src/core/services/menu.service.ts                               (hideRoutes)
+jp-shared/src/core/guards/unsaved-changes.guard.ts                        (naya)
+jp-shared/src/styles/_forms.scss                                          (.form-control--sm)
+jp-school/src/app/core/school.service.ts                                  (naya)
+jp-school/src/app/core/school-context.service.ts                          (naya + singleCampusGuard)
+jp-school/src/app/features/school/profile/school-profile.component.{ts,html,scss}  (naya)
+jp-school/src/app/features/school/branches/branches.component.{ts,html,scss}       (naya)
+jp-school/src/app/layouts/school-layout.component.{ts,html,scss}          (teen file, context load)
+jp-docs/scripts/verify/profile-branches.mjs                               (naya)
+jp-docs/scripts/verify/screens-3f.mjs                                     (naya)
+jp-docs/screenshots/3f/                                                   (9 screenshots)
+```
+
+---
+
 ## 3. SCOPE (Client spec ke against)
 
 ### IN SCOPE — MVP
@@ -4284,6 +4507,7 @@ naya Code, agla free Id, kuch renumber mat karo.
 | 2026-08-10 | — | **2.56 LOCKED — contact unlocks on teacher consent, never on payment.** Resolved the conflict between 3D's contact rule and the monetization plan. Two paths only: applied, or accepted an invite. What is sold is the school's capability. ⚠️ The spec has no ACCEPTED invite status — Phase 6 must add one or path 2 collapses into path 1 | ✅ Done |
 | 2026-08-10 | 3E | **Profile APIs** — 23 endpoints, build 0/0, HTTP verification 20/20. Contact is now protected in three layers, the third being a startup guard that refuses to boot if the browse DTO grows a contact field (proved by breaking it). Closed 3C's two mirrored assertions with real 404s for suspended and pending schools. Found a refusal whose message was written for the wrong kind of user | ✅ Done |
 | 2026-08-15 | 3G | **School team** — 4 procedures, 5 endpoints, the team screen, SQL 52/52 (27 negative), HTTP 48/48. The owner cannot be demoted, removed or scoped, by anybody including themselves. A full-set sync never removes a campus the caller could not see — the silent revocation that would have looked like a working save. Closed **G15**; opened **G24** | ✅ Done |
+| 2026-08-15 | 3F | **School profile and campus screens** — 5 sections with their own saves, the gallery, campus CRUD. Found and fixed two silent bugs older than the phase: REORDER sorted by id and discarded the order it was given (2F), and isActive never reached the DTO because Dapper does not strip underscores (3E). Added the media endpoints — nothing could display an uploaded photo before. SQL 144/144, HTTP 37/37 + 48/48, browser 25/25 | ✅ Done |
 | — | 2E | Admin screens → `frontend/apps/admin` | ⬜ Next |
 | — | 2F | School screens → `frontend/apps/school` | ⬜ Next |
 
@@ -4751,33 +4975,43 @@ badalta.
 
 ---
 
-## ▶️ NEXT: PHASE 3F — THE SCREENS
+## ✅ PHASE 3F COMPLETE — 2026-08-15
 
-Database aur API dono taiyaar. Ab `jp-teacher` ka profile edit aur
-`jp-school` ka branch management.
+School profile aur campus screens. Teen production build **0/0**, SQL
+**144/144**, HTTP **37/37 + 48/48**, browser **25/25**. Details **2.59**.
 
-### 🔴 Aadhe bhare profile ke against banao
-3B ne completeness jaan-boojh kar bikhri chhodi (2.52). Teen case jo pakka
-todenge agar unhe dekha na jaaye:
-- **Rohit Kulkarni** — koi current job nahi, sirf ek band experience row
-- **Anita Deshmukh** — profile hai, **subject ek bhi nahi**
-- **Imran Qureshi** — sirf naam aur state, 0%
+🔴 Do bug is phase se **purane** nikle, dono chup-chaap gire the: reorder kabhi
+reorder karta hi nahi tha (2F se), aur `isActive` API se hamesha `false`
+aata tha (3E se). Dono ab HTTP check se bandhe hain.
 
-### 🔴 Full-set semantics UI mein bhi nibhani hai
-Paanchon bridge endpoint poora set lete hain (2.57). Screen ko hamesha **poori
-list** bhejni hai — ek chip hataane par bhi. Sirf naya id bhejne se baaki sab
-mit jaayenge.
+⚠️ Naya gap **G25** — underscore wale column DTO tak nahi pahunchte, aur bhoolne
+par kuch fail nahi hota.
 
-### 🔴 Contact kabhi UI mein mat maango
-`/browse` mein contact hai hi nahi. Teacher card par phone/email dikhane ki
-jagah **invite ka button** ho (2.56). Jab tak teacher apply ya accept na kare,
-`/contact` 403 hi dega — aur uska message seedha dikhane layak likha hai.
+---
+
+## ▶️ NEXT: PHASE 4 — JOBS
+
+Phase 3 poora ho gaya: `jp_app` ki tables, procedures, APIs aur school ke
+teeno screen (profile, campuses, team). Ab **jobs** — pehli cheez jo teacher aur
+school ke beech aati hai.
+
+### 🔴 Jo pehle se likha hua hai aur ab zinda hoga
+- `USP_DeleteBranch` ki "is campus par jobs hain" wali refusal (2.53) — table
+  banne par comment se code banegi. **UI ka rasta 3F mein ban chuka hai.**
+- `fn_VisibleBranches` — har job query isse guzregi. Har nayi list proc ke
+  saath uska apna negative case chahiye (G22).
+- `fn_TeacherContactUnlocked` (2.54) — **application aane par hi** contact
+  khulta hai (2.56 LOCKED). Phase 5 ka aadha hissa yahin se shuru hota hai.
+
+### 🔴 BranchId kabhi NULL nahi (2.10)
+Job, application, offer — teeno par mandatory. Single-campus school ka head
+office bhi ek branch hai, isliye koi nullable-branch rasta banane ki zaroorat
+nahi.
 
 ### Verification
 `90_ops/001_verify_account_completeness.sql` teeno zero ·
-`99_tests/001_test_school_branch.sql` 41/41 ·
-`99_tests/002_test_teacher.sql` 44/44 ·
-`scripts/verify/browse-contract.mjs` 20/20.
+`99_tests/001` 48/48 · `002` 44/44 · `003` 52/52 ·
+`scripts/verify/{browse-contract,team-contract,profile-branches,screens-3f}.mjs`
 
 ---
 

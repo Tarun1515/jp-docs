@@ -50,13 +50,33 @@ const j = async (url, opts) => {
   return { http: r.status, body, text };
 };
 
-const loginFull = async (loginId, password) => {
+/**
+ * Signs in, waiting out the rate limiter rather than failing on it.
+ *
+ * ⚠️ This script signs in as five different people in a burst, and the login
+ * limiter allows 5 per minute PER IP (RateLimitOptions.LoginPerIp). Hitting it
+ * is the limiter working, not a fault — so the script waits instead of
+ * reporting a failure that would send somebody looking for a bug in the API.
+ *
+ * 🔴 The wait is bounded. A 429 that never clears is a real problem and has to
+ * surface as one.
+ */
+const loginFull = async (loginId, password, attempt = 1) => {
   const r = await j(`${SSO}/auth/login`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ loginId, password }),
   });
+
+  if (r.http === 429 && attempt <= 3) {
+    console.log(`  … rate limited signing in as ${loginId}; waiting 25s (attempt ${attempt} of 3)`);
+    await new Promise((resolve) => setTimeout(resolve, 25_000));
+
+    return loginFull(loginId, password, attempt + 1);
+  }
+
   if (!r.body?.data?.accessToken) throw new Error(`${loginId}: ${r.http} ${r.body?.message ?? r.text}`);
+
   return r.body.data;
 };
 
@@ -95,13 +115,24 @@ check('🔴 the owner has NO campus rows — they are never enumerated (2.51)',
   ownerRow?.branchIds?.length === 0 && ownerRow?.branchCount === 0,
   `branchIds ${JSON.stringify(ownerRow?.branchIds)}, count ${ownerRow?.branchCount}`);
 
-// A second campus, so the matrix has something to be a matrix about.
+/*
+  A second campus, so the matrix has something to be a matrix about.
+
+  ⚠️ Tracked and removed at the end. An earlier version left it behind, and by
+  the time 3F took screenshots the demo school had two campuses called "North
+  Wing" — a verification script that changes the data it verifies eventually
+  verifies its own leftovers.
+*/
 const existingNames = new Set(team.campuses.map((c) => c.branchName));
+let createdCampusId = null;
+
 if (![...existingNames].some((n) => n.includes('North Wing'))) {
-  await j(`${APP}/branches`, {
+  const created = await j(`${APP}/branches`, {
     method: 'POST', headers: auth(owner),
     body: JSON.stringify({ branchName: 'North Wing', stateId: 32, isActive: true }),
   });
+
+  createdCampusId = created.body?.data?.branchId ?? null;
 }
 
 team = (await j(`${APP}/school/team`, { headers: head(owner) })).body?.data;
@@ -449,6 +480,24 @@ check('…and asking for both at once is refused, not silently resolved', both2.
 
 // ---------------------------------------------------------------------------
 console.log('\n=== 9. CLEAN UP ===');
+
+// The campus, if this run is the one that added it. Removed through the API so
+// the head-office guard and the RowVersion check both apply, exactly as they
+// would for a school doing it.
+if (createdCampusId !== null) {
+  const campuses = (await j(`${APP}/branches?includeInactive=true`, { headers: head(owner) })).body?.data ?? [];
+  const created = campuses.find((c) => c.branchId === createdCampusId);
+
+  if (created) {
+    await j(`${APP}/branches/${createdCampusId}`, {
+      method: 'DELETE', headers: auth(owner), body: JSON.stringify({ rowVersion: created.rowVersion }),
+    });
+  }
+
+  const left = (await j(`${APP}/branches?includeInactive=true`, { headers: head(owner) })).body?.data ?? [];
+  check('the campus this run added is gone', !left.some((c) => c.branchId === createdCampusId),
+    `${left.length} campus(es) left`);
+}
 
 // The invited account was created by this run and nothing else refers to it.
 sql(`SET NOCOUNT ON;
