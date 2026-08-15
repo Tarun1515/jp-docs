@@ -1709,6 +1709,12 @@ kyunki ye asli registration endpoint se bane (2.52).
 ⚠️ Go-live se pehle ye sab hatana hai. **Ye list us waqt likhi gayi jab pata
 tha**; baad mein yaad karne ki koshish live database par andaaza lagana hoga.
 
+⚠️ **3H update:** in teeno adhoore profile ka password ab
+`local-accounts.md` mein likha hai, asli forgot-password flow se set kiya gaya.
+Wo ab **fixture hain** — `screens-3h.mjs` unhe khol kar dekhti hai ki screen
+adhoori profile par kaisi dikhti hai, aur **kuch save nahi karti**. Unhe "poora"
+mat karo (2.60).
+
 ### G21. Signup par teacher profile — ✅ CLOSED (3C, 2026-08-10)
 
 `AuthService.RegisterTeacherAsync` ab account banne ke turant baad profile +
@@ -4368,6 +4374,179 @@ jp-docs/screenshots/3f/                                                   (9 scr
 
 ---
 
+### 2.60 TEACHER PROFILE SCREENS — PHASE 3H
+
+Nau section, teen production build 0/0, HTTP **33/33**, browser **21/21**.
+Product ki sabse badi screen, aur wahi tay karti hai ki teacher signup poora
+karega ya nahi.
+
+#### 🔴 Sab kuch "chhod kar chale jaana" ke khilaf banaya hai
+
+Lambe form har us kadam par log khote hain jo **kaam jaisa lagta hai**. Design
+usi ke khilaf hai, kisi visual se zyada:
+
+| Kya | Kyun |
+|---|---|
+| **Nau section, nau save** | aadhe mein rukne se kuch nahi jaata, aur phone number theek karne ke liye photo gallery tak scroll nahi karna padta |
+| **Ek waqt par ek sujhav** | aath cheezon ki checklist wo cheez hai jise log band kar dete hain; ek saaf agla kadam wo hai jispar log amal karte hain |
+| **Mahine, tareekh nahi** | school join karne ka **din** kisi ko yaad nahi hota, mahina sabko. Jo precision logon ke paas hai hi nahi, use maangna form ko imtihaan bana deta hai |
+
+#### 🔴 0% par "0%" kabhi nahi likha jaata
+
+Ye is phase ka sabse zaroori faisla hai.
+
+Jo teacher abhi shuru hi kar raha hai use "0% complete" dikhana matlab **shuru
+karne se pehle hi bata dena ki usne kuch haasil nahi kiya** — aur theek wahin log
+tab band karte hain.
+
+To 0% par:
+- percentage **dikhti hi nahi**;
+- heading hai *"Let's get you found by schools"*;
+- aur ek cheez, wajah ke saath: *"Add the subjects you teach — Schools search by
+  subject. Until you pick yours, none of their searches can find you."*
+
+⚠️ **Sujhav points se nahi, "mehnat ke badle faayda" se tay hote hain.** Resume
+sabse zyada (25) hai aur **sabse badi maang** bhi — ek file dhoondhni padti hai,
+aksar likhni bhi. Subjects 20 ke hain aur do tap lagte hain, aur unke bina
+teacher kisi school ki search mein aata hi nahi. Sabse pehle PDF dhoondhne bhejna
+wahi rasta hai jahan profile 0% par chhoot jaati hai.
+
+🔴 **75% ki chhat wahin samjhaayi jaati hai jahan wo lagti hai.** Bar par ek
+nishaan hai, aur jo teacher baaki sab bhar chuka hai use saaf likha milta hai ki
+resume hi ab bar ko hilata hai. Bina wajah ruki hui bar **tooti hui** padhi jaati
+hai.
+
+#### ui-multi-select — paanch jagah, isliye theek se banaya
+
+Subjects, class levels, skills, languages, locations — **paanch** istemaal. Har
+khaami paanch se guna hoti hai, to control dobara likha (2.23 ka niyam: kami ho
+to system theek karo, screen mein bahana mat banao). Chaar cheezein galat thi,
+aur koi bhi dekh kar nahi dikhti thi:
+
+| Kya toota tha | Ab |
+|---|---|
+| **Nested interactive elements** — chips aur clear button `<button>` ke **andar** thay. Invalid HTML; screen reader poore ko ek control padhta hai aur chip par Space us button ko daba deta hai jisme wo baitha hai | chips trigger ke **bahar**, har ek asli `<button>` apne accessible naam ke saath |
+| **Keyboard navigation thi hi nahi** — options `div[tabindex=0]`, yaani 40vein subject tak 40 Tab | arrow keys ek **active option** hilati hain, `aria-activedescendant` ke saath; Enter chunta hai, Escape band karta hai aur focus wapas deta hai |
+| **Panel band hi nahi hota tha** — sirf Escape par. Paanch control wale form par do panel ek saath khule reh sakte thay | bahar click par band |
+| **Bees selection layout tod deti thi** — chips trigger ke andar the, to control pills ki deewar ban kar poora page neeche dhakel deta | trigger **ginti** batata hai ("19 subjects selected"), chips neeche wrap hoti hain |
+
+⚠️ **Languages ko isme nahi thoosa.** Unke saath ProficiencyLevel hota hai
+(2.54), to control ye chunta hai ki **kaun si**, aur neeche ek row batati hai
+**kitni achhi**. Per-item value ko shared control mein ghusaane se wo baaki
+**chaar** jagah ke liye bura ho jaata.
+
+#### Experience — sabse zyada mehnat wali jagah, isliye sabse zyada dhyaan
+
+Ye bridge nahi hai: har row ki apni pehchaan hai, alag se judti, badalti aur
+hatti hai — 3A ne unique index jaan-boojh kar nahi banaya tha, kyunki part-time
+subject teacher jo sports programme bhi chalata tha, wo **do jaayaz overlapping
+rows** hain (2.51).
+
+🔴 **`TotalExperienceMonths` client kabhi nahi ginta.** Server har badlaav par
+dobara nikaalta hai (2.54). Do phase pehle ye galat mila tha: 3B mein haath se
+likhe total apne hi rows se **terah mahine** tak alag thay, aur 3D mein
+`DATEDIFF(MONTH)` har band job ko **ek mahina kam** gin raha tha.
+
+Verification ab **exact** hai, ±1 nahi:
+```
+Jun 2015 – May 2018 (band)   = 36 mahine   ← aakhri mahina ginta hai (3D ka fix)
+Jun 2018 – aaj    (chaalu)   = 98 mahine   ← sirf POORE mahine
+                     total    = 134
+```
+⚠️ Pehle assertion mein ±1 ki chhoot thi aur wo **pass** ho gayi thi. Jis class ke
+bug ko pakadna hai usi ke liye chhoot rakhna — yaani ek mahine ka farq — test
+nahi hota. Dono niyam ab likh kar assert hote hain: band job ka aakhri mahina
+ginta hai, chaalu job ka **chal raha mahina nahi**.
+
+#### Teacher ki apni files — pehle koi dikha hi nahi sakta tha
+
+Wahi khaali jagah jo 3F ne school ki taraf pakdi thi. Photo, resume aur documents
+ka path 3A se maujood tha aur **bytes laane ka koi rasta nahi**.
+
+Teen endpoint jude: `/teacher/photo/file`, `/teacher/resume/file`,
+`/teacher/documents/{id}/file`. Teacher **token se** resolve hota hai — kiski
+file hai, iska koi parameter hai hi nahi.
+
+🔴 **Resume khaas taur par.** Uski pehli teen line mein email aur mobile hota
+hai, to wo **contact detail hai** (2.56 LOCKED). School use
+`/api/teachers/{uid}/contact` se paata hai, teacher ke apply karne ya invite
+accept karne ke baad — yahan se **kabhi nahi**. Verify kiya: school in teeno par
+**404**.
+
+#### Craft ke faisle jo dikhte nahi par mehsoos hote hain
+
+- **Upload fail hone par purani file salamat hai, aur ye kaha jaata hai.** Fail
+  hue upload ke baad asli dar yehi hota hai ki jo tha wo bhi gaya.
+- Ek document fail ho to baaki **chhoote nahi** — list server se dobara padhi
+  jaati hai.
+- Reorder/har save ke baad profile **dobara padha** jaata hai, kyunki derived
+  numbers server ke hain.
+- `dob` par saaf likha hai: **school ise kabhi nahi dekhte** — `/browse` mein
+  date of birth hai hi nahi (2.57), to umar filter ban hi nahi sakti.
+
+#### Teen profile jo is screen ko todti hain — teeno khol kar dekhi
+
+| Kaun | Kya | Screen ne kya kiya |
+|---|---|---|
+| **Imran** | naam aur state, 0% | percentage **dikhi hi nahi**; ek sujhav + wajah; khaali experience section **bulaata hai**, batata nahi |
+| **Anita** | 100 mahine, **zero subjects** | 9 section bane, "8 years 4 months" server se, aur pehla sujhav — subjects |
+| **Rohit** | 90%, **koi chaalu job nahi** | timeline bani, ek entry, **koi "Now" nishaan nahi**, kuch toota nahi |
+
+⚠️ **Kuch save nahi kiya.** Bees selection multi-select ki tasveer ke liye ticked
+hui aur save button daba hi nahi — ye teeno seeded profile system mein akeli
+aadhi-bhari profiles hain aur **saabut ke taur par zyada keemti** hain. Baad mein
+verify kiya: Anita ke abhi bhi zero subjects hain.
+
+#### Design system mein kya joda
+
+| Kya | Kyun |
+|---|---|
+| `.save-note` · `.conflict` · `.note` · `.card-empty` | school aur teacher profile mein **hu-ba-hu do baar** likhe the. Section-level save ab ghar ka pattern hai, aur har us form ko yehi teen jumle chahiye: sneh gaya, takrra gaya, ya samjhaana hai |
+| `.card__footer` ka 375px vyavhaar | dono jagah alag-alag likha tha |
+
+⚠️ `anyComponentStyle` budget jp-teacher mein 4kB se **6kB** kiya. Ye screen
+jaan-boojh kar ek component hai — nau section ek draft aur ek RowVersion share
+karte hain — aur use sirf byte-budget ke liye nau component mein todna asli
+complexity hai bina kisi faayde ke. Duplication pehle hataayi, phir budget badla.
+
+#### Verification
+
+```
+HTTP    teacher-profile.mjs 33/33 — ek throwaway account par har mutation:
+        save→reload, 409, paanch full-set, experience ka exact ganit,
+        75% chhat aur resume, aur school ke liye teeno file 404
+Browser screens-3h.mjs 21/21 — Imran/Anita/Rohit, multi-select ke arrow keys,
+        20 selection 1440 aur 375 dono par, aur "kuch save nahi hua"
+```
+
+Screenshots: `jp-docs/screenshots/3h/` — teeno profile, har section 1440 par,
+paanch section 375 par, aur multi-select bees selection ke saath dono width.
+
+⚠️ Seeded teachers ka password ab `local-accounts.md` mein likha hai (gitignored),
+asli forgot-password flow se set kiya gaya. Yehi 3F wali shikayat ka jawaab hai:
+verification script sirf un accounts par khadi honi chahiye jo likhe hue hain.
+
+#### Files
+
+```
+jp-backend/database/jp_app/04_procedures/009_teacher_experiences_documents.sql (3 path procs)
+jp-backend/JP.Infrastructure/Repositories/TeacherRepository.cs                 (3 path reads)
+jp-backend/JP.Infrastructure/Services/TeacherProfileService.cs                 (OpenPhoto/Resume/Document)
+jp-backend/JP.App.Api/Controllers/TeacherController.cs                         (3 media endpoints)
+jp-shared/src/ui/ui-multi-select/*                                            (dobara likha)
+jp-shared/src/styles/_cards.scss                                              (save-note, conflict, note, card-empty)
+jp-teacher/src/app/core/teacher.service.ts                                    (naya)
+jp-teacher/src/app/core/profile-completion.ts                                 (naya)
+jp-teacher/src/app/features/teacher/profile/teacher-profile.component.{ts,html,scss} (naya)
+jp-teacher/angular.json                                                       (style budget 6kB)
+jp-school/src/app/features/school/profile/school-profile.component.scss       (duplication hatai)
+jp-docs/scripts/verify/teacher-profile.mjs                                    (naya)
+jp-docs/scripts/verify/screens-3h.mjs                                         (naya)
+jp-docs/screenshots/3h/                                                       (18 screenshots)
+```
+
+---
+
 ## 3. SCOPE (Client spec ke against)
 
 ### IN SCOPE — MVP
@@ -4508,6 +4687,7 @@ naya Code, agla free Id, kuch renumber mat karo.
 | 2026-08-10 | 3E | **Profile APIs** — 23 endpoints, build 0/0, HTTP verification 20/20. Contact is now protected in three layers, the third being a startup guard that refuses to boot if the browse DTO grows a contact field (proved by breaking it). Closed 3C's two mirrored assertions with real 404s for suspended and pending schools. Found a refusal whose message was written for the wrong kind of user | ✅ Done |
 | 2026-08-15 | 3G | **School team** — 4 procedures, 5 endpoints, the team screen, SQL 52/52 (27 negative), HTTP 48/48. The owner cannot be demoted, removed or scoped, by anybody including themselves. A full-set sync never removes a campus the caller could not see — the silent revocation that would have looked like a working save. Closed **G15**; opened **G24** | ✅ Done |
 | 2026-08-15 | 3F | **School profile and campus screens** — 5 sections with their own saves, the gallery, campus CRUD. Found and fixed two silent bugs older than the phase: REORDER sorted by id and discarded the order it was given (2F), and isActive never reached the DTO because Dapper does not strip underscores (3E). Added the media endpoints — nothing could display an uploaded photo before. SQL 144/144, HTTP 37/37 + 48/48, browser 25/25 | ✅ Done |
+| 2026-08-15 | 3H | **Teacher profile screens** — 9 sections, the completion meter that names one next step instead of printing a verdict, the experience timeline, and the five multi-selects. Rebuilt ui-multi-select in jp-shared: nested interactive elements, no keyboard navigation, a panel that never closed, and twenty selections that broke the layout. Added the teacher media endpoints — nothing could display a photo before. HTTP 33/33, browser 21/21, opened as Rohit, Anita and Imran | ✅ Done |
 | — | 2E | Admin screens → `frontend/apps/admin` | ⬜ Next |
 | — | 2F | School screens → `frontend/apps/school` | ⬜ Next |
 
@@ -4986,6 +5166,24 @@ aata tha (3E se). Dono ab HTTP check se bandhe hain.
 
 ⚠️ Naya gap **G25** — underscore wale column DTO tak nahi pahunchte, aur bhoolne
 par kuch fail nahi hota.
+
+---
+
+## ✅ PHASE 3H COMPLETE — 2026-08-15
+
+Teacher profile ki nau section. Teen production build **0/0**, HTTP **33/33**,
+browser **21/21**. Details **2.60**.
+
+🔴 0% par percentage **dikhti hi nahi** — ek sujhav wajah ke saath dikhta hai.
+Jise shuru karne se pehle bata do ki usne kuch haasil nahi kiya, wo tab band kar
+deta hai.
+
+🔴 `ui-multi-select` dobara likha (paanch jagah istemaal hota hai): nested
+interactive elements, koi keyboard navigation nahi, panel band hi nahi hota tha,
+aur bees selection layout tod deti thi.
+
+⚠️ Experience ka ganit ab **exact** assert hota hai — pehle ±1 ki chhoot thi, jo
+theek us ek-mahine wale bug ko chhupa deti jise pakadna tha.
 
 ---
 
