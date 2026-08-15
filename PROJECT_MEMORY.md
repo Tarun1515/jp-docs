@@ -3351,9 +3351,14 @@ imaandaar baat `WHERE TeacherId = @me` hai.
 School browse karte waqt sab kuch dekh sakta hai jisse tay ho ki is insaan ko
 chahiye ya nahi — aur platform ke bahar sampark ka **koi rasta nahi**.
 
-Contact tab khulta hai jab **teacher ne us school ko apply kiya ho**. School ke
-paise dene par nahi, invite karne par nahi: jab teacher ne **pehla kadam** uthaya
-ho.
+Contact **teacher ki sehmati par** khulta hai, aur sehmati ke do roop hain:
+teacher ne **apply** kiya ho, ya us school ka invite **accept** kiya ho. School
+ke paise dene par nahi, aur sirf invite **bhej** dene par nahi.
+
+⚠️ **Ye 2.56 hai (LOCKED), aur isne is decision ka pehla version badla hai.**
+Pehle yahan likha tha "sirf apply karne par" — jo monetization plan se takraata
+tha: jo school paisa de aur phir bhi kisi tak pahunch na sake, usne kuch khareeda
+hi nahi. Poori dalil aur Phase 5/6 ke liye exact replacement **2.56** mein hai.
 
 Teen wajah, vazan ke kram mein:
 
@@ -3396,10 +3401,15 @@ kisi ki ID ka scan diye.
 nahi — `t_app_applications` Phase 5 hai, to aaj kisi ne kisi ko apply kiya hi
 nahi. Phase 5 ka exact replacement comment mein likha hai.
 
-🔴 **Ise invite tak mat badhana.** School ka invite karna school ka pehla kadam
-hai, aur invite platform se hi jaata hai taaki number ki zaroorat na ho. Invite
-par unlock ka matlab hoga ki school sabko invite karke sabka contact khol le —
-jo "koi rule nahi" ke barabar hai.
+🔴 **Bheje hue invite tak mat badhana** — par **accept kiye hue** tak badhana
+hi hai (2.56).
+
+Bhejna school ka kadam hai: uspe unlock ka matlab hoga ki school sabko invite
+karke sabka contact khol le, jo "koi rule nahi" ke barabar hai. **Accept karna
+teacher ka kadam hai**, aur wo theek utni hi sehmati hai jitni ek application.
+
+⚠️ Purana vaakya sirf "invite" kehta tha aur dono ko exclude karta hua padha
+jaata tha. Farak **kaun** kar raha hai, ispe hai.
 
 #### 🔴 Do procedure, flag nahi — 3C wali hi wajah, zyada dhaar ke saath
 
@@ -3581,6 +3591,108 @@ SCSS `includePaths` bhagwan bharose nahi, `../jp-shared` par nirbhar hain (2.42)
 
 ---
 
+### 2.56 CONTACT UNLOCK — TEACHER KI SEHMATI SE, PAISE SE NAHI 🔒 LOCKED
+
+⚠️ **Ye 2.54 ke contact rule ko badal deta hai. Purana version wahan theek kar
+diya gaya hai — do version chhode nahi gaye.**
+
+#### Takraav jo pehle tha
+
+2.54 ne likha tha: contact tab khulta hai jab teacher ne **apply** kiya ho.
+
+Monetization plan bechta hai: "teacher database search + contact" ek paid
+feature ki tarah.
+
+**Dono sach nahi ho sakte.** Jo school paisa de aur phir bhi kisi tak pahunch na
+sake, usne kuch khareeda hi nahi.
+
+#### Faisla
+
+`fn_TeacherContactUnlocked` **true** deta hai jab:
+
+1. teacher ne **is school ko apply** kiya ho, **ya**
+2. teacher ne **is school ka invite ACCEPT** kiya ho
+
+aur **iske alawa kuch nahi**.
+
+#### 🔴 Bheja hua invite ≠ accept kiya hua invite
+
+2.54 ke comment mein likha tha *"do NOT widen this to invites"* — aur wo baat
+**bheje hue** invite ke baare mein sahi thi: warna school Somvaar ko poore
+database ko invite karta aur Mangalwaar tak har number uske paas hota, jo "koi
+rule na hone" ke barabar hai.
+
+Par jise teacher ne **accept** kiya, wo theek usi tarah sehmati hai jaise
+application. Teacher se poochha gaya, usne **haan** kaha.
+
+⚠️ Purana vaakya dono ko exclude karta hua padha jaata tha. Ab comment mein saaf
+likha hai ki wo **kaun sa** wala hai.
+
+#### 🔴 Bikta kya hai: school ki KSHAMTA, teacher ka contact kabhi nahi
+
+**Bech sakte hain:**
+- teacher database mein search karne ka haq hi
+- kitne invite bhej sakte hain
+- shayad featured placement
+
+**Kabhi nahi bech sakte:** contact. Wo hamesha teacher ka faisla hai, aur koi
+bhi raqam use nahi badalti — kyunki wo line hamari hai hi nahi, teacher ki hai.
+
+⚠️ Agar aage koi requirement lage ki yahan payment chahiye, to **requirement
+galat likhi gayi hai**: bik kya raha hai — *pahunch*, aur pahunch ka matlab
+invite hai, number nahi.
+
+#### Ye vyapaar ke liye bhi behtar hai, sirf naitikta nahi
+
+Jo school paisa deta hai use **jawaab dene wale teacher** milte hain, cold-call
+karne ki list nahi.
+
+Browse ke waqt bechi gayi contact list ka matlab hai ki **pehla phone call
+platform ke bahar hota hai** — aur uske baad jo kuch hota hai (application,
+offer, hiring, record) usme hum hain hi nahi. Ek baar ki bikri, phir kuch nahi.
+
+#### ⚠️ Spec mein "Accepted" status hai hi nahi — Phase 6 ko jodna hoga
+
+`DB_TABLE_STRUCTURE` `t_app_teacher_invites` ko chaar status deta hai:
+**Sent / Viewed / Applied / Ignored**. Inme se koi bhi path 2 ka matlab nahi
+rakhta:
+
+| Status | Kyun kaafi nahi |
+|---|---|
+| `Sent` | School ne kiya, teacher ne nahi |
+| `Viewed` | Message kholna "haan" kehna nahi hai |
+| `Applied` | Path 1 pehle se cover karta hai — application maujood hai. Isse map karne se **path 2 kuch karta hi nahi** |
+| `Ignored` | Ye to inkaar hai |
+
+🔴 To **Phase 6 ko `ACCEPTED` status jodna hoga**, warna path 2 chup-chaap path 1
+mein simat jaata hai aur monetization plan phir se toota rehta hai — bina kisi ko
+pata chale. Theek wahi shakl jise rokne ke liye ye file likhi gayi hai.
+
+#### Phase 5 ke liye — replacement bilkul yahi ho
+
+Stub abhi `RETURN 0` deta hai, jo **aaj sach hai**: na koi application hai na
+koi invite.
+
+Uska exact replacement `010_teacher_public_profile.sql` ke comment mein likha
+hai. Do path, `UNION ALL`, aur:
+
+- **"koi bhi invite" NAHI** — sirf accept kiya hua
+- **"koi bhi payment" NAHI** — plan is function mein aata hi nahi
+
+⚠️ Agar kabhi is function mein `t_app_subscriptions` ya `m_mdm_plans` ka naam
+aaye, faisla toota ja chuka hai.
+
+#### Kya pehle se laagu hai
+
+`USP_GetTeacherContactForSchool` hi ekmatra rasta hai jo contact **aur resume**
+deta hai (2.54 — resume bhi contact detail hai, uski pehli teen line mein phone
+number hota hai). Browse procedure ke paas wo column hain hi nahi.
+
+To ye faisla **ek hi function badalne se** laagu hota hai. Yahi do-procedure
+design ka faayda hai: rule ek jagah hai, aur use badalne ke liye ek jagah.
+
+---
+
 ## 3. SCOPE (Client spec ke against)
 
 ### IN SCOPE — MVP
@@ -3717,6 +3829,7 @@ naya Code, agla free Id, kuch renumber mat karo.
 | 2026-08-10 | 3C | **School + branch procedures** — 10 procs, the scope resolver, the bridge-sync pattern. Suite 41/41 with 15 negative cases. **G21 and G19 closed.** Found t_app_school_users had never been written to — the resolver reads it, so every school-scoped query would have been empty for everybody. Running a real registration then found two production bugs in provisioning: the CATCH claimed ALREADY_PROVISIONED without checking, and a second school under one organisation could not be provisioned at all | ✅ Done |
 | 2026-08-10 | 3D | **Teacher procedures** — 14 procs, 5 bridge syncs (two of them not plain sets), experiences as entities. Suite 44/44 with 8 A-cannot-touch-B assertions. Contact details lock until the teacher applies, and the resume locks with them. Found DATEDIFF(MONTH) was making every closed job one month short | ✅ Done |
 | 2026-08-10 | — | **All seven repos pushed to GitHub. G0 closed.** Credentials stripped from HOW_TO_RUN, PROJECT_MEMORY and a verify script first — they are in a gitignored local-accounts.md now | ✅ Done |
+| 2026-08-10 | — | **2.56 LOCKED — contact unlocks on teacher consent, never on payment.** Resolved the conflict between 3D's contact rule and the monetization plan. Two paths only: applied, or accepted an invite. What is sold is the school's capability. ⚠️ The spec has no ACCEPTED invite status — Phase 6 must add one or path 2 collapses into path 1 | ✅ Done |
 | — | 2E | Admin screens → `frontend/apps/admin` | ⬜ Next |
 | — | 2F | School screens → `frontend/apps/school` | ⬜ Next |
 
@@ -4178,6 +4291,10 @@ repository, service, controller, wahi layering jo 2D ne banayi.
    aur phone number deta hai (2.54). Agar kabhi koi doosra endpoint
    `ResumePath` lautaaye, wo unlock rule ke bahar chala gaya.
 
+3. 🔒 **Contact kabhi bhi paid feature ki tarah expose mat karna (2.56).**
+   Subscription check search par lag sakta hai aur invite ki ginti par — contact
+   par **kabhi nahi**. Wo teacher ki sehmati hai, plan ka feature nahi.
+
 ### Uske baad screens
 `jp-teacher` profile edit (aadhe bhare profile ke against — 2.52 ke Rohit,
 Anita, Imran) aur `jp-school` branch management.
@@ -4231,6 +4348,11 @@ Sab ke liye 2.42 ka start order: **`jp-shared` :4999 pehle**.
   `describeOutcome()` iski **ekmatra** interpretation hai — doosri mat likhna.
 - **2.49** — reject **kuch provision nahi karta**, aur ye do jagah gated hai.
   Agar teesri jagah orchestration call kar rahe ho, wahi check pehle lagao.
+- **2.56 🔒** — 🔴 contact **teacher ki sehmati** se khulta hai: usne apply kiya
+  ho ya invite **accept** kiya ho. **Paise se kabhi nahi.** Bikta hai school ki
+  kshamta — search, kitne invite — teacher ka number nahi. Agar
+  `fn_TeacherContactUnlocked` mein kabhi plan ya subscription ka naam aaye,
+  faisla toota ja chuka hai.
 - **2.50** — 🔴 **kahin bhi Aadhaar NUMBER store mat karna.** Government photo ID
   ka DOCUMENT liya jaata hai, number nahi. Agar client maange to likhit mein,
   unki apni legal advice ke saath.
