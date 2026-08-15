@@ -1593,18 +1593,22 @@ approval nahi laata. Us din **sab** maayne rakhte hain.
 🔴 Jo bhi ye uthaye: **ye cases pehle likho.** Engine sahi *dikhta* hai, par
 aaj tak sirf ek raste se guzara hai.
 
-### G15. "Assigned to" filter sirf "mujhe" hai
+### G15. "Assigned to" filter — ✅ CLOSED (3G, 2026-08-15)
 
-Queue ka server-side filter ek `AssignedToUserId` leta hai. Screen ke paas
-sirf ek id hai jiska wo bharosa kar sakti hai — jo banda use kar raha hai — to
-filter **"Assigned to me"** checkbox hai, admin ka dropdown nahi.
+Do cheezein toot rahi thi, dono theek hui (2.58):
 
-Dropdown ke liye admin users ka list endpoint chahiye. `JP.Sso.Api` ke paas
-user list hai; usse admin-type users par filter kar ke expose karna baaki hai.
+- filter ab **Uid** leta hai, numeric jp_sso id nahi — service use jp_sso se
+  resolve karti hai, wahi cross-DB join API layer mein (2.2). Isi wajah se ab
+  kisi **colleague** ko naam le kar filter kiya ja sakta hai;
+- **"unassigned"** ka apna flag hai (`@UnassignedOnly`), kyunki
+  `@AssignedToUserId` par NULL ka matlab pehle se "sab" hai.
 
-⚠️ **"Unassigned"** abhi express hi nahi ho sakta: proc
-`(@P IS NULL OR ApproverUserId = @P)` use karta hai, aur NULL ka matlab
-"sab" hai — "jinka koi nahi" nahi. Us filter ko alag flag chahiye hoga.
+Screen par ek dropdown: **Anyone · Unassigned · Assigned to me · <admin>**.
+Admin list `JP.Sso.Api` ke `/api/users?userTypeId=1` se aati hai, session bhar
+cache hoti hai.
+
+🔴 Anjaan assignee **`-1`** par resolve hota hai, NULL par nahi — warna ek typo
+filter ko chup-chaap poori queue tak chauda kar deta.
 
 ### G16. Branch-add (request type 3) ka koi tab nahi
 
@@ -1766,6 +1770,27 @@ Doosra wala saaf hai, par usme session state hai.
 
 Faisla tab lena hai jab pehla asli multi-school group aaye — abhi guess karke
 banane se galat wala chun lenge.
+
+### G24. RoleInSchool badalta hai, jp_sso ka role nahi
+
+`PUT /api/school/team/{uid}/role` sirf **jp_app** likhta hai. Us bande ka
+jp_sso role — jisme unki asli **permissions** hain — wahi purana rehta hai.
+
+Nateeja: team screen kehti hai "Senior HR", aur API har wahan mana karti hai
+jahan Senior HR ki permission chahiye. `SchoolRoles` (2.58) mein dono ka naksha
+ek hi jagah hai, par abhi use **sirf invite** padhta hai.
+
+⚠️ Ye jaan-boojh kar chhoda hai, chhupaya nahi. Theek karne ka matlab hai ek aur
+cross-database write, usi partial-failure shakl mein jo invite ki hai — aur uska
+aadha chalna aadmi ko **do role** de deta, jo purane role se bura hai.
+
+**Kya chahiye:** `USP_AssignUserRole` (pehle se maujood hai) ko role save ke
+saath orchestrate karo, invite wali tarteeb mein: jp_sso pehle, jp_app baad
+mein, aur girne par **loud**. Tab tak role badalna aadha kaam hai.
+
+🔴 Aaj iska asar seemit hai kyunki har maujooda member owner hai ya naya invite,
+aur dono jagah role sahi set hota hai. **Jis din pehla HR ko Senior HR banaya
+jaayega, us din ye dikhega.**
 
 ### 2.45 `jp_mdm` — PHASE 2A BUILD NOTES
 
@@ -3901,6 +3926,225 @@ jp-docs/scripts/verify/browse-contract.mjs                      (naya)
 
 ---
 
+### 2.58 SCHOOL TEAM MANAGEMENT — PHASE 3G
+
+Chaar procedure, paanch endpoint, ek screen, aur **G15 band**. SQL suite
+**52/52** (27 negative), HTTP verification **48/48**, teeno build 0/0.
+
+#### 🔴 Chaar niyam — UI mein nahi, procedure mein
+
+| Niyam | Kahan | Kyun UI mein nahi |
+|---|---|---|
+| Owner na demote ho na deactivate — **khud se bhi nahi** | `USP_SaveSchoolUserRole`, `USP_DeactivateSchoolUser` | Bina owner wala school koi chala hi nahi sakta, aur wapas laane ka rasta sirf database edit hai |
+| Koi owner **banaya bhi na jaa sake** | dono save procedures + invite | Niyam 1 ke chalte doosra owner **permanent** hai — do log jo kabhi hataye nahi ja sakte |
+| Owner ke **link rows hote hi nahi** | `USP_SaveSchoolUserBranches` inkaar karta hai | `fn_VisibleBranches` unhe padhta hi nahi (2.51); jo rows padhi na jaayein wo ek din function se **jhagda** karengi |
+| Deactivate = `Is_Active = 0`, **kabhi** `Is_Deleted` | `USP_DeactivateSchoolUser` | "Kisne kaunsa document verify kiya" unke jaane ke baad bhi sach rehna chahiye |
+
+UI bhi yehi chaar dikhata hai — par unka **ghar** procedure hai. API UI ke bina
+bhi khuli hai, aur kal koi doosri screen ya script likhega to niyam uske saath
+nahi jaate.
+
+⚠️ **Permission yahan check nahi hoti.** `USER.MANAGE` jp_sso mein hai aur
+controller dekhta hai. Procedure sirf wo do cheezein dekhta hai jo **sirf
+database jaan sakta hai**: caller is school ka hai kya, aur target bhi.
+
+#### 🔴 Full-set sync ka wo case jo chup-chaap access chheen leta
+
+Ye is phase ki sabse mehngi cheez thi, aur **likhne se pehle pakdi gayi**.
+
+Bridge sync poora set leta hai aur jo gayab ho use hata deta hai (2.53). Ab isse
+jodiye ek screen se jo caller ko sirf **uske apne campus** dikha sakti hai:
+
+> North campus ka HR apne senior colleague ka scope kholta hai. Screen ek hi
+> campus dikhati hai — jo use dikh sakta hai. Wo kuch untick nahi karta, save
+> karta hai — aur plain pattern us colleague ke **do southern campus** chup-chaap
+> le leta, jo screen par kabhi thay hi nahi.
+
+Save **successful** dikhta. Colleague ko pata tab chalta jab campus gayab hota.
+
+**Fix:** GONE step `fn_VisibleBranches` se **join** karta hai. Jo campus caller
+ko nahi dikhta, uska link **chhua hi nahi jaata**. Owner ko sab dikhta hai, to
+owner ke liye ye bilkul saadharan full-set sync hai.
+
+Iska nateeja saaf likha hai: non-owner ka save kisi ke access ka **apna hissa**
+sync karta hai, poora nahi. Isliye screen `branchCount` (asli ginti) aur
+`branchIds` (jo dikh raha hai) **dono** deti hai, aur likhti hai
+*"+2 campus jo aapko nahi dikhte"* — kam karke dikhana ek jhooth hai jo screen
+seedha munh karke bolti.
+
+#### Invitation — do database, ek nateeja
+
+SSO ka invite pehle se tha (1C). 3G ne uske upar jp_app ka aadha hissa joda, usi
+shakl mein jo 2.48 ne tay ki thi: **koi distributed transaction nahi**.
+
+| | |
+|---|---|
+| **Tarteeb** | account pehle, membership baad mein. Ulta karte to membership ek na-maujood account ki taraf ishara karti — dono taraf se **invisible** |
+| **Idempotency** | `USP_ProvisionSchoolUser` `(SchoolId, UserUid)` par idempotent hai, aur service `DUPLICATE_EMAIL` ko **us account ki talash** mein badal deti hai jo usne pehle hi bana diya tha |
+| **Loud failure** | step 2 gira to Error log mein email + Uid + SchoolId, aur caller ko saaf kaha jaata hai ki **dobara invite bhejein** |
+
+🔴 **Retry ab sach mein kaam karta hai.** Pehle wo DUPLICATE_EMAIL par hamesha
+ke liye atak jaata — theek karne ka tareeka manual INSERT hota.
+
+⚠️ Jo bhi **pehle se check ho sakta tha, account banne se pehle** check hota hai
+— role, address, campus. Ek galat request se bana account sabse bura orphan hai:
+uska koi intezaar hi nahi kar raha, to koi report bhi nahi karega.
+
+⚠️ Re-invite kisi maujooda member ka **role nahi badalta**. Warna invite
+`USP_SaveSchoolUserRole` aur uske owner guard ke **around** ka rasta ban jaata.
+
+#### 🔴 "Aapka access hata diya gaya" ≠ "aap kabhi jude hi nahi thay"
+
+`USP_GetSchoolsForUser` pehle `Is_Active = 1` par filter karta tha. Matlab jiska
+access **hata diya gaya** wo bilkul waisa dikhta tha jaisa koi jo kabhi juda hi
+nahi tha — aur API use kehti: *"agar aapko abhi approve kiya gaya hai to sign out
+karke wapas aayein"*. Wo aisa karta. Do baar. Phir school ko phone karta.
+
+3G ne wo haalat **jaan-boojh kar reachable** banayi, to farq bhi zinda rakhna
+pada: proc ab inactive rows bhi `IsActive` ke saath deta hai, aur service ke paas
+har case ka **apna jumla** hai. Ye 3E wale bug ka hi doosra roop hai (2.57).
+
+#### Token "revoke" ka asli matlab — verification ne theek karaya
+
+Assertion likhi thi ki hataye gaye bande ka purana token **401** dega. Galat.
+JWT stateless hai: `USP_RevokeAllUserTokens` **refresh** token maarta hai, access
+token apni maut (60 min) marta hai.
+
+Do alag sach, dono verify hue:
+- purana **access token** har school endpoint par **403** — turant, "ghante bhar
+  mein" nahi, kyunki membership gate har request par lagta hai;
+- **refresh token** mara hua — session badhaya nahi ja sakta.
+
+"Session dead hai" bina jaanche likh dena ek aise system ko bayan karta jo turant
+logout karta hai. Ye system har wo darwaza turant band karta hai jahan wo pahunch
+sakte hain, aur token ko khud marne deta hai.
+
+#### Invitation email — jo naye HR ko sabse pehle dikhta hai
+
+"You have been invited to join a workspace" kuch nahi batata aur bilkul us
+phishing mail jaisa padha jaata hai jise delete karna sikhaya gaya hai. Chaar
+baatein tay karti hain ki link click hoga ya nahi: **kisne** bulaya (naam +
+address), **kaunsa school** (naam se), **kya kar payenge** (kaam ki zubaan mein,
+permission code nahi), aur **kaun se campus**.
+
+🔴 **Verification ne yahan ek galti pakdi:** template ka HTML comment — jisme yehi
+chaar-baaton wali dalil likhi thi — **deliver ho raha tha**. Har invitation ke
+saath, recipient ke mailbox mein. Dalil ab service ke doc comment mein hai;
+template mein sirf placeholder list aur ek chetavni hai ki **is file ke comment
+bheje jaate hain**.
+
+#### Screen — matrix, aur owner ki row
+
+Log neeche, campus across, har chauraahe par checkbox. Tick karte hi save, aur
+**poora set** jaata hai (2.53) — sirf badla hua box bhejne se baaki mit jaate.
+
+🔴 **Owner ki row alag dikhti hai, disabled nahi.** Saaf raasta hota greyed ticks
+aur greyed buttons — aur wo **galat** hai: disabled control "toota hua" padha
+jaata hai, aur padhne wale ka agla kadam hai use phir bhi click karna, phir
+reload, phir kisi se poochna. To owner ki row par **koi control hai hi nahi** —
+ek marked margin rule, halka tinted ground, aur jahan ticks hote wahan ek jumla:
+*"Every campus — an owner is never scoped to one."*
+
+⚠️ **GroupType = 1 par campus scope ka wajood hi nahi** (2.50) — na column, na
+invite dialog mein checkbox. Ek campus wale school se "kaun se campus dikhein"
+poochna ek aisa sawaal hai jiska ek hi jawaab hai.
+
+#### `FullName` — naya column, aur jo **backfill nahi** kiya
+
+`t_app_school_users` mein `FullName nvarchar(150) NULL` (019_alter). Wajah
+structural hai: **`t_sso_users` mein naam hai hi nahi** — wahan pehchaan "kaunsa
+account" hai, "kaun" nahi. Sirf email se bani team list padhi nahi jaati.
+
+⚠️ **Maujooda rows NULL hi rahengi.** Ek lubhaavna backfill maujood tha —
+`t_app_schools.PrincipalName` / `HrContactName` — aur wo **galat** hai: wo columns
+ye vaada nahi karte ki **owner account kiska hai**. Jis school ne registration
+mein principal ka naam diya aur jiska account office admin chalata hai, uske
+login par principal ka naam chipak jaata.
+
+Isliye: column nullable, UI email par gir jaati hai, aur naam tab aata hai jab
+koi type kare. **Owner apna naam khud likh sakta hai** — role frozen hai, row
+nahi. Warna koi owner apna naam kabhi daal hi nahi paata.
+
+#### G15 band — queue ab "kis par koi nahi hai?" poochh sakti hai
+
+Do cheezein toot rahi thi:
+- server ka filter **numeric jp_sso UserId** leta tha, aur screen ke paas sirf
+  apni id thi — isliye "assigned to me" checkbox, dropdown nahi;
+- **"unassigned" express hi nahi ho sakta tha**: `@AssignedToUserId` par NULL ka
+  matlab pehle se "sab" hai.
+
+Ab: `@UnassignedOnly` apna flag hai, aur filter **Uid** leta hai jise service
+jp_sso se resolve karti hai — wahi cross-DB join, API layer mein, jahan uski
+ijazat hai (2.2).
+
+🔴 **Anjaan assignee `-1` par resolve hota hai, NULL par nahi.** NULL ka matlab
+"koi bhi" hai, to ek typo ya delete ho chuka account filter ko chup-chaap **poori
+queue** tak chauda kar deta. Jo filter **khul kar** fail ho wo band ho kar fail
+hone se bura hai — page phir bhi jawaab jaisa dikhta hai.
+
+⚠️ Dono ek saath bhejne par **400**, chup-chaap ek chun kar nahi.
+
+#### Test suite ne apne aap ko pakda
+
+Section 4 ki assertion — "branch HR ka khaali save sirf wahi hataye jo use
+dikhta hai" — **FAIL** hui. Procedure sahi tha; **test ka premise bah gaya tha**:
+section 3 branch HR ko do campus de chuka tha, to us waqt use dono dikhte thay
+aur dono hatna sahi tha.
+
+Ek scoping test jiska premise khisak jaaye **na-hone se bura** hai: wo theek us
+bug par PASS likhta hai jise pakadne ke liye likha gaya tha. Ab section 4 apna
+premise pehle **reset karta hai aur assert karta hai**.
+
+#### Verification — 48/48, asli HTTP
+
+```
+1. team + campuses     owner flagged, ZERO link rows
+2. invite              jp_sso account + jp_app membership + scope, ek call se
+                       email drop se padhi: kisne, kaunsa school, kya kar payenge
+                       re-invite = ALREADY_A_MEMBER, role nahi badla
+3. invite poora chala  token → password → login → school (refusal nahi)
+                       ordinary member team padh sakta, likh nahi sakta (403)
+4. owner               demote/remove/scope/promote/invite — paanchon 400
+                       aur uske baad owner row jyon ki tyon
+5. doosra school       re-role/scope/remove — teeno 404, row salamat
+6. campus scope        poora set, no-op kuch nahi likhta, chhota set hataata hai
+7. removal             row zinda, links zinda, access mara, message sahi
+8. G15                 anyone 17 · unassigned 7 · by-uid 10 · anjaan 0 · dono 400
+```
+
+Script: `jp-docs/scripts/verify/team-contract.mjs`.
+
+⚠️ **`browse-contract.mjs` (3E) is session mein chal nahi paayi** — wo
+`head.711429@brightfield.edu.in` se login karti hai aur uska password sirf us
+waqt ke `JP_PW` env var mein tha; `local-accounts.md` mein wo account hai hi
+nahi. Jo cover hua: API **boot hui**, matlab `ContactLeakGuard` pass hua, aur
+`/school/profile` teen alag callers ke liye 3G script mein verify hua. Sudhaar:
+verification scripts ko un accounts par khada hona chahiye jo
+`local-accounts.md` mein hain.
+
+#### Files
+
+```
+jp-backend/database/jp_app/01_tables/019_alter_t_app_school_users_fullname.sql (naya)
+jp-backend/database/jp_app/04_procedures/011_school_team.sql                   (naya)
+jp-backend/database/jp_app/04_procedures/003_scope_resolver.sql                (IsActive)
+jp-backend/database/jp_sso/04_procedures/009_users_by_uid.sql                  (naya)
+jp-backend/database/jp_mdm/04_procedures/003_approval_reads.sql                (@UnassignedOnly)
+jp-backend/database/jp_app/99_tests/003_test_school_team.sql                   (naya, 52)
+jp-backend/JP.Domain/Schools/TeamContracts.cs                                  (naya)
+jp-backend/JP.Infrastructure/Repositories/SchoolTeamRepository.cs              (naya)
+jp-backend/JP.Infrastructure/Services/SchoolTeamService.cs                     (naya)
+jp-backend/JP.Infrastructure/Email/Templates/school-invite.html                (naya)
+jp-backend/JP.App.Api/Controllers/TeamController.cs                            (naya)
+jp-school/src/app/core/team.service.ts                                         (naya)
+jp-school/src/app/features/school/team/team.component.{ts,html,scss}           (naya)
+jp-admin/src/app/core/admin-user.service.ts                                    (naya)
+jp-admin/src/app/features/verification/queue/verification-queue.component.*    (G15)
+jp-docs/scripts/verify/team-contract.mjs                                       (naya)
+```
+
+---
+
 ## 3. SCOPE (Client spec ke against)
 
 ### IN SCOPE — MVP
@@ -4039,6 +4283,7 @@ naya Code, agla free Id, kuch renumber mat karo.
 | 2026-08-10 | — | **All seven repos pushed to GitHub. G0 closed.** Credentials stripped from HOW_TO_RUN, PROJECT_MEMORY and a verify script first — they are in a gitignored local-accounts.md now | ✅ Done |
 | 2026-08-10 | — | **2.56 LOCKED — contact unlocks on teacher consent, never on payment.** Resolved the conflict between 3D's contact rule and the monetization plan. Two paths only: applied, or accepted an invite. What is sold is the school's capability. ⚠️ The spec has no ACCEPTED invite status — Phase 6 must add one or path 2 collapses into path 1 | ✅ Done |
 | 2026-08-10 | 3E | **Profile APIs** — 23 endpoints, build 0/0, HTTP verification 20/20. Contact is now protected in three layers, the third being a startup guard that refuses to boot if the browse DTO grows a contact field (proved by breaking it). Closed 3C's two mirrored assertions with real 404s for suspended and pending schools. Found a refusal whose message was written for the wrong kind of user | ✅ Done |
+| 2026-08-15 | 3G | **School team** — 4 procedures, 5 endpoints, the team screen, SQL 52/52 (27 negative), HTTP 48/48. The owner cannot be demoted, removed or scoped, by anybody including themselves. A full-set sync never removes a campus the caller could not see — the silent revocation that would have looked like a working save. Closed **G15**; opened **G24** | ✅ Done |
 | — | 2E | Admin screens → `frontend/apps/admin` | ⬜ Next |
 | — | 2F | School screens → `frontend/apps/school` | ⬜ Next |
 
@@ -4490,6 +4735,19 @@ hone par API ko chalne hi nahi deta — **DTO tod kar sabit kiya**.
 
 ⚠️ Ek naya gap: **G23** — ek user ek hi school par ho sakta hai; API doosra keh
 hi nahi sakti.
+
+---
+
+## ✅ PHASE 3G COMPLETE — 2026-08-15
+
+Chaar procedure, paanch endpoint, team screen. SQL **52/52**, HTTP **48/48**.
+Details **2.58**.
+
+Owner ko na demote kiya ja sakta hai na hataya — **khud se bhi nahi** — aur
+non-owner ka campus save wo campus **kabhi nahi hataata** jo use dikhta hi nahi.
+
+✅ **G15 band.** ⚠️ Naya gap **G24** — role badalne par jp_sso ka role saath nahi
+badalta.
 
 ---
 
