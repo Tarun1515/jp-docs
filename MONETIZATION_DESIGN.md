@@ -328,6 +328,153 @@ same shape 3I's dashboard uses to carry a plan's name back.
 
 ---
 
+## 🔴 Gating reads never come from the master cache
+
+That resolution — the feature's `Is_Active` and `GatingModeId`, and the
+plan-feature mapping — is the one read in this design that must never be
+allowed to go stale. **It is never served from the master cache.**
+
+### What the cache actually is today, stated precisely
+
+Worth getting right, because the danger is not where it first appears:
+
+- **The API holds no server-side cache.** `MasterService` reads the database on
+  every call. There is no `IMemoryCache` anywhere in the backend.
+- The hour is `[ResponseCache(Duration = 3600, Location = ResponseCacheLocation.Client)]`
+  on `/api/masters/*` — the API *telling clients* to cache — plus the Angular
+  `MasterService`'s in-memory cache, which lives for the session.
+
+So there is no stale-cache bug to fix. The trap is the other direction:
+**features and gating modes are master data by every structural test** — they
+are `m_mdm_*` tables, they are pure reference data, they change roughly never,
+and they will be read constantly. Everything about them says "put them behind
+`IMasterService`", and `IMasterService` is the single most obvious place in this
+codebase to add an `IMemoryCache`. The day somebody does — a reasonable
+optimisation, correct for subjects and boards — gating quietly acquires an hour
+of lag.
+
+### Why an hour of lag is disqualifying here, and not for subjects
+
+- **The kill switch would engage up to an hour after the operator flips it.** A
+  feature stays live during exactly the incident it was switched off for.
+  🔴 That defeats this document's own argument in Decision 1: `Is_Active` was
+  chosen over a fourth mode *because it restores cleanly under incident
+  conditions*. A kill switch with an hour of lag is not a kill switch, and the
+  argument for it would be self-refuting.
+- **A `FREE → METERED` flip keeps serving free until the cache turns.** Every
+  consume in that window is revenue given away, and nothing anywhere records
+  that it happened.
+
+Both fail **silently**. Nothing errors, no log line appears, and the screen the
+operator is looking at shows the new value — which is the shape of bug that
+survives longest.
+
+A stale subject name for an hour is a cosmetic inconvenience. A stale
+entitlement for an hour is an unsellable kill switch and unbilled usage. Same
+storage, same access pattern, completely different tolerance — and that
+difference is the reason this rule exists as a rule rather than a preference.
+
+### The choice: **(a) a direct read per consume**
+
+Not a short-TTL cache with invalidation.
+
+**Note what this actually is:** the read is *already* in the design — the API
+resolves from jp_mdm and passes parameters into the jp_app procedure, because
+the two databases cannot join (2.2). So choosing (a) is not adding work. It is
+**writing down that this read is never allowed to become a cache**, which is a
+different and more durable thing than choosing an implementation.
+
+Why it is affordable:
+
+- **A consume is already a write.** It opens a transaction, takes `UPDLOCK,
+  HOLDLOCK` on the subscription row, derives two aggregates and inserts a row.
+  One indexed singleton `SELECT` in front of that is dominated by the work it
+  precedes.
+- **The volume is nothing like masters.** `masters/bulk` is fetched by every
+  user on every app load — that is why it is cached. Consumes are job posts and
+  invitations: single-digit to low-double-digit **per school per month**. A
+  cache here would be solving a problem this path does not have.
+
+**Admin-flip-to-visible latency: the next consume.** There is no TTL to state
+and nothing to wait for. Flip it, and the very next call sees it.
+
+### Rejected — (b) a short-TTL cache with invalidation on the admin write
+
+Invalidation-on-write is correct **only while one process owns both the admin
+screen and the consume path.** They are one process today. They will not always
+be.
+
+⚠️ **Under multiple instances it breaks in the worst available shape.** An
+invalidation raised on instance A never reaches instance B, so after the flip
+the feature is *off for some requests and on for others*, with no way to tell
+from outside which request got which. During an incident that is worse than a
+uniform hour of lag: not off, not on, and not diagnosable. Two operators
+watching two requests would reasonably disagree about whether the switch worked.
+
+A distributed cache or a message bus fixes it — and that is infrastructure
+bought to speed up a query that was never hot.
+
+🔴 **The point is not that caching is wrong.** It is that (b) requires taking on
+the single-process assumption in exchange for saving a read this path does not
+feel. Naming the assumption is what the brief asked for; not needing one is the
+better answer.
+
+### What happens under multiple instances
+
+**Nothing.** Each instance reads the same rows from the same database, so there
+is no second copy that can go incoherent. (a) is correct on one instance and on
+twenty, with no invalidation, no bus and no shared cache — and that is precisely
+why it was chosen over the faster option.
+
+### Enforced structurally, not by a comment
+
+The entitlement path gets its **own repository** (`IEntitlementRepository`) that
+resolves the feature and its plan mapping in **one query**. It does not call
+`IMasterService`, and it is never given a cache.
+
+- **One query, not two.** The feature's mode and the mapping's quota come back
+  together, so there is no window in which the mode is read fresh and the quota
+  stale — a flip mid-resolution cannot produce a combination that never existed.
+- **Its own path** means the day `IMasterService` is sensibly given a cache,
+  gating is not on that path and nothing has to be remembered.
+- 🔴 **Phase 2.5's isolation grep covers this**, alongside the 2.56 grep the
+  phase already owes: **zero references to `IMasterService` from the entitlement
+  path**, output shown.
+
+This follows 2.36's precedent — the password hash is out of the API's reach by
+compilation, not by a comment asking people not to. A rule that depends on
+somebody reading a remark is a rule with a shelf life.
+
+### 🔴 The verification this requires — Phase 2.5 inherits it
+
+The admin mode-flip test does not stop at the database row.
+
+> **Flip the mode through the admin screen, show the row before and after — then,
+> with NO restart, NO sleep and NO cache clear, call the consume path and assert
+> the NEW behaviour immediately.**
+
+Three things that test must do, each because the obvious version of it does not:
+
+1. **Assert on the consume path, not just the row.** A test that only checks the
+   row changed **passes against every cached implementation, including the
+   broken one.** The row was never in doubt.
+2. **No wait, no restart, no clear, between the flip and the call.** Any of those
+   also passes against the broken implementation — the pause is exactly what the
+   bug needs in order to hide. If the test needs a wait to go green, it has
+   found the bug rather than disproved it.
+3. **Assert the specific `Code`, and assert both directions.** `FEATURE_DISABLED`
+   — not merely "refused", which `PLAN_LACKS_FEATURE` and `QUOTA_EXHAUSTED` also
+   satisfy. And flip it back on and assert the consume *succeeds* immediately:
+   a refusal-only test passes if the feature was already denied for some
+   unrelated reason, proving nothing about the flip.
+
+⚠️ Point 3 is 3G's lesson repeated: that phase shipped a scoping assertion that
+passed while being **vacuous**, because the fixture already satisfied it for a
+different reason. An assertion that cannot fail for the right reason is worse
+than no assertion, because it is counted.
+
+---
+
 ## Decision 4 — Credit model
 
 **Per-feature, non-fungible, no expiry in MVP.**

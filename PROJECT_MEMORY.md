@@ -1,7 +1,13 @@
 # TEACHER RECRUITMENT PORTAL — PROJECT MEMORY
 
 > **Ye file har kaam ke baad update hogi.** Har naye chat/session mein sabse pehle ye file padho.
-> Last updated: 2026-08-08 | Current Phase: **0 — Foundation ✅ COMPLETE + review fixes 1–6 applied (Phase 1A approval pending)**
+> Last updated: **2026-08-15** | Phase **3 COMPLETE** (3A–3I) + **2.5-PRE** design likha ja chuka | Next: **Phase 4 — Jobs**
+>
+> 🔴 **Ye do line har phase ke close-out mein update hongi.** File 3I tak
+> pahunch chuki thi aur ye header **Phase 0** par khada tha — saat phase purana,
+> aur wahi pehli cheez jo har session padhta hai. 3I ne theek yehi class of
+> galti `HOW_TO_RUN.md` mein pakdi aur is file mein chhod di. Close-out ki
+> checklist: header + progress row + build notes + close-out section, chaaron.
 
 ---
 
@@ -4811,6 +4817,16 @@ maan lena hai.** Us surat mein doc pehle likho.
 feature catalog, plan × feature, credits, idempotency, reset anchor), ledger ki
 shakl, refusal codes, aur `USP_ConsumeFeature` ka algorithm.
 
+🆕 **"Gating reads never come from the master cache"** — usi doc mein. Gating ka
+read (`Is_Active`, `GatingModeId`, plan-feature mapping) **kabhi** master cache
+se nahi aayega; **har consume par seedha read**, apni `IEntitlementRepository`
+se, ek hi query mein. Wajah, rejected alternative, multi-instance ka jawaab aur
+us par ka **verification requirement** — sab wahin hai.
+
+⚠️ Uska ek natija Phase 2.5 ke brief par seedha lagta hai: mode-flip test ko
+row badalna nahi, **consume path par turant naya behaviour** sabit karna hoga —
+bina restart, bina sleep, bina cache clear.
+
 **Wo decisions yahan dobara nahi likhi ja rahi.** Ek design ki do copy ka matlab
 hai ki ek din wo alag ho jaayengi, aur kisi ko pata nahi chalega kaun si sahi
 hai. PROJECT_MEMORY unhe **refer** karti hai, rakhti nahi.
@@ -4912,8 +4928,11 @@ pehla attempt ruka:
 table maujood hai aur us par 15 live row hain. "Out of scope" wo cheez nahi ho
 sakti jo ship ho chuki ho.
 
-Design poora `MONETIZATION_DESIGN.md` mein hai (2.63). Client ki **likhit**
-confirmation abhi bhi chahiye — Q4.
+Design poora `MONETIZATION_DESIGN.md` mein hai (2.63).
+
+🟢 **Engine client ke jawaab par ruka HUA NAHI hai** — har feature `FREE` seed
+hoti hai, to "na" ka jawaab bhi ek line nahi badalta. **Billing (6.5)** ruki
+hai. Poori wajah Q4 ke neeche.
 
 ---
 
@@ -4924,13 +4943,48 @@ confirmation abhi bhi chahiye — Q4.
 | 1 | Point 7 ka exact scope — sirf interview scheduling hata rahe hain ya offer flow bhi? | ⏳ Pending |
 | 2 | Public website MVP mein chahiye ya launch ke baad? (26 dev-days ka farak) | ⏳ Pending |
 | 3 | School branches support karni hai? (spec single address imply karta hai, humne multi-branch design kiya) | ⏳ Pending |
-| 4 | Payment/subscription MVP mein? (point 12 vs point 13 contradiction) | 🟡 **Zubaani jawaab: haan, engine MVP mein.** Design likha ja chuka (`MONETIZATION_DESIGN.md`, 2.63), §3 reconcile ho chuka. 🔴 **Likhit confirmation abhi bhi chahiye** — engine ka build isi par ruka hai |
+| 4 | Payment/subscription MVP mein? (point 12 vs point 13 contradiction) | 🟢 **Engine ke liye BLOCKING NAHI** — neeche wajah. 🔴 **Billing (6.5) likhit confirmation par ruki hai.** Design: `MONETIZATION_DESIGN.md` (2.63) |
 | 5 | Master data — humne khud seed kar diya (2.47). Client ko **reconcile** karna hai, khaas kar provisional wale. Neeche exact list. | 🟡 **Unblocked, par reconciliation pending** |
 | 6 | Email/SMS provider kaunsa? (SendGrid/SES/MSG91) Budget kiska? | ⏳ Pending — abhi plain SMTP behind `IEmailService`, teeno usi ko bolte hain |
 | 7 | Teacher hard gate ya soft verification? (humne soft decide kiya) | ⏳ Pending |
 | 8 | Admin "Settings" screen ka scope kya hai? (spec point 3 mein hai, detail nahi) | ⏳ Pending |
 | 9 | File storage — S3 / Azure Blob / local server? | ⏳ Pending — abhi local disk behind `IFileStorageService`, swap = 1 class |
 | 10 | Domain, hosting, SSL kaun arrange karega? | ⏳ Pending |
+
+#### Q4 — engine ruka HUA NAHI hai; billing ruki hai
+
+⚠️ **Ye row kal galat likhi thi** ("engine ka build isi par ruka hai") aur usse
+**Phase 4 bhi email ka intezaar karta dikh raha tha.** Wo sach nahi hai.
+
+**Engine ko confirmation chahiye hi nahi.** 2.63 kehta hai har feature `FREE`
+seed hoti hai aur engine ship hone par **kisi ko kuch badla hua nahi dikhta** —
+koi screen gate nahi hoti, ledger khaali rehta hai. Client agar **"na"** keh de
+to hataana kya padega? **Ek line bhi nahi** — sab pehle se free hai.
+
+Jo cheez sach mein likhit confirmation par ruki hai wo **billing** hai: asli
+paisa, payment gateway, invoice, purchase screen, refund — **Phase 6.5**.
+
+#### 🔴 Par risk khatam nahi hota — sirf uska naam badalta hai
+
+**Accepted risk agar confirmation kabhi nahi aayi:** lagbhag **12 dev-days** ka
+engine ka kaam, **unbilled aur unacknowledged**, ek **fixed fee** ke against.
+
+⚠️ **Aur ye list DO additions ki hai, ek ki nahi:**
+
+| Scope addition | Kab aayi | Dev-days | Likhit acknowledgment |
+|---|---|---|---|
+| **Teen alag frontend apps** (2.41 / 2.42) — ek portal ki jagah admin + school + teacher, plus `jp-shared` remote | 2026-08-08 | ⚠️ **kabhi estimate hi nahi kiya** — isi wajah se karna chahiye | ❌ nahi |
+| **Monetization engine** (2.63) | zubaani, planning baatcheet mein | **~12** | ❌ nahi |
+
+🔴 **Dono ek hi jagah likhe hain kyunki agar timeline slip hoti hai to wo dono
+milkar banati hai.** Baad mein inhe **alag-alag** justify karna mushkil hoga:
+ek-ek karke poochne par har addition chhoti lagti hai, aur saath rakhne par hi
+wo sach dikhte hain.
+
+⚠️ **Number likho, phrase nahi.** "Commercial risk" chhe mahine baad padh kar
+koi ye nahi bata payega ki kitna tha; **"12 dev-days"** bata dega. Isi liye
+upar wali table mein ek khaali cell hai aur wo jaan-boojh kar dikh raha hai —
+frontend split ka cost kabhi gina hi nahi gaya, aur wahi is column ka point hai.
 
 #### Q5 — client ko exactly ye reconcile karna hai (2.47)
 
@@ -5042,6 +5096,7 @@ naya Code, agla free Id, kuch renumber mat karo.
 | 2026-08-15 | 3H | **Teacher profile screens** — 9 sections, the completion meter that names one next step instead of printing a verdict, the experience timeline, and the five multi-selects. Rebuilt ui-multi-select in jp-shared: nested interactive elements, no keyboard navigation, a panel that never closed, and twenty selections that broke the layout. Added the teacher media endpoints — nothing could display a photo before. HTTP 33/33, browser 21/21, opened as Rohit, Anita and Imran | ✅ Done |
 | 2026-08-15 | 3I | **Dashboards on real data** — school and teacher dashboards replaced their mockups; the applicants mockup lost its route and menu row and moved to `_design-reference/`. One new read (the subscription) and everything else composed from 3E/3G/3H. **G6 closed** after two of its three bullets had been false since 2D/2E; **G25 promoted to decision 2.61**. HTTP 27/27 including the row+JSON dual read, browser 16/16 | ✅ Done |
 | 2026-08-15 | 2.5-PRE | **Monetization design written down** — `MONETIZATION_DESIGN.md`: three gating modes with `Is_Active` as the kill switch, teacher-search Boolean and invites metered, a derived-not-scheduled quota period, and the ledger that makes balances recomputable. §3 reconciled — the engine is MVP (2.5), billing is 6.5. Two directions argued against in writing rather than quietly followed. Found that `jp_app` has no IST helpers while both other databases do — 2.5's first script. No code, no schema, no migrations | ✅ Done |
+| 2026-08-15 | 2.5-PRE | **Three documentation fixes** — gating reads are never served from the master cache (direct read per consume; the rejected short-TTL alternative rests on a single-process assumption that scaling out would silently break), and Phase 2.5's mode-flip test must prove the flip live on the consume path with no restart, sleep or clear. Fixed the header, stale since Phase 0 while the file ran to 3I. 🔴 Corrected Q4: the engine is **not** blocked on the client — every feature seeds FREE, so "no" changes nothing — billing is. The unacknowledged scope now has a number: ~12 dev-days, and it is a list of two | ✅ Done |
 
 ---
 
@@ -5566,8 +5621,9 @@ jo disk par tha hi nahi. Wo karz ab chuka.
 
 ✅ **§3 ka contradiction reconcile hua** — "Subscription & billing" ek line
 mein do cheezein thi. Engine MVP (2.5), billing 6.5.
-🟡 **Q4 update** — zubaani jawaab aa chuka, **likhit abhi baaki**. Build usi par
-ruka hai.
+🟢 **Q4 update** — engine **blocking nahi** hai (har feature FREE seed hoti
+hai); **billing** likhit confirmation par ruki hai. ⚠️ Ye kal is section mein
+**galat** likha tha, aur usse Phase 4 bhi rukta dikh raha tha.
 ⚠️ **`jp_app` mein IST helper nahi hain** — 2.5 ka pehla script.
 
 Do jagah maine likhi hui direction se **asehmati** darj ki (chaar mode, aur
@@ -5626,7 +5682,9 @@ plan par hai**, to yahan reconcile karne ko koi legacy row nahi hogi.
 unke bina poora chalta hai, aur alag rakhne se pehla gate ek data change hai,
 deploy nahi (2.63).
 
-🔴 Build client ki **likhit** confirmation par ruka hai (Q4).
+🟢 **Build kisi jawaab par ruka nahi hai.** Engine ke liye client ki
+confirmation chahiye hi nahi — sab kuch `FREE` seed hota hai. **Billing (6.5)**
+ruki hai (Q4).
 
 **Phase 6 — do-level offer approval.** 🔴 **G14 pehle padho.** Multi-level
 engine sahi dikhta hai par sirf ek raste se guzara hai; level 2 par reject,
