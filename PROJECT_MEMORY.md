@@ -4794,6 +4794,94 @@ jp-docs/scripts/verify/screens-3i.mjs                               (naya)
 
 ---
 
+### 🔒 2.63 MONETIZATION — SCOPE KA BATWARA AUR DESIGN KA PATA (2.5-PRE)
+
+Phase 2.5 ka pehla attempt **jaan-boojh kar ruka**: prompt `MONETIZATION_DESIGN.md`
+padhne ko keh raha tha aur wo file disk par thi hi nahi. Design ek planning
+baatcheet mein hui thi aur kabhi likhi nahi gayi — aur zubaani design wo cheez
+hai jiske against koi build check nahi kar sakta.
+
+⚠️ Rukna sahi tha aur ye us par ek niyam hai: **jab prompt kisi document ko
+authority bataye aur wo document na mile, tab engine likhna "design yaad hai"
+maan lena hai.** Us surat mein doc pehle likho.
+
+#### Doc kahan hai, aur ismein kya NAHI hai
+
+🔴 `jp-docs/MONETIZATION_DESIGN.md` — chhe design decisions (gating modes,
+feature catalog, plan × feature, credits, idempotency, reset anchor), ledger ki
+shakl, refusal codes, aur `USP_ConsumeFeature` ka algorithm.
+
+**Wo decisions yahan dobara nahi likhi ja rahi.** Ek design ki do copy ka matlab
+hai ki ek din wo alag ho jaayengi, aur kisi ko pata nahi chalega kaun si sahi
+hai. PROJECT_MEMORY unhe **refer** karti hai, rakhti nahi.
+
+#### Jo yahan tay hua
+
+**1. Engine (2.5) aur billing (6.5) do alag cheezein hain.**
+Engine batata hai ki kaun kya kar sakta hai; billing paisa leta hai. Engine
+billing ke bina poora chalta hai — quota, credit, refusal, sab. Isi liye §3 ki
+"Subscription & billing" line do hisson mein tooti.
+
+⚠️ **Ye batwara `## Uske baad` mein galat likha tha** — wahan Phase 2.5 ke
+andar "payment gateway, invoices" likha tha. Wo ab 6.5 mein hai.
+
+**2. Har feature `FREE` seed hoti hai.** Engine ship hone par **kisi ko kuch
+badla hua nahi dikhta** — koi screen gate nahi hoti, ledger khaali rehta hai.
+Pehla asli consume Phase 4 (job post) ke saath likha jaayega, aur pehla non-free
+mode 6.5 mein **data badal kar** set hoga, deploy karke nahi (2.7).
+
+🔴 Ye jaan-boojh kar hai. Engine + gating ek saath ship karne ka matlab hai ki
+jis din kuch band hota hai, do naye cheezein ek saath shak ke ghere mein aati
+hain. Alag karne se pehla gate ek **data change** hai, jise wapas lena ek aur
+data change hai.
+
+**3. `jp_app` mein IST helper nahi hain — 2.5 ka pehla script yehi hai.**
+
+```
+jp_sso: fn_IstDateToUtc, fn_IstDayRangeUtc, fn_IstToday
+jp_mdm: fn_IstDateToUtc, fn_IstDayRangeUtc, fn_IstToday
+jp_app: (koi nahi)
+```
+
+Ledger `jp_app` mein hai, uske period IST par hai (2.28), aur doosri DB ka
+function call nahi kar sakte (2.2). `jp_mdm` wali file waise ki waisi copy
+hogi.
+
+⚠️ Ye **conflict nahi, prerequisite hai** — pattern pehle se "har DB apni copy
+rakhti hai" hai; `jp_app` ko aaj tak zaroorat hi nahi padi thi.
+
+#### 🔴 Do jagah likha gaya asehmati (doc mein dono paksh hain)
+
+| Kya kaha gaya tha | Kya likha gaya | Kyun |
+|---|---|---|
+| Chaar mode (Free/Boolean/Metered/**Disabled**) | **Teen mode + `Is_Active` kill switch** | Mode-wala Disabled us mode ko **mita deta hai** jiski jagah aata hai. Wapas laane ke liye kisi ko yaad hona chahiye ki wo Metered thi — wo bhi incident ke beech mein |
+| "Reset se kaun si ledger row banti hai, wo dikhao" | **Ek bhi nahi** | Quota ginti se nikalta hai (is period ke consume). Reset koi ghatna hai hi nahi — calendar aage badha hai. Scheduled reset ek aisa job hai jo ek din nahi chalega, aur **chup-chaap** fail hoga |
+
+Dono jagah doc mein donon paksh likhe hain, aur "agar phir bhi doosra raasta
+chahiye to kya karna padega" bhi.
+
+#### 🔴 2.56 doc ke sar par hai
+
+Engine aur contact unlock **kisi bhi disha mein** ek doosre ko refer nahi
+karte. Design doc apne header mein wahi prohibition uthata hai jo
+`010_teacher_public_profile.sql` uthati hai — subscription **capability**
+kharidta hai (search, invite), teacher ka number kabhi nahi.
+
+#### Is task mein kya banaya — kuch nahi
+
+Sirf `MONETIZATION_DESIGN.md` aur ye reconciliation. **Koi engine code nahi,
+koi schema script nahi, koi migration nahi.** 2F ki tables ya kisi locked
+decision se koi conflict nahi mila, isliye doc mein CONFLICTS section nahi hai.
+
+#### Files
+
+```
+jp-docs/MONETIZATION_DESIGN.md    (naya — design, schema dump nahi)
+jp-docs/PROJECT_MEMORY.md         (§3 batwara, Q4, 2.63, progress row)
+```
+
+---
+
 ## 3. SCOPE (Client spec ke against)
 
 ### IN SCOPE — MVP
@@ -4808,7 +4896,24 @@ Decision: **Offer Lite** rakhenge —
 - **Interview scheduling ka fancy part hata diya** (meeting links, panel, online/offline mode) → Phase 2
 
 ### OUT OF SCOPE — Phase 2
-AI candidate matching · AI resume scoring/generation · Video interview / demo class · Advanced analytics · Subscription & billing · Payroll/HRMS · Background verification · WhatsApp automation · AI interviewer · **Advanced multi-level HR permissions**
+AI candidate matching · AI resume scoring/generation · Video interview / demo class · Advanced analytics · Payroll/HRMS · Background verification · WhatsApp automation · AI interviewer · **Advanced multi-level HR permissions**
+
+#### 🔴 "Subscription & billing" is line se HATAYI GAYI — 2026-08-15
+
+Ye line **do alag cheezon** ko ek maan rahi thi, aur isi wajah se Phase 2.5 ka
+pehla attempt ruka:
+
+| Cheez | Kahan hai | Kyun |
+|---|---|---|
+| **Entitlement engine** — features, gating modes, quota, credits, `ConsumeAsync` | ✅ **MVP, Phase 2.5** | Client ne zubaani MVP mein daala. Aur `m_mdm_plans` + `t_app_subscriptions` **2F mein ban chuki hain** — har account din se ek plan par hai (2.50) |
+| **Billing** — payment gateway, invoice, purchase screen, refund | 📅 **Phase 6.5** | Ye asli paisa hai, aur iske bina engine poora chalta hai |
+
+⚠️ Ye line jaise likhi thi, wo **aaj ke code se hi galat thi** — subscription
+table maujood hai aur us par 15 live row hain. "Out of scope" wo cheez nahi ho
+sakti jo ship ho chuki ho.
+
+Design poora `MONETIZATION_DESIGN.md` mein hai (2.63). Client ki **likhit**
+confirmation abhi bhi chahiye — Q4.
 
 ---
 
@@ -4819,7 +4924,7 @@ AI candidate matching · AI resume scoring/generation · Video interview / demo 
 | 1 | Point 7 ka exact scope — sirf interview scheduling hata rahe hain ya offer flow bhi? | ⏳ Pending |
 | 2 | Public website MVP mein chahiye ya launch ke baad? (26 dev-days ka farak) | ⏳ Pending |
 | 3 | School branches support karni hai? (spec single address imply karta hai, humne multi-branch design kiya) | ⏳ Pending |
-| 4 | Payment/subscription MVP mein? (point 12 vs point 13 contradiction) | ⏳ Pending |
+| 4 | Payment/subscription MVP mein? (point 12 vs point 13 contradiction) | 🟡 **Zubaani jawaab: haan, engine MVP mein.** Design likha ja chuka (`MONETIZATION_DESIGN.md`, 2.63), §3 reconcile ho chuka. 🔴 **Likhit confirmation abhi bhi chahiye** — engine ka build isi par ruka hai |
 | 5 | Master data — humne khud seed kar diya (2.47). Client ko **reconcile** karna hai, khaas kar provisional wale. Neeche exact list. | 🟡 **Unblocked, par reconciliation pending** |
 | 6 | Email/SMS provider kaunsa? (SendGrid/SES/MSG91) Budget kiska? | ⏳ Pending — abhi plain SMTP behind `IEmailService`, teeno usi ko bolte hain |
 | 7 | Teacher hard gate ya soft verification? (humne soft decide kiya) | ⏳ Pending |
@@ -4936,6 +5041,7 @@ naya Code, agla free Id, kuch renumber mat karo.
 | 2026-08-15 | 3F | **School profile and campus screens** — 5 sections with their own saves, the gallery, campus CRUD. Found and fixed two silent bugs older than the phase: REORDER sorted by id and discarded the order it was given (2F), and isActive never reached the DTO because Dapper does not strip underscores (3E). Added the media endpoints — nothing could display an uploaded photo before. SQL 144/144, HTTP 37/37 + 48/48, browser 25/25 | ✅ Done |
 | 2026-08-15 | 3H | **Teacher profile screens** — 9 sections, the completion meter that names one next step instead of printing a verdict, the experience timeline, and the five multi-selects. Rebuilt ui-multi-select in jp-shared: nested interactive elements, no keyboard navigation, a panel that never closed, and twenty selections that broke the layout. Added the teacher media endpoints — nothing could display a photo before. HTTP 33/33, browser 21/21, opened as Rohit, Anita and Imran | ✅ Done |
 | 2026-08-15 | 3I | **Dashboards on real data** — school and teacher dashboards replaced their mockups; the applicants mockup lost its route and menu row and moved to `_design-reference/`. One new read (the subscription) and everything else composed from 3E/3G/3H. **G6 closed** after two of its three bullets had been false since 2D/2E; **G25 promoted to decision 2.61**. HTTP 27/27 including the row+JSON dual read, browser 16/16 | ✅ Done |
+| 2026-08-15 | 2.5-PRE | **Monetization design written down** — `MONETIZATION_DESIGN.md`: three gating modes with `Is_Active` as the kill switch, teacher-search Boolean and invites metered, a derived-not-scheduled quota period, and the ledger that makes balances recomputable. §3 reconciled — the engine is MVP (2.5), billing is 6.5. Two directions argued against in writing rather than quietly followed. Found that `jp_app` has no IST helpers while both other databases do — 2.5's first script. No code, no schema, no migrations | ✅ Done |
 
 ---
 
@@ -5450,6 +5556,26 @@ aur "static mockup" wali kategory **khaali**.
 
 ---
 
+## ✅ PHASE 2.5-PRE COMPLETE — 2026-08-15
+
+Monetization ka design **likh diya gaya**: `jp-docs/MONETIZATION_DESIGN.md`.
+Details **2.63**. **Koi code nahi, koi schema nahi, koi migration nahi.**
+
+🔴 Phase 2.5 isi liye ruka tha — prompt ek document ko authority bata raha tha
+jo disk par tha hi nahi. Wo karz ab chuka.
+
+✅ **§3 ka contradiction reconcile hua** — "Subscription & billing" ek line
+mein do cheezein thi. Engine MVP (2.5), billing 6.5.
+🟡 **Q4 update** — zubaani jawaab aa chuka, **likhit abhi baaki**. Build usi par
+ruka hai.
+⚠️ **`jp_app` mein IST helper nahi hain** — 2.5 ka pehla script.
+
+Do jagah maine likhi hui direction se **asehmati** darj ki (chaar mode, aur
+reset ki ledger rows) — dono doc mein donon paksh ke saath hain, chup-chaap
+kuch nahi chuna.
+
+---
+
 ## ▶️ NEXT: PHASE 4 — JOBS
 
 Phase 3 poora ho gaya: `jp_app` ki tables, procedures, APIs aur school ke
@@ -5481,17 +5607,26 @@ nahi.
 **MILESTONE 1 DEMO — abhi bhi baaki hai.** School signup → admin approve →
 school active poora chalta hai. Dikhane se pehle: jaan-boojh kar orphan chhodi
 gayi `REG-SCH-2026-00005` saaf karo, nayi screenshots lo, known gaps dobara
-padho, aur saaf batao kaun si screen asli hai aur kaun si
-abhi mockup (applicants table fixture par hai — G6).
+padho, aur saaf batao kaun si screen asli hai aur kaun si abhi bani nahi.
+
+⚠️ Ye line pehle kehti thi "applicants table fixture par hai — G6". **3I ke baad
+galat hai**: dono dashboard asli data par hain aur applicants ka route hi nahi
+raha. Ab koi bhi live screen fixture par nahi chalti.
 
 **Phase 4 — jobs.** Har job ek branch par lagti hai, aur har school ke paas ab
 din se ek head office hai (2.50) — to yahan koi nullable-branch code path nahi
 chahiye.
 
-**Phase 2.5 — entitlement engine.** Features, gating modes, credits,
-`ConsumeAsync`, admin ki feature-gating screen, payment gateway, invoices.
-Table pehle se maujood hai aur **har account ek plan par hai**, to yahan
-reconcile karne ko koi legacy row nahi hogi.
+**Phase 2.5 — entitlement engine.** Features, gating modes, quota, credits,
+`ConsumeAsync`, admin ki feature-gating screen. Design poora likha hua hai —
+`MONETIZATION_DESIGN.md` (2.63). Table pehle se maujood hai aur **har account ek
+plan par hai**, to yahan reconcile karne ko koi legacy row nahi hogi.
+
+⚠️ **Payment gateway aur invoices yahan NAHI hain — wo Phase 6.5 hai.** Engine
+unke bina poora chalta hai, aur alag rakhne se pehla gate ek data change hai,
+deploy nahi (2.63).
+
+🔴 Build client ki **likhit** confirmation par ruka hai (Q4).
 
 **Phase 6 — do-level offer approval.** 🔴 **G14 pehle padho.** Multi-level
 engine sahi dikhta hai par sirf ek raste se guzara hai; level 2 par reject,
