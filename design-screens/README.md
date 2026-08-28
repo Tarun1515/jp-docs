@@ -14,6 +14,11 @@ the next time its phase's verification runs.
 | `teacher-dashboard-zero-1440` | 🔴 A teacher at 0% — the case that must never print "0%" | `screens-3i.mjs` |
 | `admin-plans-1440`, `admin-plans-375` | The plan × feature matrix. ⚠️ Captured with a **test fixture** applied — JOB_POST metered at 500/month, TEACHER_SEARCH boolean and unmapped — so the screen shows every cell state. The real database has every feature Free and no mappings | `screens-25.mjs` |
 | `admin-plans-killswitch-1440` | 🔴 The same screen with a feature switched off: banner, struck-through row, and the mode still reading Metered underneath. The consume path refused immediately, in the same script | `screens-25.mjs` |
+| `school-jobs-*`, `school-job-form-*`, `school-job-locked-*` | The jobs list, the form, and a published job with its matching fields locked | `jobs-screens.mjs` |
+| `school-jobs-quota-1440` | 🔴 The quota refusal as a person sees it: the plan's limit, when it resets, and that the job is safe as a draft. No upgrade CTA — purchase screens are 6.5 | `jobs-screens.mjs` |
+| `school-jobs-hr-1440`, `school-jobs-readonly-1440` | The same list as HR (no Publish) and as a JOB.VIEW-only account (no New job, read-only banner). ⚠️ The read-only one is a fixture — no Viewer account is seeded, so HR's grants were reduced to JOB.VIEW and restored | `jobs-screens.mjs` |
+| `school-dashboard-jobs-1440` | The dashboard with real job counts. ⚠️ The applicants area beside it is deliberately unchanged — Phase 5 | `jobs-screens.mjs` |
+| `admin-plans-metered-1440` | JOB_POST set to METERED through the admin screen, mid-chain | `jobs-screens.mjs` |
 | `login-*`, `signup-*`, `account-status-*`, `sidebar-375` | Auth and chrome | Phase 1D |
 | `public-*`, `continue-*` | The public site | Phase 1 |
 | `federation-*`, `wrong-app-guard` | Module Federation and the cross-app guard | Phase 1 |

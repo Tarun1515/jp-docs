@@ -1,7 +1,7 @@
 # TEACHER RECRUITMENT PORTAL — PROJECT MEMORY
 
 > **Ye file har kaam ke baad update hogi.** Har naye chat/session mein sabse pehle ye file padho.
-> Last updated: **2026-08-28** | Phase **3 COMPLETE** + **2.5 engine** + **4 jobs BACKEND** | Next: **Phase 4 screens**, phir Phase 5 — Applications
+> Last updated: **2026-08-28** | Phase **3 COMPLETE** + **2.5 engine** + **4 jobs COMPLETE** | Next: **Phase 5 — Applications**
 >
 > 🔴 **Ye do line har phase ke close-out mein update hongi.** File 3I tak
 > pahunch chuki thi aur ye header **Phase 0** par khada tha — saat phase purana,
@@ -5277,20 +5277,165 @@ jp-docs/scripts/verify/jobs-consume.mjs               (naya)
 jp-docs/scripts/verify/jobs-lifecycle.mjs             (naya)
 ```
 
-#### ⚠️ Kya baaki hai — Phase 4 ka frontend
+#### ✅ Frontend ban gaya — Phase 4B (2.66)
 
-Backend poora aur verified hai. **Screens nahi bane:**
+Is section mein jo pending list thi wo poori ho chuki hai. Details **2.66**.
 
-- jp-school ka job list (status filter), create/edit form, publish aur close actions
-- 3I ke dashboard ka jobs area — abhi bhi honest-empty hai; `USP_GetSchoolJobStats`
-  aur `GetStatsAsync` **ban chuke hain**, dashboard unhe abhi call nahi karta
-- routes + `SCHOOL_JOBS` menu row
-- screenshots 1440/375
+---
 
-🔴 **Applicants area waise hi rahega** — applications Phase 5 hain (2.62).
+### 🔒 2.66 JOB SCREENS — PHASE 4B (PHASE 4 BAND)
 
-Ye jaan-boojh kar chhoda gaya boundary hai, aadha kaam nahi: koi screen aadhi
-bani hui nahi hai, aur backend apne verification ke saath poora khada hai.
+2.65 ki pending list poori. `jobs-screens.mjs` **37/37**, saari purani suites
+bina badle pass.
+
+```
+browser  jobs-screens.mjs   37/37   (lifecycle UI se, poori chain, permissions,
+                                     scope, locked fields, validation, 375)
+regression  jobs-consume 23/23 · jobs-lifecycle 34/34
+            entitlement 34/34 + 34/34 · dashboards 27/27
+            team 49/49 · profile-branches 37/37
+build    paanchon frontend prod clean · backend 0/0
+```
+
+#### 🔴 Do endpoint gap mile — ek approve karwa kar joda, doosra chhoda
+
+Phase 4 ne backend "poora" kaha tha. Screens banate waqt do jagah pata chala ki
+wo poora nahi tha, aur **dono report karke** aage badhe — chup-chaap endpoint
+nahi joda.
+
+**1. `GET /api/jobs/stats` — approve hua, joda gaya.**
+
+`USP_GetSchoolJobStats` → `JobRepository.GetStatsAsync` → `IJobService.GetStatsAsync`
+teeno bane the aur tested the, par **koi controller route unhe expose nahi karta
+tha**. Dashboard unhe call kar hi nahi sakta tha — 2.65 ne likha tha "call nahi
+karta", jo sach tha par kam tha: kar hi **nahi sakta tha**.
+
+Client ne do shart ke saath approve kiya, dono lagu:
+- SchoolId scope resolver se, koi parameter nahi (2.39)
+- sirf `JOB.VIEW` — Viewer dashboard dekhta hai to counts bhi dekhega
+
+⚠️ **`GetStatsAsync` mein koi permission check tha hi nahi.** Method Phase 4
+mein bana, koi caller nahi tha, to uska authorization kabhi chala hi nahi. Chhota
+sabak: **jis method tak koi nahi pahunchta, wo verify nahi hua hota.**
+
+🔴 Aur ek nuance jo shart mein tha par implement nahi ho sakta tha: "doosre
+school ke stats maangne par 404". Endpoint ka **koi parameter hi nahi** hai, to
+maangne ka koi tareeka nahi — 404 wala case exist hi nahi karta. 2.39 ki apni
+table yahi kehti hai: forged org id ka expected result **"ignore ho, apna data
+mile"** hai, 404 nahi. 404 unke liye hai jo id LETE hain (`GET /jobs/{id}`),
+aur wo jobs-lifecycle pehle se cover karti hai.
+
+**2. Employment type ka dropdown — NAHI joda, aur hardcode bhi nahi kiya.**
+
+`m_app_employment_types` `jp_app` mein hai. `/api/masters/*` `jp_mdm` ki
+`USP_GetMaster` padhti hai, jismein iski koi branch nahi — to us dropdown ke
+liye koi data source hai hi nahi.
+
+🔴 Paanch values **hardcode nahi ki**. 2.7 kehta hai har dropdown master table
+se aaye taaki badalne ke liye deploy na karna pade, aur hardcoded list theek
+wahi cheez hoti jo wo mana karta hai — kaam karti hui dikhte hue.
+
+To field form se hata di aur column ka default (Full-time) lagta hai. **Natija
+saaf likha: school abhi Part-time ya Contract vacancy post nahi kar sakta.**
+Isse band karne ke liye ek endpoint chahiye jo Phase 4B ne apne aap nahi joda.
+
+#### 🔴 Poori chain — ek session, dono app, koi restart nahi
+
+Ye wo cheez hai jo 2.5 aur 2.64 ne aadhi-aadhi sabit ki thi. Ab poori:
+
+```
+admin screen par JOB_POST -> METERED (select change, SQL nahi)
+   jp-school: pehla publish  -> ledger 0 -> 1, consume hua
+   jp-school: doosra publish -> quota message, job DRAFT hi rahi, ledger 1 hi
+admin screen par wapas FREE
+   jp-school: wahi job turant publish, ledger 1 -> 1 (kuch charge nahi)
+```
+
+⚠️ Beech mein koi restart nahi, koi sleep nahi. Live-flip ka niyam ab
+**end-to-end** sabit hai, na ki sirf ek app ke andar.
+
+#### Quota ka message — "something went wrong" nahi
+
+```
+"You have used all the job posts your plan includes this month.
+ The allowance resets on the 1st. Your job is saved as a draft until then."
+```
+
+Teen baatein, teeno zaroori: limit lagi hai, wo **maheene** ki hai, aur job
+**kho nahi gayi**. 🔴 Koi upgrade button nahi — purchase screens 6.5 hain, aur
+ek CTA jo kahin nahi le jaata us button se bura hai jo hai hi nahi.
+
+#### ⚠️ Ek refusal, DO toast — aur uska theek hona
+
+Pehle run mein ek hi refusal par do message dikhe: error interceptor ka (server
+ka vakya) aur component ka (poora wala). Verification ne output chhapa to saaf
+dikh gaya.
+
+Interceptor mein pehle se yahi soch thi — `VALIDATION_FAILED` par wo toast
+skip karta hai kyunki "field-level errors form control par jaate hain". Wahi
+tark yahan bhi lagta hai: **jis code ko koi screen khud render karti hai, us par
+toast nahi hona chahiye.** `COMPONENT_RENDERED_CODES` mein chaar entitlement
+code jode gaye (400 aur 403 dono branch mein).
+
+🔴 Us set mein code daalna ek **vaada** hai ki koi component use render karta
+hai — warna refusal chup ho jaayega, jo theek wahi cheez hai jise interceptor
+rokta hai. Isliye entry aur uska handler ek hi commit mein.
+
+#### Permission rendering — seed decide karti hai
+
+| Kaun | New job | Publish | Close |
+|---|---|---|---|
+| Owner | ✅ | ✅ | ✅ |
+| HR | ✅ | ❌ **gayab** | ❌ **gayab** |
+| sirf JOB.VIEW | ❌ | ❌ | ❌ + read-only line |
+
+🔴 **Gayab, greyed nahi** (3F/3G ka niyam). Greyed button "toota hua" ya "phir
+try karo" padha jaata hai; HR ke liye jawaab kabhi badlega nahi.
+
+⚠️ Aur chhupana **bachana nahi hai**: verification ne devtools se `fetch` karke
+publish force kiya — server ne **403** diya. UI chhupati hai, server mana karta
+hai, dono dikhaye gaye.
+
+⚠️ **Viewer ka account seeded nahi hai.** UI permissions se decide karti hai,
+role se nahi — to HR ke grants ko temporarily sirf `JOB.VIEW` kiya gaya aur
+bahaal kiya gaya. Entry aur exit dono par grants assert hote hain. Ye fixture
+hai, dikhawa nahi.
+
+#### Locked fields — 2.62 ki "not allowed" wali bhasha
+
+Published job par matching fields **disabled + "locked" marker + ek banner** jo
+wajah aur rasta dono batata hai ("close karke nayi post karein"). Fields
+**dikhti hain** — unki value padhne layak hai — bas badalti nahi.
+
+Server phir bhi apna kaam karta hai: forced save ne `JOB_FIELD_LOCKED` khaaya.
+
+#### Dashboard — jobs asli, applicants waise ka waisa
+
+Jobs area ab asli counts dikhata hai aur zero ab **maap** hai (3I mein wo maap
+tha hi nahi, isliye tab empty state tha). Copy bhi badli: "You have not posted a
+vacancy yet" (is school ke baare mein ek baat) vs purani "arrives in a coming
+release" (product ke baare mein).
+
+🔴 **Applicants area byte-identical hai.** `t_app_applications` Phase 5 hai;
+wahan zero abhi bhi bina kisi cheez ke number hoga (2.62). Verification assert
+karti hai ki us area mein **ek bhi digit nahi** hai.
+
+#### Files
+
+```
+JP.App.Api/Controllers/JobsController.cs             (GET /api/jobs/stats)
+JP.Infrastructure/Services/JobService.cs             (JOB.VIEW check jo tha hi nahi)
+jp-shared/src/core/interceptors/error.interceptor.ts (COMPONENT_RENDERED_CODES)
+jp-school/src/app/core/job.service.ts                (naya)
+jp-school/src/app/features/school/jobs/list/*        (naya — 3 file)
+jp-school/src/app/features/school/jobs/form/*        (naya — 3 file)
+jp-school/src/app/features/school/dashboard/*        (jobs area asli)
+jp-school/src/app/app.routes.ts                      (3 route)
+jp-docs/scripts/verify/jobs-screens.mjs              (naya)
+```
+
+⚠️ `SCHOOL_JOBS` menu row **pehle se seeded thi** (1D se) — koi seed change
+nahi chahiye tha, sirf route asli component par point karna tha.
 
 ---
 
@@ -5499,7 +5644,8 @@ naya Code, agla free Id, kuch renumber mat karo.
 | 2026-08-15 | 2.5-PRE | **Monetization design written down** — `MONETIZATION_DESIGN.md`: three gating modes with `Is_Active` as the kill switch, teacher-search Boolean and invites metered, a derived-not-scheduled quota period, and the ledger that makes balances recomputable. §3 reconciled — the engine is MVP (2.5), billing is 6.5. Two directions argued against in writing rather than quietly followed. Found that `jp_app` has no IST helpers while both other databases do — 2.5's first script. No code, no schema, no migrations | ✅ Done |
 | 2026-08-15 | 2.5-PRE | **Three documentation fixes** — gating reads are never served from the master cache (direct read per consume; the rejected short-TTL alternative rests on a single-process assumption that scaling out would silently break), and Phase 2.5's mode-flip test must prove the flip live on the consume path with no restart, sleep or clear. Fixed the header, stale since Phase 0 while the file ran to 3I. 🔴 Corrected Q4: the engine is **not** blocked on the client — every feature seeds FREE, so "no" changes nothing — billing is. The unacknowledged scope now has a number: ~12 dev-days, and it is a list of two | ✅ Done |
 | 2026-08-28 | 2.5 | **Entitlement engine** — features, gating modes, the append-only ledger, the atomic consume, and the admin plan × feature matrix. 🔴 Every feature ships FREE with no mappings, so nothing a user can see changed. Two bugs found by running the path rather than reading it: the balance formula invented a credit every time a quota consume was refunded, and a retry of an already-paid action was refused with QUOTA_EXHAUSTED once quota ran out. Engine 34/34, HTTP 31/31, browser 19/19; all four SQL suites and three HTTP regressions unchanged | ✅ Done |
-| 2026-08-28 | 4 | **Jobs — backend** — tables, six procedures, the API, and the engine's first real consumer. 🔴 Publish and consume are ONE transaction: a refused consume leaves the job a Draft, and a failure after the consume rolls the ledger row back with it. Two things found by running rather than reading: INSERT ... EXEC made the first design illegal (Msg 3915) and forced the consume into core+wrapper, and a test hook inside the procedure made the atomicity test pass for the wrong reason. Expiry is derived, never stored. jobs-consume 23/23, jobs-lifecycle 34/34, all regressions unchanged. ⚠️ Screens not built — a stated boundary | 🟡 Backend done |
+| 2026-08-28 | 4B | **Job screens** — list, form, publish/close, permission shaping, and the dashboard's jobs area on real counts. 🔴 The full chain proven end to end across BOTH apps in one session: JOB_POST flipped to METERED in the admin screen, jp-school publishes once, is refused with the quota message and keeps the job as a Draft, flipped back to FREE, publishes free. Two endpoint gaps found and reported rather than quietly filled — one approved and added (`GET /api/jobs/stats`), one left open (employment types have no master endpoint, and the five values were NOT hardcoded). browser 37/37, every earlier suite unchanged | ✅ Done |
+| 2026-08-28 | 4 | **Jobs — backend** — tables, six procedures, the API, and the engine's first real consumer. 🔴 Publish and consume are ONE transaction: a refused consume leaves the job a Draft, and a failure after the consume rolls the ledger row back with it. Two things found by running rather than reading: INSERT ... EXEC made the first design illegal (Msg 3915) and forced the consume into core+wrapper, and a test hook inside the procedure made the atomicity test pass for the wrong reason. Expiry is derived, never stored. jobs-consume 23/23, jobs-lifecycle 34/34, all regressions unchanged. ⚠️ Screens not built — a stated boundary | ✅ Done |
 
 ---
 
@@ -6059,36 +6205,44 @@ paint` se theek hua, baaki chaar candidate ne kuch nahi hilaya.
 
 ---
 
-## 🟡 PHASE 4 — BACKEND COMPLETE, SCREENS PENDING — 2026-08-28
+## ✅ PHASE 4 COMPLETE — 2026-08-28
 
-Jobs ka poora backend bana aur verify hua. Details **2.65**.
+Jobs poora — backend (2.65) aur screens (2.66).
 
 ```
-jobs-consume.mjs    23/23   jobs-lifecycle.mjs  34/34
-regression: entitlement 34/34 + 34/34 · dashboards 27/27 · team 49/49
+browser jobs-screens 37/37 · jobs-consume 23/23 · jobs-lifecycle 34/34
+regression entitlement 34/34 + 34/34 · dashboards 27/27 · team 49/49 · profile 37/37
+build paanchon frontend prod clean · backend 0/0
 ```
 
-🔴 **Publish = consume, ek transaction mein.** Refused consume par job draft
-rehti hai; consume ke baad fail hone par ledger row bhi wapas chali jaati hai.
-Dono verification mein dikhaye gaye hain.
+🔴 **Engine ki poori chain ab end-to-end sabit hai** — admin screen se METERED,
+jp-school mein publish/refusal/draft, wapas FREE, sab ek session mein bina
+restart ke.
 
-🔴 **Do cheezein chalane se mili:** `INSERT ... EXEC` ne pehle design ko Msg
-3915 par toda (consume ab core + wrapper hai, 2.5 ka contract waisa hi), aur ek
-test hook ne atomicity test ko **galat wajah se pass** kara diya (ab injection
-ek temporary trigger hai, file ke bahar).
+🔴 **Do endpoint gap report kiye, chup-chaap nahi bhare.** Ek approve hoke juda
+(`/api/jobs/stats`), doosra khula hai: employment type ka master `jp_app` mein
+hai aur `/api/masters/*` sirf `jp_mdm` padhti hai — paanch values hardcode
+karna 2.7 todta, to field hi nahi banayi. **Natija: Part-time/Contract vacancy
+abhi post nahi ho sakti.**
 
-⚠️ **Expired kabhi store nahi hoti** — `fn_EffectiveJobStatusId`, koi sweep job
-nahi. Row Active kehti hai, API Expired kehti hai, dono side by side dikhaye.
-
-### ▶️ Aage — Phase 4 ke screens
-
-- job list (status filter) + create/edit form + publish/close actions
-- dashboard ka jobs area asli counts par (`GetStatsAsync` **ban chuka hai**,
-  dashboard abhi use call nahi karta)
-- routes + `SCHOOL_JOBS` menu row, screenshots 1440/375
-- 🔴 applicants area **waise hi** rahega — Phase 5 (2.62)
+⚠️ Applicants area **chhua nahi gaya** — Phase 5 (2.62).
 
 ---
+
+## ▶️ NEXT: PHASE 5 — APPLICATIONS
+
+`t_app_applications`, teacher ka apply flow, aur school ka applicants screen —
+jiska design `jp-school/src/app/_design-reference/applicants/` mein rakha hai.
+
+🔴 **2.56 yahin zinda hoti hai:** apply karte hi contact khulta hai. Wahi wo
+pehla raasta hai jo `fn_TeacherContactUnlocked` (2.54) mein likha hai aur aaj
+tak kabhi trigger nahi hua.
+
+⚠️ Dashboard ka applicants area tabhi asli hoga — abhi wo jaan-boojh kar
+not-yet hai.
+
+---
+
 
 ## Uske baad
 
