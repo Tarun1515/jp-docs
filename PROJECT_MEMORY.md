@@ -1,7 +1,7 @@
 # TEACHER RECRUITMENT PORTAL — PROJECT MEMORY
 
 > **Ye file har kaam ke baad update hogi.** Har naye chat/session mein sabse pehle ye file padho.
-> Last updated: **2026-08-28** | Phase **3 COMPLETE** + **2.5 engine** + **4 jobs COMPLETE** | Next: **Phase 5 — Applications**
+> Last updated: **2026-08-28** | Phase **3 COMPLETE** + **2.5 engine** + **4 jobs COMPLETE** + **2.67 swagger fix** | Next: **Phase 5 — Applications**
 >
 > 🔴 **Ye do line har phase ke close-out mein update hongi.** File 3I tak
 > pahunch chuki thi aur ye header **Phase 0** par khada tha — saat phase purana,
@@ -5439,6 +5439,100 @@ nahi chahiye tha, sirf route asli component par point karna tha.
 
 ---
 
+### 🔒 2.67 SWAGGER 500 — DUPLICATE SCHEMA ID (FIX)
+
+`JP.App.Api` ki `/swagger/v1/swagger.json` **500 de rahi thi**, aur shayad
+Phase 2.5 se. Ek live instance par mila — kisi suite ne nahi.
+
+```
+pehle : HTTP 500,  0 operations
+baad  : HTTP 200, 76 operations, 110 schemas
+SSO   : HTTP 200, 21 operations, 32 schemas  (pehle bhi theek thi)
+```
+
+#### 🔴 Asli wajah — wrapper nahi, inner exception
+
+Bahar wala message sirf itna kehta tha "Failed to generate Operation for
+`EntitlementsController.GetMatrix`. See inner exception". Andar wala:
+
+```
+Can't use schemaId "PlanSummaryDto" for type "JP.Domain.Entitlements.PlanSummaryDto".
+The same schemaId is already used for type "JP.Domain.Dashboards.PlanSummaryDto"
+```
+
+Do alag-alag DTO, dono ka chhota naam ek: dashboard ka plan (3I) aur admin
+matrix ka plan row (2.5). Swashbuckle default mein **chhote type name** par
+schema key karta hai.
+
+⚠️ Global exception handler ne inner exception nigal li thi — response mein
+sirf wrapper aata hai. Wo **Serilog ke log file** se nikala,
+`JP.App.Api/App_Data/logs/`. Guess nahi kiya.
+
+#### 🔴 Ek DTO rename karna sahi fix NAHI tha
+
+Rename se **ye** takkar khatam hoti aur **agli** intezaar karti. Do feature
+dobara ek hi naam chun lein — kuch rokta nahi hai.
+
+Fix generator par: `CustomSchemaIds` ab poore namespace se qualify karta hai
+(`JP.Core.SchemaIds`), dono API mein. `DomainDashboardsPlanSummaryDto` aur
+`DomainEntitlementsPlanSummaryDto`.
+
+⚠️ **Trade saaf likha:** naam lambe ho gaye. Sirf `JP.` hataya hai — jo prefix
+sab par hai wo kisi ko alag nahi karta. Aur chhota karna (bas aakhri segment,
+maslan) padhne mein accha lagta aur takkar ka darwaza chup-chaap khol deta —
+yahi ek cheez hai jo nahi chahiye thi. Ab do type tabhi takra sakte hain jab
+namespace **aur** naam dono ek hon, jo compiler pehle hi mana karta hai.
+
+⚠️ SSO mein abhi tak kuch takraya nahi tha, phir bhi wahan bhi laga diya. Wajah
+failure ki shakl hai: **ek duplicate naam ek endpoint nahi todta, poora document
+todta hai.** Har API mein ek baar surprise hone ka intezaar karna do baar
+surprise hona hai.
+
+#### 🔴 Ye chhupa kyun raha — suites swagger ko chhoote hi nahi
+
+Har suite green thi, poore waqt. **Koi bhi `swagger.json` fetch nahi karti** —
+sab endpoints ko seedha call karti hain, aur endpoints bina document ke bilkul
+theek chalte hain.
+
+API us tareeke se toota tha jise dekhne ke liye test bane hi nahi the. Ye 3I
+wale sabak ka doosra chehra hai: green suite saboot nahi hai — asli raasta
+chala kar dekhna saboot hai.
+
+#### Ab kya rokta hai — `scripts/verify/swagger.mjs`
+
+| Assert | Kya pakadta hai |
+|---|---|
+| HTTP 200 | schema takkar (**loud** case — 500) |
+| JSON parse hoti hai | 200 jo error envelope leke aaye |
+| operations >= floor | 🔴 **quiet** case — koi controller discover hona band ho jaaye |
+| schema ids unique | wahi bug dobara, doosri shakl mein |
+| `/api/entitlements/matrix` aur `/api/jobs/stats` naam se | ginti barabar rehte hue bhi ek operation gayab ho jaana |
+
+Floors: SSO **21**, App **76** — aaj ki asli ginti. ⚠️ Ye **farsh** hai, barabari
+nahi: endpoint jodna normal hai aur fail nahi hona chahiye; ghatna nahi.
+Jaan-boojh kar hataye jaayen to number usi commit mein neeche karo, wajah ke
+saath.
+
+🔴 **Guard ko fail hote hue dekha gaya** — floor 999 kiya, wo gira
+("76 found, floor 999"), phir 76 par wapas. Jis guard ko kisi ne fail hote nahi
+dekha, uske kaam karne ka koi saboot nahi.
+
+⚠️ **`run_all.sql` mein nahi daala ja sakta** — wo sqlcmd ka SQL script hai,
+HTTP call kar hi nahi sakta. Guard baaki verification ke saath rehta hai:
+`npm run verify:swagger` (jp-docs), aur `scripts/verify/` mein.
+
+#### Files
+
+```
+JP.Core/Common/SchemaIds.cs                 (naya — namespace-qualified ids)
+JP.App.Api/Program.cs                       (CustomSchemaIds)
+JP.Sso.Api/Program.cs                       (CustomSchemaIds)
+jp-docs/scripts/verify/swagger.mjs          (naya — guard)
+jp-docs/package.json                        (verify:swagger)
+```
+
+---
+
 ## 3. SCOPE (Client spec ke against)
 
 ### IN SCOPE — MVP
@@ -5644,6 +5738,7 @@ naya Code, agla free Id, kuch renumber mat karo.
 | 2026-08-15 | 2.5-PRE | **Monetization design written down** — `MONETIZATION_DESIGN.md`: three gating modes with `Is_Active` as the kill switch, teacher-search Boolean and invites metered, a derived-not-scheduled quota period, and the ledger that makes balances recomputable. §3 reconciled — the engine is MVP (2.5), billing is 6.5. Two directions argued against in writing rather than quietly followed. Found that `jp_app` has no IST helpers while both other databases do — 2.5's first script. No code, no schema, no migrations | ✅ Done |
 | 2026-08-15 | 2.5-PRE | **Three documentation fixes** — gating reads are never served from the master cache (direct read per consume; the rejected short-TTL alternative rests on a single-process assumption that scaling out would silently break), and Phase 2.5's mode-flip test must prove the flip live on the consume path with no restart, sleep or clear. Fixed the header, stale since Phase 0 while the file ran to 3I. 🔴 Corrected Q4: the engine is **not** blocked on the client — every feature seeds FREE, so "no" changes nothing — billing is. The unacknowledged scope now has a number: ~12 dev-days, and it is a list of two | ✅ Done |
 | 2026-08-28 | 2.5 | **Entitlement engine** — features, gating modes, the append-only ledger, the atomic consume, and the admin plan × feature matrix. 🔴 Every feature ships FREE with no mappings, so nothing a user can see changed. Two bugs found by running the path rather than reading it: the balance formula invented a credit every time a quota consume was refunded, and a retry of an already-paid action was refused with QUOTA_EXHAUSTED once quota ran out. Engine 34/34, HTTP 31/31, browser 19/19; all four SQL suites and three HTTP regressions unchanged | ✅ Done |
+| 2026-08-28 | fix | **swagger.json 500 — duplicate schema id** — `JP.App.Api`'s OpenAPI document had been answering 500 for EVERY endpoint, probably since 2.5: two DTOs named `PlanSummaryDto` collided on Swashbuckle's short-name schema ids, and the generator abandons the whole document on the first collision. Fixed at the generator (namespace-qualified ids, both APIs) rather than by renaming one DTO, which would have left the next collision waiting. 🔴 It survived because no suite fetches swagger.json — they call endpoints directly, which work fine without a document. `verify:swagger` now guards it, and was watched failing at an inflated floor before being set back. 500 → 200, 0 → 76 operations | ✅ Done |
 | 2026-08-28 | 4B | **Job screens** — list, form, publish/close, permission shaping, and the dashboard's jobs area on real counts. 🔴 The full chain proven end to end across BOTH apps in one session: JOB_POST flipped to METERED in the admin screen, jp-school publishes once, is refused with the quota message and keeps the job as a Draft, flipped back to FREE, publishes free. Two endpoint gaps found and reported rather than quietly filled — one approved and added (`GET /api/jobs/stats`), one left open (employment types have no master endpoint, and the five values were NOT hardcoded). browser 37/37, every earlier suite unchanged | ✅ Done |
 | 2026-08-28 | 4 | **Jobs — backend** — tables, six procedures, the API, and the engine's first real consumer. 🔴 Publish and consume are ONE transaction: a refused consume leaves the job a Draft, and a failure after the consume rolls the ledger row back with it. Two things found by running rather than reading: INSERT ... EXEC made the first design illegal (Msg 3915) and forced the consume into core+wrapper, and a test hook inside the procedure made the atomicity test pass for the wrong reason. Expiry is derived, never stored. jobs-consume 23/23, jobs-lifecycle 34/34, all regressions unchanged. ⚠️ Screens not built — a stated boundary | ✅ Done |
 
