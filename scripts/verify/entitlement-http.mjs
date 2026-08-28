@@ -73,20 +73,38 @@ const login = async (id, pw, attempt = 1) => {
 
 const OWNER = 'A5B2C7D1-0E44-4F19-9A3C-2500BEEF2510';
 let feature = null;
-let originalMode = null;
-let originalActive = null;
+
+/*
+  🔴 RESTORES TO THE SHIPPED STATE, NOT TO "WHATEVER WAS FOUND".
+
+  The first version captured JOB_POST's mode on the way in and put that value
+  back on the way out. That is wrong in exactly one situation, and it is the
+  situation that happens: if a previous run DIED before its teardown — killed,
+  timed out, or a truncated pipe closing stdout — the next run reads the dirty
+  state as "original" and faithfully preserves the mess. Two runs later nobody
+  knows what the real baseline was.
+
+  Phase 2.5 ships every feature FREE and active with no plan mappings, and this
+  script ASSERTS that as its premise below. So the honest restore is to that
+  documented state, which also makes the script self-healing after a kill.
+
+  ⚠️ Found the hard way: a `Select-Object -First` in the shell terminated the
+  pipeline, node died mid-run, and the next run failed its own premise check —
+  which is the assertion doing its job.
+*/
+const SHIPPED_MODE = 1;   // FREE
 
 const restore = () => {
-  if (feature && originalMode !== null) {
-    sql(`SET NOCOUNT ON; USE jp_mdm;
-      UPDATE m_mdm_features SET GatingModeId=${originalMode}, Is_Active=${originalActive}
-      WHERE FeatureId=${feature.featureId};
-      DELETE FROM m_mdm_plan_features WHERE FeatureId=${feature.featureId} AND PlanId=${PLAN};`);
-  }
+  sql(`SET NOCOUNT ON; USE jp_mdm;
+    UPDATE m_mdm_features SET GatingModeId=${SHIPPED_MODE}, Is_Active=1 WHERE Is_Deleted=0;
+    DELETE FROM m_mdm_plan_features;`);
   sql(`SET NOCOUNT ON; USE jp_app;
     DELETE FROM t_app_feature_ledger WHERE OwnerUid='${OWNER}';
     DELETE FROM t_app_subscriptions  WHERE OwnerUid='${OWNER}';`);
 };
+
+// Start from the shipped state even if a previous run was killed mid-way.
+restore();
 
 const PLAN = Number(sql(`SET NOCOUNT ON; USE jp_mdm;
   SELECT TOP 1 PlanId FROM m_mdm_plans WHERE PlanCode='SCHOOL_FREE' AND Is_Deleted=0;`)[0]);
@@ -121,8 +139,9 @@ try {
     m?.features?.map((f) => `${f.featureCode}=${f.gatingModeCode}`).join(' '));
 
   feature = m.features.find((f) => f.featureCode === 'JOB_POST');
-  originalMode = feature.gatingModeId;
-  originalActive = feature.isActive ? 1 : 0;
+  // No "original" is captured — see restore(). The shipped state is the
+  // baseline, and the two checks above have just asserted the run is starting
+  // from it.
 
   /*
     🔴 THE DUAL READ (2.61).
@@ -200,21 +219,70 @@ try {
     body: JSON.stringify({ gatingModeId: 3, isActive: true }),
   });
 
+  /*
+    🔴 THE LAST-UNIT BOUNDARY — three calls, one owner, one unbroken state.
+
+    These three used to be asserted individually. They are the same sequence,
+    but what makes them a BOUNDARY is that they run back to back without the
+    fixture being touched in between:
+
+      1. spend the last unit                -> Status 1
+      2. retry the SAME reference           -> 200, ALREADY_CONSUMED
+      3. a FRESH reference                  -> QUOTA_EXHAUSTED
+
+    Step 2 is the bug this phase fixed: idempotency used to live only in the
+    INSERT collision, which is never reached once the quota branch refuses
+    first, so a retry of an already-paid action came back QUOTA_EXHAUSTED.
+
+    🔴 Step 3 is what proves the FIX did not overshoot. The reference check now
+    runs ahead of the quota decision; if it matched too loosely or
+    short-circuited the quota branch, a fresh reference would be allowed and the
+    engine would have quietly stopped enforcing quota at the exact moment it
+    matters. Steps 2 and 3 have to hold together, or neither means anything.
+
+    The ledger row count is asserted after each one — it must stay at exactly
+    one across all three.
+  */
+  const liveConsumes = () => Number(sql(`SET NOCOUNT ON; USE jp_app;
+    SELECT COUNT(*) FROM t_app_feature_ledger
+    WHERE OwnerUid='${OWNER}' AND FeatureId=${feature.featureId}
+      AND EntryTypeId=2 AND Is_Deleted=0 AND ReversedOn IS NULL;`)[0]);
+
+  const consumesBefore = liveConsumes();
+
   const metered1 = await consume(ref(3));
-  check('METERED, quota 1 -> allowed and CONSUMED from quota',
+  check('1. METERED, quota 1 -> allowed and CONSUMED from quota',
     metered1.http === 200 && metered1.body?.data?.consumed === true
       && metered1.body?.data?.source === 1,
     `consumed ${metered1.body?.data?.consumed}, source ${metered1.body?.data?.source}`);
 
+  check('1. …and the month is now empty',
+    metered1.body?.data?.quotaRemaining === 0,
+    `quotaRemaining ${metered1.body?.data?.quotaRemaining}`);
+
+  const firstEntryId = metered1.body?.data?.entryId;
+
   const retry = await consume(ref(3));
-  check('🔴 the same reference again -> HTTP 200 (a SUCCESS), code ALREADY_CONSUMED',
+  check('2. 🔴 the same reference again -> HTTP 200 (a SUCCESS), code ALREADY_CONSUMED',
     retry.http === 200 && retry.body?.code === 'ALREADY_CONSUMED' && retry.body?.status === 1,
     `HTTP ${retry.http}, status ${retry.body?.status}, code ${retry.body?.code}`);
 
+  check('2. …returning the ORIGINAL entry, having written nothing',
+    retry.body?.data?.entryId === firstEntryId
+      && retry.body?.data?.consumed === false
+      && liveConsumes() === consumesBefore + 1,
+    `entry ${retry.body?.data?.entryId} (original ${firstEntryId}), `
+    + `live consumes ${liveConsumes()}`);
+
   const exhausted = await consume(ref(4));
-  check('quota gone, no credits -> 400 QUOTA_EXHAUSTED',
+  check('3. 🔴 a FRESH reference -> 400 QUOTA_EXHAUSTED — quota is still enforced',
     exhausted.http === 400 && exhausted.body?.code === 'QUOTA_EXHAUSTED',
-    `HTTP ${exhausted.http}, code ${exhausted.body?.code}`);
+    `HTTP ${exhausted.http}, code ${exhausted.body?.code} `
+    + '— an allow here would mean the reference check had swallowed the quota branch');
+
+  check('3. …and the ledger still holds exactly the one row from step 1',
+    liveConsumes() === consumesBefore + 1,
+    `${liveConsumes()} live consume(s), expected ${consumesBefore + 1}`);
 
   // Unmap -> the plan says nothing -> denied, and with a DIFFERENT code.
   await j(`${APP}/entitlements/plan-features`, {
