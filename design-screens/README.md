@@ -12,6 +12,8 @@ the next time its phase's verification runs.
 | `school-dashboard-*` | The school dashboard, on real data | `screens-3i.mjs` |
 | `teacher-dashboard-*` | The teacher dashboard | `screens-3i.mjs` |
 | `teacher-dashboard-zero-1440` | 🔴 A teacher at 0% — the case that must never print "0%" | `screens-3i.mjs` |
+| `admin-plans-1440`, `admin-plans-375` | The plan × feature matrix. ⚠️ Captured with a **test fixture** applied — JOB_POST metered at 500/month, TEACHER_SEARCH boolean and unmapped — so the screen shows every cell state. The real database has every feature Free and no mappings | `screens-25.mjs` |
+| `admin-plans-killswitch-1440` | 🔴 The same screen with a feature switched off: banner, struck-through row, and the mode still reading Metered underneath. The consume path refused immediately, in the same script | `screens-25.mjs` |
 | `login-*`, `signup-*`, `account-status-*`, `sidebar-375` | Auth and chrome | Phase 1D |
 | `public-*`, `continue-*` | The public site | Phase 1 |
 | `federation-*`, `wrong-app-guard` | Module Federation and the cross-app guard | Phase 1 |

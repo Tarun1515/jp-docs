@@ -3,8 +3,14 @@
 Everything needed to get this running from a clean machine, and an honest
 statement of what is actually built.
 
-**Status: Phase 3 complete** — three databases, both APIs, and the school and
-teacher portals running on real data.
+**Status: Phase 3 complete, plus the Phase 2.5 entitlement engine** — three
+databases, both APIs, and the school and teacher portals running on real data.
+
+⚠️ The engine is built and **nothing is gated by it**. Every feature ships
+"free", no plan includes or excludes anything yet, and no screen asks it a
+question. That is deliberate: the first real use arrives with job posting in
+Phase 4, and the first paid gate in Phase 6.5 — by changing data, not by
+deploying code.
 
 - **Phase 1** — `jp_sso`, its procedures, `JP.Sso.Api`, the auth screens and the
   design system.
@@ -558,6 +564,33 @@ grep and by the absence of its fixture strings from every built chunk.
 ⚠️ If you are demonstrating this product, there is no longer a screen you have
 to talk around. There are areas that say "not yet", which is a different thing.
 
+### ⚠️ Built but deliberately inert — the entitlement engine
+
+Phase 2.5 added features, gating modes, quotas, credits and an append-only
+ledger, plus the **Plans and features** screen in the admin console.
+
+🔴 **Turning any of it on is a data change, and none has been made.** Right now:
+
+- every feature is **Free** — the mode that reads no plan mapping at all;
+- **no plan includes or excludes anything** — the matrix is entirely unmapped;
+- the ledger is **empty**, and no endpoint in the product calls the engine.
+
+So Phase 2.5 changed nothing a school or a teacher can see, and that is how it
+was designed. Shipping the engine and the gating together would mean that on the
+day something stops working, two new things are under suspicion at once.
+
+⚠️ **If you are demonstrating to a client:** the Plans and features screen shows
+the machinery, not a price list. `m_mdm_plans` still holds two free plans and no
+prices, because pricing has not been agreed — the public FAQ says so too. Do not
+present the screen as a commercial offer.
+
+🔴 **And the rule underneath it, which does not bend:** a subscription buys the
+school's *capability* — whether it may search at all, how many invitations it may
+send. It never buys a teacher's phone number or email. Contact opens only when
+the teacher consents, by applying or by accepting an invitation.
+
+Design and rationale: `MONETIZATION_DESIGN.md`.
+
 ### Fully wired to the API
 
 | Screen | App | Route | Reads |
@@ -571,6 +604,7 @@ to talk around. There are areas that say "not yet", which is a different thing.
 | **Dashboard** | teacher | `/dashboard` | `GET /api/dashboard/teacher` |
 | **My profile** | teacher | `/profile` | `GET/PUT /api/teacher/profile` plus nine section endpoints |
 | **Verification queue and request detail** | admin | `/verification/*` | `GET /api/approvals`, actions, documents |
+| **Plans and features** | admin | `/settings/plans` | `GET /api/entitlements/matrix`, gating and mapping saves |
 
 Every one of these has been exercised end to end against running APIs — see
 `scripts/verify/` for the checks and `screenshots/` for what they look like.

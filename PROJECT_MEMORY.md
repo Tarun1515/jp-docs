@@ -1,7 +1,7 @@
 # TEACHER RECRUITMENT PORTAL — PROJECT MEMORY
 
 > **Ye file har kaam ke baad update hogi.** Har naye chat/session mein sabse pehle ye file padho.
-> Last updated: **2026-08-15** | Phase **3 COMPLETE** (3A–3I) + **2.5-PRE** design likha ja chuka | Next: **Phase 4 — Jobs**
+> Last updated: **2026-08-28** | Phase **3 COMPLETE** (3A–3I) + **2.5 entitlement engine BUILT** | Next: **Phase 4 — Jobs**
 >
 > 🔴 **Ye do line har phase ke close-out mein update hongi.** File 3I tak
 > pahunch chuki thi aur ye header **Phase 0** par khada tha — saat phase purana,
@@ -4898,6 +4898,200 @@ jp-docs/PROJECT_MEMORY.md         (§3 batwara, Q4, 2.63, progress row)
 
 ---
 
+### 🔒 2.64 ENTITLEMENT ENGINE — PHASE 2.5
+
+Engine ban gaya, aur **kisi ko kuch badla hua nahi dikhta** — ye design tha,
+kanjoosi nahi. Har feature `FREE` seed hoti hai, ek bhi plan-feature mapping
+nahi bani, ledger khaali hai, aur koi business endpoint gated nahi hai.
+
+```
+SQL suites (regression)  48/48 · 44/44 · 52/52 · 30/30 — sab pehle jaise
+engine  entitlement-engine.mjs  34/34   (race, order, idempotency, reversal,
+                                         har refusal code, period boundary)
+HTTP    entitlement-http.mjs    31/31   (dual read, kill switch live, greps)
+browser screens-25.mjs          19/19   (1440 + 375, screen se flip)
+regression dashboards-3i 27/27 · team-contract 49/49 · profile-branches 37/37
+build   backend 0/0 · jp-admin prod clean
+```
+
+#### 🔴 Do bug jo **chalane se** mile, padhne se nahi
+
+**1. Reversal ne credit "bana" diya hota.**
+
+Design doc ka balance formula `Reversal +N` ko sum mein ginta tha. Chalane par
+dikha ki ye **quota** consume ke reverse hone par ek aisa credit paida karta hai
+jo customer ne kabhi khareeda hi nahi:
+
+```
+quota consume : SourceId = QUOTA  ->  credit balance mein tha hi nahi
+uska reversal : Units +N, apna SourceId nahi
+              ->  sum karo to har refund ek MUFT job post de deta
+```
+
+Ab reversal **exclusion se** kaam karta hai — target par `ReversedOn` stamp,
+aur har balance query `ReversedOn IS NULL` par filter karti hai. Reversal row
+kisi balance mein nahi ginti; wo audit record hai. Quota side ko waise bhi yehi
+karna tha (index ke liye `ReversedOn` chahiye hi tha), to ab **ek hi mechanism**
+dono ke liye.
+
+⚠️ Verification seedha yahi assert karti hai: quota consume reverse karo, credit
+balance **na badle**. Phantom credit ek zyada dikhata.
+
+**2. `ALREADY_CONSUMED` quota khatam hone par milta hi nahi tha.**
+
+Idempotency sirf unique index par thi — INSERT takrata, 2601 CATCH mein aata,
+aur ALREADY_CONSUMED milta. Par wo **tabhi** kaam karta hai jab request waise
+bhi allow hoti. Quota khatam ho to quota branch **pehle** mana kar deti hai aur
+INSERT tak baat pahunchti hi nahi:
+
+```
+quota 1. Job A post hua, charge hua. Connection toota. Client ne WAHI
+         reference dobara bheja. Quota ab khatam hai, to jawaab aaya
+         QUOTA_EXHAUSTED — us kaam ke liye JISKA PAISA PEHLE HI LIYA JA CHUKA HAI.
+```
+
+Ye us double-charge ka **ulta chehra** hai jise rokne ke liye poora design bana
+tha: do baar charge nahi, par **kharide hue kaam se inkaar**.
+
+Fix: reference **quota se pehle** check hota hai, usi transaction mein, usi
+per-owner lock ke andar. ⚠️ **Ye check-then-consume NAHI hai** — read critical
+section ke andar hai. Unique index **rehta hai**, kyunki asli race (do
+ek-saath-pehli-baar request, ek hi reference) wo hi pakadta hai. Dono zaroori,
+har ek wo cover karta hai jo doosra nahi kar sakta.
+
+#### 🔴 Race — do sach mein samanantar session
+
+```
+dono session ek hi wall-clock instant par armed (WAITFOR TIME) — 2C wala pattern
+session A: status 1, code null
+session B: status 0, code QUOTA_EXHAUSTED
+ledger   : theek EK consume row
+```
+
+`UPDLOCK, HOLDLOCK` subscription row par — poora mechanism yehi hai. HOLDLOCK
+utna hi zaroori hai: bina row wale owner par range lock leta hai, warna do
+session ek saath "subscription missing" branch se nikal jaate.
+
+#### 🔴 Kill switch **live** — screen se, bina rukey
+
+3I ke baad ka sabse zaroori test. Admin screen par switch click, aur **turant**
+consume — koi restart nahi, koi sleep nahi, koi cache clear nahi:
+
+```
+PUT /gating -> 200 · row Is_Active 1 -> 0
+agla consume -> 403 FEATURE_DISABLED   (turant)
+wapas on     -> 200 allowed            (turant)
+mode         -> abhi bhi METERED (3)
+```
+
+⚠️ **Dono disha** assert hoti hain. Sirf refusal check karna 3G wali khaali
+assertion hai — feature kisi aur wajah se bhi mana kar sakta tha.
+
+⚠️ Aur mode **bacha rehta hai** — yehi poori wajah hai ki kill switch chautha
+mode nahi hai (2.63).
+
+#### Cache par khadi hui baat, ab code mein
+
+`IEntitlementRepository` (jp_mdm) hi ek query mein feature + mapping resolve
+karti hai, `IMasterService` ko chhuti nahi, aur usse cache kabhi nahi milega.
+Grep dono prohibition par chalti hai aur output chhapti hai:
+
+| Grep | Natija |
+|---|---|
+| 2.56 A — engine mein contact ka zikr | 0 hits (8 file) |
+| 2.56 B — contact unlock mein engine ka zikr | 0 hits (2 file) |
+| consume path par `IMasterService` / cache | 0 hits |
+| poore backend mein `IMemoryCache` | 0 |
+
+#### Jo design doc mein nahi tha aur build mein zaroori nikla
+
+**`PLAN_CHANGED` — ek asli race jispar doc chup thi.** Service ko plan
+`jp_app` se padhna padta hai **isse pehle** ki wo us plan ki mapping `jp_mdm`
+mein dhoondh sake (2.2 — join nahi kar sakte). Us do read ke beech plan badal
+sakta hai. Ab proc ko `@ExpectedPlanId` jaata hai, lock ke andar compare hota
+hai, aur service **ek baar** dobara resolve karke retry karti hai. Loop nahi —
+bounded.
+
+**Ek consume kabhi quota aur credit mein nahi batta.** Idempotency index
+`(FeatureId, RefEntityTypeId, RefEntityUid)` par unique hai, to ek action = ek
+row = ek `SourceId`. `Units > 1` ke liye ya poora quota se, ya poora credit se.
+Ye do decisions ka aapasi natija hai jo koi ek akela nahi likhti.
+
+#### ⚠️ jp_app ke IST helper — aur ek cheez jo dobara chalane se mili
+
+`000_fn_datetime_ist.sql` jp_sso se copy hua. Definitions **byte-identical**
+sabit ki gayi (`sys.sql_modules` se diff, file se nahi — file mein header aur
+`USE` line alag hai, aur wo chalti nahi):
+
+```
+fn_IstDateToUtc · fn_IstDayRangeUtc · fn_IstToday · fn_ToIst
+app_vs_sso: IDENTICAL   mdm_vs_sso: IDENTICAL
+```
+
+🔴 Pehla version `fn_QuotaPeriodForUtc` ko `fn_IstDateToUtc` call karwata tha,
+SCHEMABINDING ke saath. Pehli baar clean bana — aur **doosri baar** `run_all`
+Msg 3729 par gira: schemabound dependent hone ki wajah se helper file dobara
+nahi chal sakti. Wo file **teeno DB mein saanjhi** hai aur re-runnable rehni
+chahiye. Ab function khud `±330` likhta hai — jo waise bhi house pattern hai,
+`fn_IstDayRangeUtc` bhi yehi karti hai.
+
+⚠️ Ye **dobara chalane se** mila, soch kar nahi. Ek pass clean hona idempotent
+hone ka saboot nahi hai.
+
+#### ⚠️ `contain: paint` — ek naap se mila, andaaze se nahi
+
+375 par page 70px side mein scroll kar raha tha, **jabki** chain ka har box 375
+ya kam tha, `main` par `overflow-x: hidden` tha, aur kisi element ka right edge
+viewport ke bahar nahi tha. `body.scrollWidth` sahi 375 tha, par
+`documentElement.scrollWidth` 445.
+
+Chaar candidate naape gaye — `min-width: 0`, `max-width: 100%`,
+`width: max-content`, host `display: block` — **ek bhi nahi hila**. Sirf
+`contain: paint` ne theek kiya.
+
+Wo hack nahi hai: scroll box ke andar se kuch bahar paint hota hi nahi, aur ye
+declaration wahi baat kehti hai. ⚠️ Assertion ab **kaunsa element** overflow kar
+raha hai wo bhi chhapti hai — sirf "70px" ne teen galat andaaze karwaye the.
+
+#### Naming — brief aur doc mein farq, doc jeeti
+
+Brief ne missing-mapping refusal ko `NO_MAPPING` kaha; doc `PLAN_LACKS_FEATURE`
+kehti hai. Brief ne khud likha ki **doc governs**, to code mein
+`PLAN_LACKS_FEATURE` hai. Poore phase ko rokna ek identifier ke naam par galat
+hota; report kiya gaya aur doc ke header mein bhi likha hai.
+
+#### Permission — nayi nahi banayi
+
+`SETTINGS.MANAGE` pehle se seeded hai aur sirf `SUPER_ADMIN` ke paas hai. Plan
+mein kya shaamil hai — ye **system setting hi hai**, aur nayi permission ka
+matlab hota pehle role grant, phir screen. Reuse.
+
+#### Files
+
+```
+database/jp_app/04_procedures/000_fn_datetime_ist.sql       (naya — jp_sso ki copy)
+database/jp_app/01_tables/020_entitlement_ledger.sql        (naya — ledger + 3 master)
+database/jp_app/04_procedures/013_entitlement.sql           (naya — engine)
+database/jp_mdm/01_tables/036_entitlement_catalog.sql       (naya — modes/features/mappings)
+database/jp_mdm/03_seed/010_seed_features.sql               (naya — sab FREE, koi mapping nahi)
+database/jp_mdm/04_procedures/009_entitlement_catalog.sql   (naya — resolve + admin matrix)
+database/jp_sso/03_seed/005_seed_menus.sql                  (ADMIN_PLANS menu row)
+database/jp_sso/04_procedures/000_fn_datetime_ist.sql       (header: ye master hai)
+JP.Core/Constants/ErrorCodes.cs                             (8 naye code)
+JP.Core/Constants/AppConstants.cs                           (SettingsManage)
+JP.Core/Common/Response.cs                                  (SuccessWithCode)
+JP.Domain/Entitlements/EntitlementContracts.cs              (naya)
+JP.Infrastructure/Repositories/EntitlementRepository.cs     (naya — dono repo)
+JP.Infrastructure/Services/EntitlementService.cs            (naya)
+JP.App.Api/Controllers/EntitlementsController.cs            (naya)
+jp-admin/src/app/core/entitlement.service.ts                (naya)
+jp-admin/src/app/features/entitlements/matrix/*            (naya — 3 file)
+jp-docs/MONETIZATION_DESIGN.md                              (3 correction, in place)
+jp-docs/scripts/verify/{entitlement-engine,entitlement-http,screens-25}.mjs (naye)
+```
+
+---
+
 ## 3. SCOPE (Client spec ke against)
 
 ### IN SCOPE — MVP
@@ -4973,7 +5167,7 @@ engine ka kaam, **unbilled aur unacknowledged**, ek **fixed fee** ke against.
 
 | Scope addition | Kab aayi | Dev-days | Likhit acknowledgment |
 |---|---|---|---|
-| **Teen alag frontend apps** (2.41 / 2.42) — ek portal ki jagah admin + school + teacher, plus `jp-shared` remote | 2026-08-08 | ⚠️ **kabhi estimate hi nahi kiya** — isi wajah se karna chahiye | ❌ nahi |
+| **Teen alag frontend apps** (2.41 / 2.42) — ek portal ki jagah admin + school + teacher, plus `jp-shared` remote | 2026-08-08 | **~4** *(planning estimate, naapa hua nahi)* | ❌ nahi |
 | **Monetization engine** (2.63) | zubaani, planning baatcheet mein | **~12** | ❌ nahi |
 
 🔴 **Dono ek hi jagah likhe hain kyunki agar timeline slip hoti hai to wo dono
@@ -4982,9 +5176,14 @@ ek-ek karke poochne par har addition chhoti lagti hai, aur saath rakhne par hi
 wo sach dikhte hain.
 
 ⚠️ **Number likho, phrase nahi.** "Commercial risk" chhe mahine baad padh kar
-koi ye nahi bata payega ki kitna tha; **"12 dev-days"** bata dega. Isi liye
-upar wali table mein ek khaali cell hai aur wo jaan-boojh kar dikh raha hai —
-frontend split ka cost kabhi gina hi nahi gaya, aur wahi is column ka point hai.
+koi ye nahi bata payega ki kitna tha; **"12 dev-days"** bata dega.
+
+🔴 **Kul mila kar ~16 dev-days**, dono milakar, bina kisi likhit acknowledgment
+ke, fixed fee ke against.
+
+⚠️ Frontend split ka **~4** planning baatcheet ka estimate hai — **naapa hua
+nahi**. Wo farq likha hua hai kyunki ek estimate ko baad mein measurement bata
+dena wahi galti hai jo is table ne rokni thi.
 
 #### Q5 — client ko exactly ye reconcile karna hai (2.47)
 
@@ -5097,6 +5296,7 @@ naya Code, agla free Id, kuch renumber mat karo.
 | 2026-08-15 | 3I | **Dashboards on real data** — school and teacher dashboards replaced their mockups; the applicants mockup lost its route and menu row and moved to `_design-reference/`. One new read (the subscription) and everything else composed from 3E/3G/3H. **G6 closed** after two of its three bullets had been false since 2D/2E; **G25 promoted to decision 2.61**. HTTP 27/27 including the row+JSON dual read, browser 16/16 | ✅ Done |
 | 2026-08-15 | 2.5-PRE | **Monetization design written down** — `MONETIZATION_DESIGN.md`: three gating modes with `Is_Active` as the kill switch, teacher-search Boolean and invites metered, a derived-not-scheduled quota period, and the ledger that makes balances recomputable. §3 reconciled — the engine is MVP (2.5), billing is 6.5. Two directions argued against in writing rather than quietly followed. Found that `jp_app` has no IST helpers while both other databases do — 2.5's first script. No code, no schema, no migrations | ✅ Done |
 | 2026-08-15 | 2.5-PRE | **Three documentation fixes** — gating reads are never served from the master cache (direct read per consume; the rejected short-TTL alternative rests on a single-process assumption that scaling out would silently break), and Phase 2.5's mode-flip test must prove the flip live on the consume path with no restart, sleep or clear. Fixed the header, stale since Phase 0 while the file ran to 3I. 🔴 Corrected Q4: the engine is **not** blocked on the client — every feature seeds FREE, so "no" changes nothing — billing is. The unacknowledged scope now has a number: ~12 dev-days, and it is a list of two | ✅ Done |
+| 2026-08-28 | 2.5 | **Entitlement engine** — features, gating modes, the append-only ledger, the atomic consume, and the admin plan × feature matrix. 🔴 Every feature ships FREE with no mappings, so nothing a user can see changed. Two bugs found by running the path rather than reading it: the balance formula invented a credit every time a quota consume was refunded, and a retry of an already-paid action was refused with QUOTA_EXHAUSTED once quota ran out. Engine 34/34, HTTP 31/31, browser 19/19; all four SQL suites and three HTTP regressions unchanged | ✅ Done |
 
 ---
 
@@ -5629,6 +5829,30 @@ hai); **billing** likhit confirmation par ruki hai. ⚠️ Ye kal is section mei
 Do jagah maine likhi hui direction se **asehmati** darj ki (chaar mode, aur
 reset ki ledger rows) — dono doc mein donon paksh ke saath hain, chup-chaap
 kuch nahi chuna.
+
+---
+
+## ✅ PHASE 2.5 COMPLETE — 2026-08-28
+
+Entitlement engine bana. Details **2.64**, design **MONETIZATION_DESIGN.md**.
+
+🔴 **Kuch bhi gated nahi hai, aur ye plan tha.** Har feature `FREE`, koi
+plan-feature mapping nahi, ledger khaali, koi business endpoint engine ko call
+nahi karta. Pehla asli consume **Phase 4** (job post) likhega; pehla non-free
+mode **6.5** mein, **data badal kar** (2.7).
+
+```
+engine  34/34 · HTTP 31/31 · browser 19/19
+regression  48/48 · 44/44 · 52/52 · 30/30 SQL, 27/27 · 49/49 · 37/37 HTTP
+build   backend 0/0 · jp-admin prod clean
+```
+
+🔴 **Do bug chalane se mile** — reversal phantom credit banata, aur pehle se
+paid action ka retry QUOTA_EXHAUSTED khaata. Dono `MONETIZATION_DESIGN.md` mein
+jagah par 🔴 mark ke saath theek kiye gaye, chup-chaap nahi.
+
+⚠️ **Ek naap ne teen andaaze galat sabit kiye** — 375 ka overflow `contain:
+paint` se theek hua, baaki chaar candidate ne kuch nahi hilaya.
 
 ---
 

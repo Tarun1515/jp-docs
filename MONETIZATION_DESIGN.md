@@ -1,11 +1,24 @@
 # Monetization design — the entitlement engine
 
-**Status:** design accepted, not built. Written 2026-08-15 (Phase 2.5-PRE).
-**Builds in:** Phase 2.5 (engine) and Phase 6.5 (payment, invoices, purchase).
+**Status:** 🟢 **BUILT — Phase 2.5, 2026-08-28.** Written 2026-08-15 (2.5-PRE).
+**Still to come:** Phase 6.5 (payment, invoices, purchase screens).
 
-This is the design the engine phase implements. It exists because the decisions
+This is the design the engine phase implemented. It exists because the decisions
 below were made in a planning conversation and never written down — and a
 verbal design is one nobody can check a build against.
+
+⚠️ **Three things changed while building, and each is marked 🔴 in place rather
+than silently edited:**
+
+| What | Where | Why it changed |
+|---|---|---|
+| Reversals are **not** summed into a balance | Decision 4 | The original formula invented a credit every time a quota consume was refunded |
+| The reference is checked **before** quota | Decision 5 | The index alone refused already-paid retries once quota ran out |
+| One consume never splits across quota and credits | Decision 5 | Forced by the idempotency index: one reference, one row, one source |
+
+The build also confirmed a naming difference worth recording: the phase brief
+called the missing-mapping refusal `NO_MAPPING`; this document calls it
+**`PLAN_LACKS_FEATURE`**, and the document governs. That is the shipped code.
 
 ---
 
@@ -514,11 +527,43 @@ Credit balance for `(OwnerUid, FeatureId)` is **derived from the ledger**:
 
 ```
   SUM(Units) over live rows for that owner+feature
-    Grant     +N
-    Consume   −N   (only rows where SourceId = CREDIT)
-    Reversal  +N
-    Expiry    −N
+  WHERE ReversedOn IS NULL
+    Grant     +N   EntryTypeId 1
+    Expiry    −N   EntryTypeId 4
+    Consume   −N   EntryTypeId 2 AND SourceId = CREDIT
 ```
+
+### 🔴 Corrected during the build — reversals are NOT summed
+
+**This formula originally listed `Reversal +N` as a fourth line, and that was
+wrong.** Phase 2.5 found it by running the path, and the correction is recorded
+here rather than quietly applied.
+
+A reversal takes effect by **stamping `ReversedOn` on its target**, which drops
+that target out of every filter above. Summing the reversal row *as well* would
+count it twice — and for a reversed **quota** consume it is worse than double
+counting, because that consume was never in this sum to begin with:
+
+```
+  quota consume:  SourceId = QUOTA  ->  never part of the credit balance
+  its reversal:   Units +N, no SourceId of its own
+                  ->  summing it INVENTS a credit the customer never bought
+```
+
+Every refunded job posting would have silently handed the school a free one.
+
+The reversal row cannot carry a `SourceId` to disambiguate this:
+`CK_..._SourceOnConsume` reserves that column for consumes, and relaxing it
+would make every balance query two-sided. Exclusion is also what the **quota**
+side already had to do — `ReversedOn` must exist anyway for the idempotency
+index — so one mechanism now serves both.
+
+**Reversal rows remain in the ledger as audit records.** They carry `Units` so a
+report can say how much was refunded; they are simply not part of a balance.
+
+⚠️ The verification asserts this directly: reverse a quota consume, and the
+credit balance must be **unchanged**. A phantom credit would show up as one
+higher.
 
 No cached balance column in MVP. See "The ledger" for why, and for what to do if
 one is ever needed.
@@ -539,6 +584,21 @@ The caller passes what it is doing — `RefEntityTypeId = JOB`, `RefEntityUid =
 <the job's Uid>` — and the index makes a second consume for the same action
 impossible at the storage layer rather than by a check that can be raced.
 
+### 🔴 A consequence found while building: one consume never splits
+
+The index is UNIQUE on `(FeatureId, RefEntityTypeId, RefEntityUid)` for live
+consumes, so **one action gets exactly one row — and one row carries exactly one
+`SourceId`.**
+
+Therefore a consume of `Units > 1` must be covered **entirely** by quota or
+**entirely** by credits. It cannot take three from quota and two from credits;
+that would need two rows for one reference, which the index forbids.
+
+This is harmless at `Units = 1`, which is every caller today. The alternative —
+a second nullable source column — would make every balance query two-sided for a
+case nobody has. Recorded because it is an interaction between two decisions
+that neither one states on its own.
+
 ### What "live rows" means in the filter
 
 Three conditions, each load-bearing:
@@ -551,6 +611,43 @@ Three conditions, each load-bearing:
   Without this condition a refund would permanently prevent the customer from
   redoing the thing they were refunded for, which is the opposite of what a
   refund means.
+
+### 🔴 Corrected during the build — the index alone is not enough
+
+The design as written relied on the unique index **as the only** idempotency
+mechanism: the INSERT collides, the CATCH re-reads, the caller is told
+`ALREADY_CONSUMED`. Phase 2.5 found that this is correct **only while the
+request would otherwise have been allowed**, and it silently is not the moment
+quota runs out:
+
+```
+  quota 1.  Job A is posted and charged.
+            The connection drops. The client retries the SAME reference.
+            Quota is now spent, so the quota branch refuses FIRST —
+            the INSERT is never reached, the index never fires,
+            and the customer is told QUOTA_EXHAUSTED
+            for an action they have ALREADY PAID FOR.
+```
+
+That is the mirror image of the double charge this design exists to prevent:
+not charged twice, but **refused for work already bought**.
+
+**The fix:** the reference is checked **before** the quota and mapping
+decisions, inside the same transaction and under the same per-owner lock.
+
+⚠️ **This is not check-then-consume.** The read is inside the critical section,
+so no session can slip an insert between the check and the decision.
+
+**The unique index stays**, and is still the mechanism for the genuine race —
+two concurrent *first-time* requests carrying one reference, where neither read
+can see the other's uncommitted row. Belt and braces, each covering what the
+other cannot.
+
+Precedence note: the reference check sits **below** the subscription checks and
+**above** everything else. A killed feature or a dead subscription still outrank
+it — those are answers about the account, not about this action — but a plan
+mapping that changed since the original charge must not turn a completed, paid
+action into `PLAN_LACKS_FEATURE`.
 
 ### What the caller receives on the already-done path
 
@@ -884,8 +981,14 @@ written against.
 ## Still open — for the client
 
 - **Written acknowledgment that monetization is in the MVP.** It was added
-  verbally; §4 Q4 of PROJECT_MEMORY tracks it. The engine is designed and its
-  build waits on this.
+  verbally; §4 Q4 of PROJECT_MEMORY tracks it.
+
+  ⚠️ **This does not block the engine, and an earlier version of this line said
+  it did.** Every feature ships `FREE` with no mappings, so a "no" from the
+  client would require removing nothing — everything is already ungated. What
+  genuinely waits on written confirmation is **billing** (Phase 6.5): real
+  money, invoices, purchase screens. The accepted commercial risk is recorded
+  with a number in PROJECT_MEMORY §4.
 - **The actual plans and prices.** This document defines the mechanism and takes
   no position on what anything costs.
 - **Whether purchased credits expire** (Decision 4), which is a consumer-facing
