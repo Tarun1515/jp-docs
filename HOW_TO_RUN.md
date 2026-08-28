@@ -564,6 +564,24 @@ grep and by the absence of its fixture strings from every built chunk.
 ⚠️ If you are demonstrating this product, there is no longer a screen you have
 to talk around. There are areas that say "not yet", which is a different thing.
 
+### ⚠️ Every dropdown of master data is still OUR guess, not the client's
+
+Subjects, designations, qualifications, class levels, skills, facilities and
+document types were seeded by us in Phase 2B because the client's lists never
+arrived, and five of them are marked PROVISIONAL (2.47).
+
+🔴 **This matters most on a job form**, because that screen is nothing but those
+lists: subject, designation, qualification, class level, employment type. If you
+demonstrate posting a job, say once that the option lists are provisional and
+that the client reconciles them by `Code` — otherwise the first question after
+the demo is "why isn't *our* subject in there", and the honest answer arrives
+late instead of early.
+
+The engineering cost of a change is near zero: rename freely, deactivate what is
+not wanted (`Is_Active = 0`, never DELETE), add new rows with new codes. What is
+NOT free is changing a `Code` that is already live — foreign keys resolve
+through it.
+
 ### ⚠️ Built but deliberately inert — the entitlement engine
 
 Phase 2.5 added features, gating modes, quotas, credits and an append-only

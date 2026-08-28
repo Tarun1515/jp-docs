@@ -1,7 +1,7 @@
 # TEACHER RECRUITMENT PORTAL — PROJECT MEMORY
 
 > **Ye file har kaam ke baad update hogi.** Har naye chat/session mein sabse pehle ye file padho.
-> Last updated: **2026-08-28** | Phase **3 COMPLETE** (3A–3I) + **2.5 entitlement engine BUILT** | Next: **Phase 4 — Jobs**
+> Last updated: **2026-08-28** | Phase **3 COMPLETE** + **2.5 engine** + **4 jobs BACKEND** | Next: **Phase 4 screens**, phir Phase 5 — Applications
 >
 > 🔴 **Ye do line har phase ke close-out mein update hongi.** File 3I tak
 > pahunch chuki thi aur ye header **Phase 0** par khada tha — saat phase purana,
@@ -5092,6 +5092,208 @@ jp-docs/scripts/verify/{entitlement-engine,entitlement-http,screens-25}.mjs (nay
 
 ---
 
+### 🔒 2.65 JOBS — PHASE 4 (BACKEND)
+
+Jobs ki tables, procedures aur API ban gaye, aur **entitlement engine ka pehla
+asli consumer** wire ho gaya. Publish paisa kharch karta hai; draft banana muft
+hai.
+
+```
+engine   jobs-consume.mjs    23/23   (consume wired, atomicity, republish)
+HTTP     jobs-lifecycle.mjs  34/34   (lifecycle, scope, permissions, expiry, validation)
+regression  entitlement-engine 34/34 · entitlement-http 34/34
+            dashboards-3i 27/27 · team-contract 49/49
+build    backend 0/0 · run_all idempotent
+```
+
+⚠️ **Screens abhi nahi bane** — is phase ka frontend hissa baaki hai. Neeche
+"Kya baaki hai" dekho.
+
+#### 🔴 PUBLISH kharch karta hai, CREATE nahi
+
+Draft kisi ko dikhta nahi. Uske liye paisa lena **typing ke liye paisa lena** hai.
+Jo bik raha hai wo **reach** hai — job ka teachers ke saamne hona — aur wo publish
+se shuru hoti hai. Iska ek accha side effect bhi hai: school mahine bhar ke
+drafts taiyar kar sakta hai aur jaise-jaise release kare waise pay kare.
+
+#### 🔴 PUBLISH aur CONSUME ek hi transaction mein
+
+Ye is phase ki sabse zaroori cheez hai. `USP_PublishJob` ek transaction kholta
+hai aur usi mein dono karta hai:
+
+| Kya hua | Natija |
+|---|---|
+| consume mana | koi status change nahi, refusal Code caller tak |
+| publish consume ke **baad** fail | poora rollback — **ledger row bhi chala jaata hai** |
+
+Do API call ka matlab hota beech mein ek window jisme school se paisa kat chuka
+hai aur job abhi bhi draft hai. Us window ka pata sirf tab chalta jab customer
+shikayat karta ki quota kahan gaya.
+
+⚠️ `USP_ConsumeFeatureCore` **call hota hai, copy nahi**. Per-owner lock,
+quota-then-credits order, idempotency index, saare refusal Codes — sab wahin se.
+
+#### 🔴 Do cheezein chalane se mili, padhne se nahi
+
+**1. `INSERT ... EXEC` ne pehla design tod diya.**
+
+Pehle publish consume ka result set `INSERT ... EXEC` se pakadta tha. Pehli hi
+asli call par **Msg 3915** — "cannot use ROLLBACK within an INSERT-EXEC
+statement" — aur ROLLBACK theek wahi cheez hai jo refusal path karta hai. Uske
+upar `INSERT ... EXEC` **nest nahi ho sakta**, to publish ko koi bhi wrap nahi
+kar paata, hamesha ke liye.
+
+Fix: consume **core + wrapper** mein toota. `USP_ConsumeFeatureCore` OUTPUT
+parameters se jawaab deta hai; `USP_ConsumeFeature` patla wrapper hai jo usko
+call karke result set SELECT karta hai. **2.5 ka contract bilkul waisa hi hai** —
+dono suites bina ek line badle 34/34 pass hui, aur wahi saboot hai ki ye refactor
+tha, redesign nahi.
+
+**2. Ek test hook ne test ko GALAT WAJAH se pass kara diya.**
+
+Atomicity sabit karne ke liye pehle `USP_PublishJob` ke andar ek conditional
+`RAISERROR` dala tha, ek table par guard karke jo verification banati.
+
+SQL Server table ka naam statement **chalte waqt** resolve karta hai, IF ke waqt
+nahi. To jab table nahi thi, procedure "Invalid object name" par gir gaya —
+aur **atomicity test PASS ho gaya**: job draft rahi, ledger khaali raha, par
+isliye ki procedure kuch karne se **pehle** hi phat gaya tha.
+
+🔴 Jo test galat wajah se pass ho, wo fail hone wale test se bura hai.
+
+Ab injection **file ke bahar** hai: verification `t_app_jobs` par ek
+**temporary AFTER UPDATE trigger** lagati hai, jo theek consume aur commit ke
+beech chalta hai, aur baad mein hata deti hai. Production code mein koi
+scaffolding nahi.
+
+#### ⚠️ Idempotency reference = JobUid, aur uska natija khula likha hai
+
+`(JOB, JobUid)`. To **band ki hui job dobara publish karna muft hai** —
+`ALREADY_CONSUMED`, wahi original entryId, ledger mein ek hi row.
+
+MVP ke liye jaan-boojh kar: wo sach mein wahi job hai, aur ek posting ko dobara
+kholne ke liye dobara paisa lena zyadatar galat jawaab hota.
+
+🔴 **Gaming edge, saaf likha:** school baar-baar close/reopen karke kabhi dobara
+pay nahi karega. Aaj ye chalega kyunki listing `PublishedOn` se order hoti hai
+aur reopen usse refresh nahi karta — yaani gaming se **kuch milta nahi**. 6.5
+ise dobara dekhegi jis din listings freshness par rank hongi, kyunki tab reopen
+karne se **kuch milne lagega**.
+
+#### 🔴 Expired kabhi STORE nahi hoti
+
+`m_app_job_status` mein chaar row hain, likhi sirf teen jaati hain (1 Draft,
+2 Active, 4 Closed). `CK_t_app_jobs_StoredStatus` 3 ko rokta hai — warna niyam
+ek comment reh jaata aur kisi din derived aur stored status alag ho jaate, bina
+ye bataye ki kaun sahi hai.
+
+Ek hi jagah: `dbo.fn_EffectiveJobStatusId`. Koi proc date comparison haath se
+nahi likhta — kyunki paanch-chhe reader honge (list, detail, dashboard, Phase 6
+ka public search, Phase 5 ka applied-jobs) aur jis din ek ne `<=` likha jahan
+baakiyon ne `<`, ek screen par job band hogi aur doosri par khuli.
+
+⚠️ Koi nightly sweep nahi — 2.5-PRE wali wajah: **scheduler ka fail hona chup
+rehta hai**, aur expired jobs chup-chaap applications lete rehti.
+
+Verification ne ye alag-alag dikhaya:
+```
+database row : JobStatusId = 2 (Active), LastDateToApply = 2026-08-27
+IST today    : 2026-08-28   (UTC now 2026-08-28 11:07 — dono din alag ho sakte hain)
+API response : jobStatusId = 3 (Expired), storedStatusId = 2 (Active)
+```
+
+**Expired job par kya kar sakte hain:** close — **haan** (row abhi Active hai,
+sirf date nikal gayi; band karna hi imaandaar ant hai). Edit — **haan**, wahi
+Active wale niyam, aur `LastDateToApply` aage badhana hi use **zinda** karta hai.
+Wahi asli use case hai, aur "unexpire" naam ka koi action banane ki zaroorat
+nahi padi.
+
+#### Active job par kya edit ho sakta hai — aur wo line kyun wahan hai
+
+Jo field par teacher ne **match kiya** wo locked; jo **terms** batata hai wo nahi.
+
+| LOCKED | EDITABLE |
+|---|---|
+| BranchId · SubjectId · DesignationId · QualificationId | JobTitle · JobDescription |
+| EmploymentTypeId · CityId · StateId | SalaryMin/Max · IsSalaryNegotiable |
+| Min/MaxExperienceMonths · subject aur class-level sets | WorkingDays · Timing · NoOfVacancies |
+| | LastDateToApply · ExpectedJoiningDate |
+
+Teacher ne apply isliye kiya kyunki job uske **subject** ki thi, uske **level**
+par, uske paas, uske experience band mein. Live posting ke neeche subject badalna
+us cheez ko **peechhe se** badal deta hai jispar usne apply kiya — aur Phase 5
+se us par applications latki hongi.
+
+⚠️ **JobTitle editable hai, aur yahi ek judgement call hai.** Wo headline hai jo
+teacher padhta hai, to lock karne ka tark asli hai. Allow isliye kiya kyunki
+**matching title se nahi hoti** — subject, designation aur experience se hoti hai
+— aur title ki typo aam hai aur warna theek hi nahi ho sakti. 🔴 Agar Phase 6
+kabhi title text par rank ya search kare, ye faisla dobara dekhna padega: tab wo
+label ke kapde pehna hua matching field ban jaayega.
+
+#### 🔴 Branch scope — is phase ki security surface (2.39)
+
+`BranchId` body mein **jaayaz** hai ("ye job kis campus ki hai") — aur isi liye
+khatarnak hai. `SchoolId` body mein hona itna clearly galat hai ki koi likhega
+hi nahi; `BranchId` ko validate karna bhool jaana aasan hai.
+
+Har read aur har write `fn_VisibleBranches` se guzarti hai. Verification ne
+doosre school ka **asli, maujood** BranchId bheja:
+
+```
+create doosre school ke campus par  -> 404 NOT_FOUND
+edit   doosre school ki job par      -> 404 NOT_FOUND
+read   doosre school ki job          -> 404
+list                                  -> 0 rows (kam nahi, ZERO)
+koi bhi response mein SchoolId        -> nahi hai
+```
+
+⚠️ **NOT_FOUND, FORBIDDEN nahi** (2.6) — "ye campus aapka nahi hai" ye bata deta
+hai ki campus hai.
+
+#### Permissions seed se aati hain, UI ki raay se nahi
+
+Seed kehti hai: **HR ke paas CREATE/EDIT/VIEW hai, PUBLISH aur CLOSE nahi.**
+Owner aur Senior HR ke paas paanchon. Viewer ke paas sirf VIEW.
+
+To HR draft banata hai aur koi senior publish karta hai. Code mein koi role check
+hard-code nahi kiya — wo ek hi sawaal ka doosra jawaab hota, aur jis din seed
+badalti dono chup-chaap alag ho jaate. Verification ne HR se publish aur close
+dono try kiye: 403, aur draft draft hi rahi.
+
+#### Files
+
+```
+database/jp_app/01_tables/021_job_masters.sql        (naya — status + employment types)
+database/jp_app/01_tables/022_t_app_jobs.sql          (naya — jobs + 2 bridge)
+database/jp_app/04_procedures/013_entitlement.sql     (core + wrapper mein toota)
+database/jp_app/04_procedures/014_jobs.sql            (naya — 6 proc + fn_EffectiveJobStatusId)
+JP.Core/Constants/AppConstants.cs                     (JOB.* permission codes)
+JP.Domain/Jobs/JobContracts.cs                        (naya)
+JP.Infrastructure/Repositories/JobRepository.cs       (naya)
+JP.Infrastructure/Services/JobService.cs              (naya)
+JP.App.Api/Controllers/JobsController.cs              (naya)
+jp-docs/scripts/verify/jobs-consume.mjs               (naya)
+jp-docs/scripts/verify/jobs-lifecycle.mjs             (naya)
+```
+
+#### ⚠️ Kya baaki hai — Phase 4 ka frontend
+
+Backend poora aur verified hai. **Screens nahi bane:**
+
+- jp-school ka job list (status filter), create/edit form, publish aur close actions
+- 3I ke dashboard ka jobs area — abhi bhi honest-empty hai; `USP_GetSchoolJobStats`
+  aur `GetStatsAsync` **ban chuke hain**, dashboard unhe abhi call nahi karta
+- routes + `SCHOOL_JOBS` menu row
+- screenshots 1440/375
+
+🔴 **Applicants area waise hi rahega** — applications Phase 5 hain (2.62).
+
+Ye jaan-boojh kar chhoda gaya boundary hai, aadha kaam nahi: koi screen aadhi
+bani hui nahi hai, aur backend apne verification ke saath poora khada hai.
+
+---
+
 ## 3. SCOPE (Client spec ke against)
 
 ### IN SCOPE — MVP
@@ -5297,6 +5499,7 @@ naya Code, agla free Id, kuch renumber mat karo.
 | 2026-08-15 | 2.5-PRE | **Monetization design written down** — `MONETIZATION_DESIGN.md`: three gating modes with `Is_Active` as the kill switch, teacher-search Boolean and invites metered, a derived-not-scheduled quota period, and the ledger that makes balances recomputable. §3 reconciled — the engine is MVP (2.5), billing is 6.5. Two directions argued against in writing rather than quietly followed. Found that `jp_app` has no IST helpers while both other databases do — 2.5's first script. No code, no schema, no migrations | ✅ Done |
 | 2026-08-15 | 2.5-PRE | **Three documentation fixes** — gating reads are never served from the master cache (direct read per consume; the rejected short-TTL alternative rests on a single-process assumption that scaling out would silently break), and Phase 2.5's mode-flip test must prove the flip live on the consume path with no restart, sleep or clear. Fixed the header, stale since Phase 0 while the file ran to 3I. 🔴 Corrected Q4: the engine is **not** blocked on the client — every feature seeds FREE, so "no" changes nothing — billing is. The unacknowledged scope now has a number: ~12 dev-days, and it is a list of two | ✅ Done |
 | 2026-08-28 | 2.5 | **Entitlement engine** — features, gating modes, the append-only ledger, the atomic consume, and the admin plan × feature matrix. 🔴 Every feature ships FREE with no mappings, so nothing a user can see changed. Two bugs found by running the path rather than reading it: the balance formula invented a credit every time a quota consume was refunded, and a retry of an already-paid action was refused with QUOTA_EXHAUSTED once quota ran out. Engine 34/34, HTTP 31/31, browser 19/19; all four SQL suites and three HTTP regressions unchanged | ✅ Done |
+| 2026-08-28 | 4 | **Jobs — backend** — tables, six procedures, the API, and the engine's first real consumer. 🔴 Publish and consume are ONE transaction: a refused consume leaves the job a Draft, and a failure after the consume rolls the ledger row back with it. Two things found by running rather than reading: INSERT ... EXEC made the first design illegal (Msg 3915) and forced the consume into core+wrapper, and a test hook inside the procedure made the atomicity test pass for the wrong reason. Expiry is derived, never stored. jobs-consume 23/23, jobs-lifecycle 34/34, all regressions unchanged. ⚠️ Screens not built — a stated boundary | 🟡 Backend done |
 
 ---
 
@@ -5856,29 +6059,34 @@ paint` se theek hua, baaki chaar candidate ne kuch nahi hilaya.
 
 ---
 
-## ▶️ NEXT: PHASE 4 — JOBS
+## 🟡 PHASE 4 — BACKEND COMPLETE, SCREENS PENDING — 2026-08-28
 
-Phase 3 poora ho gaya: `jp_app` ki tables, procedures, APIs aur school ke
-teeno screen (profile, campuses, team). Ab **jobs** — pehli cheez jo teacher aur
-school ke beech aati hai.
+Jobs ka poora backend bana aur verify hua. Details **2.65**.
 
-### 🔴 Jo pehle se likha hua hai aur ab zinda hoga
-- `USP_DeleteBranch` ki "is campus par jobs hain" wali refusal (2.53) — table
-  banne par comment se code banegi. **UI ka rasta 3F mein ban chuka hai.**
-- `fn_VisibleBranches` — har job query isse guzregi. Har nayi list proc ke
-  saath uska apna negative case chahiye (G22).
-- `fn_TeacherContactUnlocked` (2.54) — **application aane par hi** contact
-  khulta hai (2.56 LOCKED). Phase 5 ka aadha hissa yahin se shuru hota hai.
+```
+jobs-consume.mjs    23/23   jobs-lifecycle.mjs  34/34
+regression: entitlement 34/34 + 34/34 · dashboards 27/27 · team 49/49
+```
 
-### 🔴 BranchId kabhi NULL nahi (2.10)
-Job, application, offer — teeno par mandatory. Single-campus school ka head
-office bhi ek branch hai, isliye koi nullable-branch rasta banane ki zaroorat
-nahi.
+🔴 **Publish = consume, ek transaction mein.** Refused consume par job draft
+rehti hai; consume ke baad fail hone par ledger row bhi wapas chali jaati hai.
+Dono verification mein dikhaye gaye hain.
 
-### Verification
-`90_ops/001_verify_account_completeness.sql` teeno zero ·
-`99_tests/001` 48/48 · `002` 44/44 · `003` 52/52 ·
-`scripts/verify/{browse-contract,team-contract,profile-branches,screens-3f}.mjs`
+🔴 **Do cheezein chalane se mili:** `INSERT ... EXEC` ne pehle design ko Msg
+3915 par toda (consume ab core + wrapper hai, 2.5 ka contract waisa hi), aur ek
+test hook ne atomicity test ko **galat wajah se pass** kara diya (ab injection
+ek temporary trigger hai, file ke bahar).
+
+⚠️ **Expired kabhi store nahi hoti** — `fn_EffectiveJobStatusId`, koi sweep job
+nahi. Row Active kehti hai, API Expired kehti hai, dono side by side dikhaye.
+
+### ▶️ Aage — Phase 4 ke screens
+
+- job list (status filter) + create/edit form + publish/close actions
+- dashboard ka jobs area asli counts par (`GetStatsAsync` **ban chuka hai**,
+  dashboard abhi use call nahi karta)
+- routes + `SCHOOL_JOBS` menu row, screenshots 1440/375
+- 🔴 applicants area **waise hi** rahega — Phase 5 (2.62)
 
 ---
 
