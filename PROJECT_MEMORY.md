@@ -1,7 +1,7 @@
 # TEACHER RECRUITMENT PORTAL — PROJECT MEMORY
 
 > **Ye file har kaam ke baad update hogi.** Har naye chat/session mein sabse pehle ye file padho.
-> Last updated: **2026-09-19** | Phase **3 COMPLETE** + **2.5 engine** + **4 jobs COMPLETE** + **2.67 swagger fix** + **PRE-5 (G26 band, 2.68/2.69)** + **PRE-5b (baseline green)** + **5A applications BACKEND (2.70, G28)** + **5B applications SCREENS COMPLETE — PHASE 5 POORA (2.71, G30)** | Next: **Phase 6 — Offers, invites, notifications, teacher search**
+> Last updated: **2026-09-19** | Phase **3 COMPLETE** + **2.5 engine** + **4 jobs COMPLETE** + **2.67 swagger fix** + **PRE-5 (G26 band, 2.68/2.69)** + **PRE-5b (baseline green)** + **5A applications BACKEND (2.70, G28)** + **5B applications SCREENS COMPLETE — PHASE 5 POORA (2.71, G30)** + **6A-0 approval engine above level 1 (2.72, G14 BAND, G31)** | Next: **Phase 6A — Offer Lite**
 >
 > 🔴 **Ye do line har phase ke close-out mein update hongi.** File 3I tak
 > pahunch chuki thi aur ye header **Phase 0** par khada tha — saat phase purana,
@@ -1640,7 +1640,7 @@ storage se pehle**, aur reject kar sakne wala.
 ⚠️ `SaveAsync` ke baad **mat** rakhna — disk pe pada file wo file hai jo serve
 ho sakti hai.
 
-### G14. Multi-level approval — aadha hi verify hua hai
+### G14. Multi-level approval — aadha hi verify hua tha — ✅ CLOSED (6A-0, 2026-09-19)
 
 Independent verification ne ye **saabit** kiya: level advancement configuration
 padhti hai, ek level maan kar nahi chalti. Do level configure karne par level 1
@@ -1660,6 +1660,26 @@ approval nahi laata. Us din **sab** maayne rakhte hain.
 
 🔴 Jo bhi ye uthaye: **ye cases pehle likho.** Engine sahi *dikhta* hai, par
 aaj tak sirf ek raste se guzara hai.
+
+#### ✅ Band kaise hua — 6A-0, offer ka ek bhi line likhne se PEHLE
+
+`scripts/verify/approval-levels.mjs` — **31/31**. Fixture apni
+`OrganizationUid` ke neeche do-level config banata hai (platform default rows
+ko haath nahi lagata — PRE-5b ka niyam), aur `finally` mein sab wapas.
+
+| G14 ka sawaal | Jawaab, ab naapa hua |
+|---|---|
+| level 2 par **reject** — poori request, ya level 1 par wapas? | **Poori request Rejected**, aur `CurrentApprovalLevel` 2 par hi rehta hai — taaki trail bataye ki inkaar kahan hua |
+| level 2 par **resubmit** — level 1 se shuru, ya level 2 se? | Request `ResubmitRequired` par level 2 par rukti hai; par applicant ke resubmit karte hi **level 1 par reset** ho jaati hai (`USP_ResubmitApprovalRequest`) — aur dono level dobara approve karne padte hain |
+| **per-level role scoping** | Dono taraf se kaam karta hai: level-2 ka role level 1 par FORBIDDEN, level-1 ka role level 2 par FORBIDDEN |
+| level 2 par **concurrency** | Do sach mein parallel approve (gate instants, gap 0 ms) → ek jeeta, doosre ko `CONCURRENCY_CONFLICT`, trail mein level 2 ki **ek** row |
+
+🔴 **Aur ek asli defect mila — wahi jiske liye G14 likha gaya tha.** Dekho **2.72**.
+
+⚠️ Teen ya usse zyada level ab bhi nahi chalaye gaye. 6A ek level seed karta hai
+aur engine do par sabit hai; teen ka koi consumer nahi hai, aur bina consumer ke
+test likhna wahi anumaan hai jiske khilaf G14 tha. Jis din teen level ka koi
+maang kare, ye table dobara khulegi.
 
 ### G15. "Assigned to" filter — ✅ CLOSED (3G, 2026-08-15)
 
@@ -2114,6 +2134,32 @@ laayak nahi hona chahiye.
 🔴 **Sabak:** ek attribute jo kisi input se match nahi karta, chup-chaap girta
 hai. Naya input add karte waqt uske call-site `[bracket]` form mein likho, ya
 kam se kam ek baar click karke dekho ki hota kya hai.
+
+### G31. Approval engine ek NORMAL concurrency conflict ko error-log karta hai — 🟡 OPEN (6A-0, 2026-09-19)
+
+`USP_ProcessApprovalAction` ki optimistic check jab race haarti hai to
+`THROW 50023` karti hai. Wo CATCH mein jaata hai, aur CATCH **pehle
+`USP_LogError` chalata hai**, phir error ko `CONCURRENCY_CONFLICT` mein
+badalta hai.
+
+Matlab: **har ordinary race ek error-log row likhti hai.** Do admin ne ek hi
+request par Approve daba diya — ye product ka rozmarra ka vyavhaar hai, bug
+nahi.
+
+🔴 **Ye 5A ke ulta hai, aur dono ek hi sawaal par hain.** `USP_ApplyToJob` mein
+**expected** 2601 (wahi index, duplicate apply) chup-chaap swallow hota hai aur
+sirf **unexpected** 2601 log hota hai — 3C ka poora sabak yahi tha. Approval
+engine mein expected conflict bhi log hota hai.
+
+⚠️ **Nuksaan:** error log dheere-dheere non-error se bhar jaata hai, aur jis din
+koi usme asli bug dhoondega, wo shor mein doobega. Yahi wajah hai ki log rakhte
+hain.
+
+**Band kaise hoga:** 50023 ko CATCH mein log se pehle pehchaan kar chhod do
+(baaki sab waise ka waisa log hota rahe) — teen line. ⚠️ Par ye **operations ka
+faisla** hai, G14 ka bakaya nahi: kisi ko ye bhi chahiye ho sakta hai ki har
+conflict dikhe. 6A-0 ne isliye behaviour nahi badla, sirf number diya, aur
+`approval-levels.mjs` ab exactly ek row expect karti hai aur kehti hai kyun.
 
 ### 2.45 `jp_mdm` — PHASE 2A BUILD NOTES
 
@@ -6473,6 +6519,70 @@ hai). Teacher ke kisi bhi action ka is table mein aana **kabhi** allowed nahi.
 
 ---
 
+### 2.72 APPROVAL ENGINE ABOVE LEVEL 1 — PHASE 6A-0
+
+G14 ka bakaya, **offer ka ek bhi line likhne se pehle** chukaya gaya — kyunki
+OFFER_APPROVAL isi engine par chadhne wala hai.
+
+```
+approval-levels.mjs   31/31   (G14 ke chaaron case + gate instants)
+99_tests/001          30/30   (purani SQL suite, unchanged)
+run_all ×2 → 0 objects · profile-branches 37 · screens-25 19 · dashboards-3i 28
+```
+
+#### 🔴 ASLI DEFECT: org override override karta hi nahi tha
+
+`024_t_mdm_request_levels.sql` ka header ek line mein contract likhta hai:
+*"A row WITH an OrganizationUid overrides it for that one organisation."*
+
+⚠️ **Procedure us table ko DO baar padhta tha, aur dono read "override" ka
+matlab alag samajhte the:**
+
+- `IsFinal` wali read `TOP (1)` leti thi, organisation row ko **pehle**
+  order karke — yaani asli override;
+- permission check `NOT EXISTS` **dono rows par ek saath** chalata tha, to
+  platform default ka role bhi match kar jaata tha.
+
+Nateeja: jis organisation ne likha "yahan sirf Senior HR approve karega", use
+mila **"Senior HR YA jo bhi platform default kehta hai"**. Override ne role
+**joda**, badla nahi.
+
+🔴 **Aur ye dikhta isliye nahi tha ki koi override hai hi nahi.** Saare seeded
+rows platform default hain; bina override ke dono reading ka jawaab ek hi hai.
+G14 theek isi class ke liye likha gaya tha — ek raasta, sau baar.
+
+**Fix:** effective row **ek baar** resolve hota hai, sabse upar, aur dono faisle
+(`@LevelRoleId`, `@LevelIsFinal`) usi ek result se padhte hain. Ek
+configuration ki do read hi drift ka tareeka hai; ab ek hai.
+
+⚠️ Ek jaan-boojh ki asymmetry: config **bilkul na ho** to `IsFinal` 1 maana
+jaata hai (request atak na jaye) par permission **FORBIDDEN** rehti hai
+(anjaane mein kisi ko authorise na kar de). Dono line par likha hai.
+
+#### ⚠️ Fixture platform defaults ko chhuta nahi — PRE-5b ka niyam
+
+Do level lene ka aasan raasta tha seeded rows edit karna. PRE-5b ka calendar
+bomb bilkul yahi tha. Isliye suite apni `OrganizationUid` ke neeche apna config
+banati hai, requests bhi usi ke saath submit hoti hain, aur entry **aur** exit
+dono par platform config byte-identical assert hoti hai.
+
+#### ⚠️ Mere do test galat the — engine nahi
+
+1. **Trail ki expectation adhoori thi.** Trail approval se nahi, **submission**
+   se shuru hota hai (action 4 = Submit, 5 = Resubmit). Assertion ne wo row
+   nahi ginni thi.
+2. **Org-override wala test galat level par pooch raha tha.** Pichli assertion
+   request ko level 2 par bhej chuki thi, to override ka sawaal level 2 par
+   gaya aur bilkul sahi "approved" mila — **pass kuch nahi kiya, sabit kuch
+   nahi kiya.** Ab uska apna fresh request hai, level 1 par.
+
+   🔴 Aur fixture ab **teen** role use karta hai, do nahi. Do ke saath org ka
+   level-2 role aur platform default ka level-1 role **ek hi** nikal rahe the,
+   jisse do alag property — "check isi level ko padhta hai" aur "override
+   replace karta hai" — ek doosre se alag hi nahi ho paati thin.
+
+---
+
 ## 3. SCOPE (Client spec ke against)
 
 ### IN SCOPE — MVP
@@ -6685,6 +6795,7 @@ naya Code, agla free Id, kuch renumber mat karo.
 | 2026-08-28 | 4 | **Jobs — backend** — tables, six procedures, the API, and the engine's first real consumer. 🔴 Publish and consume are ONE transaction: a refused consume leaves the job a Draft, and a failure after the consume rolls the ledger row back with it. Two things found by running rather than reading: INSERT ... EXEC made the first design illegal (Msg 3915) and forced the consume into core+wrapper, and a test hook inside the procedure made the atomicity test pass for the wrong reason. Expiry is derived, never stored. jobs-consume 23/23, jobs-lifecycle 34/34, all regressions unchanged. ⚠️ Screens not built — a stated boundary | ✅ Done |
 | 2026-09-19 | 5A | **Applications — backend** — tables, das read procedures upar 016 ke paanch write procedures ke, dono taraf ka API, aur teen nayi verification. 🔴 **2.56 pehli baar ZINDA hua**: `fn_TeacherContactUnlocked` 3D se `RETURN 0` tha, ab ek EXISTS hai — apply karte hi contact **us ek school** ke liye khulta hai, doosre ke liye nahi, aur job SAVE karne se kuch nahi khulta. 🔴 **3C ka guard aakhirkaar chalaya gaya**: ek temporary doosra unique index bana kar 2601 karaya, aur procedure ne ALREADY_APPLIED **nahi** kaha — error apne aap ki tarah upar aaya, log hua, rollback hua. 🔴 Apply **muft** hai — poore feature mein ek bhi consume nahi (2.64). Do asli bug mile: `USP_GetJobList`/`GetJobById` stale `ApplicationCount` column project kar rahe the (ab derived), aur history ka "kisne badla" naam agar email par fallback karta to **teacher ka email** har applicant screen par leak karta — pehli history row teacher hi likhta hai. consent 31/31, race 21/21, lifecycle 70/70, swagger farsh 76 -> 89, saari purani suites unchanged, `run_all` idempotent. ⚠️ Screens nahi bane — 5B, ek likhi hui seema | ✅ Done |
 | 2026-09-19 | 5B | **Applications — screens. PHASE 5 POORA.** Teacher: job browse, job detail + apply, my applications (+ detail), saved jobs. School: applicants list, applicant detail + status actions. Dono dashboard ke area asli count par. 🔴 **1D ka applicants mockup DELETE** — `_design-reference/` poora gaya, uska design asli screen mein hai, aur suite check karti hai ki uska koi fixture naam screen par ya kisi built chunk mein nahi aa sakta. 🔴 **`APPLICATION_STATUS` master serve hi nahi hota tha** — table 5A mein bana, whitelist mein nahi tha, to school ka stage filter hardcode hota (2.7); ab **sirf 6 reachable** rows jaati hain. 🔴 **`AllowedTransitions` server se aata hai** — wahi `fn_ApplicationTransitionAllowed` jo illegal move refuse karta hai; component ke paas map ki koi copy nahi, aur Rejected par khaali list matlab **koi button hi nahi** (absent, disabled nahi). 🔴 Ek shipped bug mila: `ui-empty-state` par `actionLink` **input tha hi nahi** — 4B se plain attribute ki tarah likha ja raha tha, to "Post a job" **kuch nahi karta tha**, aur type error bhi nahi aata tha. Ab input hai aur `<a>` render hota hai. ⚠️ Ek purana tootá guard bhi mila jo 5B ka nahi: `screens-3h` ka `#section-experience .empty` 3H se hi galat tha — wo assertion kabhi chali hi nahi. ⚠️ CHAUTHI fixture contamination (suite ne Imran ka resume chhod diya tha) — ab snapshot normalise ke baad lete hain aur `finally` mein restore. Teen suite ki assertion **jaan-boojh kar** badli (`dashboards-3i`, `jobs-screens`, `screens-3i`) kyunki shipped state badla. screens 86/86, swagger 13/13 (floor 89 waise ka waisa — koi naya route nahi), saari purani suites green, backend 0/0, paanchon frontend warnings=0, `run_all` ×2 → 0 objects | ✅ Done |
+| 2026-09-19 | 6A-0 | **G14 ka bakaya chukaya — offer ka ek bhi line likhne se pehle.** `approval-levels.mjs` 31/31: level-2 reject (poori request rejected, level 2 par rukta hai), level-2 resubmit (ResubmitRequired level 2 par, par applicant ke resubmit par **level 1 reset** — dono level dobara), per-level role scoping (dono taraf FORBIDDEN), aur level-2 concurrency (gate instants, gap 0 ms, ek jeeta ek CONCURRENCY_CONFLICT). 🔴 **Ek asli defect mila:** procedure `t_mdm_request_levels` ko **do baar** padhta tha aur dono read "org override" ka matlab alag samajhte the — `IsFinal` org row ko preference deta tha, permission check dono rows par ek saath chalta tha, to override ne role **joda** banisbat badle ke. Jis organisation ne apni approval narrow ki, wahi ek case chup-chaap kaam nahi karta tha — aur dikhta nahi tha kyunki koi override hai hi nahi. Ab effective row **ek baar** resolve hota hai aur dono faisle usse padhte hain. ⚠️ Mere do test galat the (trail submission se shuru hota hai; override wala test galat level par pooch raha tha) — dono theek. **G14 CLOSED**, **G31 open** (engine normal concurrency conflict ko error-log karta hai — 5A ke ulta). Purani SQL suite 30/30 unchanged, `run_all` ×2 → 0 objects | ✅ Done |
 
 ---
 
