@@ -418,21 +418,42 @@ try {
   /*
     And end-to-end: two rows written a second apart across that boundary are
     counted against different months by the balance procedure.
+
+    🔴 THESE TWO ROWS GET THEIR OWN OWNER, AND THAT IS A BUG FIX.
+
+    They used to share OWNER with everything above them. The earlier sections
+    consume through USP_ConsumeFeature, which stamps OccurredOn =
+    SYSUTCDATETIME() — so those rows land in whatever month the machine clock
+    says it is, and they landed in the SAME buckets this assertion counts.
+
+    Written in August 2026 that was invisible: the four earlier consumes fell
+    into August, where `augUsed >= 1` swallowed them, and September held only
+    the 18:30:00Z row. Come September the four moved across and sepUsed read 5.
+
+    ⚠️ A calendar bomb — green for a month, then deterministically red, with
+    nothing about the engine having changed. Fixed by ISOLATING the fixture
+    rather than by loosening the assertion: `sepUsed === 1` is the part that
+    proves the 18:30:00Z row crossed the boundary, and weakening it to `>= 1`
+    would have made the check unable to fail for the right reason.
   */
+  const BOUNDARY = 'A5B2C7D1-0E44-4F19-9A3C-2500BEEF2504';
   sql(`SET NOCOUNT ON; USE jp_app;
+    DELETE FROM t_app_feature_ledger WHERE OwnerUid='${BOUNDARY}';
     INSERT INTO t_app_feature_ledger
       (OwnerUid, FeatureId, EntryTypeId, SourceId, Units, RefEntityTypeId, RefEntityUid, OccurredOn)
-    VALUES ('${OWNER}', ${FEATURE}, 2, 1, -1, 1, '${uid(60)}', '2026-08-31T18:29:59'),
-           ('${OWNER}', ${FEATURE}, 2, 1, -1, 1, '${uid(61)}', '2026-08-31T18:30:00');`);
+    VALUES ('${BOUNDARY}', ${FEATURE}, 2, 1, -1, 1, '${uid(60)}', '2026-08-31T18:29:59'),
+           ('${BOUNDARY}', ${FEATURE}, 2, 1, -1, 1, '${uid(61)}', '2026-08-31T18:30:00');`);
 
   const augUsed = Number(one(`SET NOCOUNT ON; USE jp_app;
-    EXEC USP_GetFeatureBalance @OwnerUid='${OWNER}', @FeatureId=${FEATURE}, @AsOfUtc='2026-08-15T00:00:00';`)[4]);
+    EXEC USP_GetFeatureBalance @OwnerUid='${BOUNDARY}', @FeatureId=${FEATURE}, @AsOfUtc='2026-08-15T00:00:00';`)[4]);
   const sepUsed = Number(one(`SET NOCOUNT ON; USE jp_app;
-    EXEC USP_GetFeatureBalance @OwnerUid='${OWNER}', @FeatureId=${FEATURE}, @AsOfUtc='2026-09-15T00:00:00';`)[4]);
+    EXEC USP_GetFeatureBalance @OwnerUid='${BOUNDARY}', @FeatureId=${FEATURE}, @AsOfUtc='2026-09-15T00:00:00';`)[4]);
 
-  check('…and the balance counts them in DIFFERENT months',
-    augUsed >= 1 && sepUsed === 1,
-    `August ${augUsed} used, September ${sepUsed} used (the September row is the 18:30:00Z one)`);
+  sql(`SET NOCOUNT ON; USE jp_app; DELETE FROM t_app_feature_ledger WHERE OwnerUid='${BOUNDARY}';`);
+
+  check('…and the balance counts them in EXACTLY one month each',
+    augUsed === 1 && sepUsed === 1,
+    `August ${augUsed} used, September ${sepUsed} used — one row each, on either side of 18:30Z`);
 
   // =========================================================================
   console.log('\n=== 1. 🔴 THE RACE — TWO GENUINELY PARALLEL SESSIONS ===');

@@ -447,7 +447,32 @@ environment config, never hardcoded.
 | `principal@greenwood.edu.in` | see `local-accounts.md` | School | `SCHOOL_OWNER` | The complete school sidebar (8 items) and every school screen: dashboard, profile, campuses, team |
 | `hr.lead@greenwood.edu.in` | see `local-accounts.md` | School | `HR` | **Permission filtering.** Same organisation as the principal, but fewer menus — no Campuses, no Team. Sign in as both back to back; that difference is `USP_GetUserMenus` doing its job |
 | `head@stmarys.edu.in` | see `local-accounts.md` | School | `SCHOOL_OWNER` | **Tenant isolation.** A second organisation, with its own school (St Mary's Convent, Bandra), its own head office and its own plan. Neither school can see the other's branches, users or applicants |
+| `viewer@greenwood.edu.in` | see `local-accounts.md` | School | `SCHOOL_VIEWER` | **Read-only rendering.** Same school as the principal, scoped to its campus, holding `JOB.VIEW` · `APPLICANT.VIEW` · `REPORT.VIEW` and nothing else. Opens `/jobs`, sees the rows, and sees **no** New job, Publish or Close — absent, not greyed |
 | `tarun@yopmail.com` | *(yours)* | Teacher | `TEACHER` | The teacher portal — 8 menus, no admin or school items |
+
+> 🔴 **The Viewer is a real account, and it used to be a fixture.** Phase 4B had
+> no Viewer, so `jobs-screens.mjs` synthesised one by soft-deleting the HR
+> role's `JOB.CREATE`/`JOB.EDIT` grants for the length of one assertion and
+> putting them back. That was honest but it edited a shared role to test a
+> screen, and a killed run left the HR account weakened. The account below
+> replaced it in PRE-5.
+>
+> ⚠️ **It cannot come from `JP.Tools.SeedAdmin`** — that tool calls
+> `USP_CreateAdminUser` and takes `SUPER_ADMIN`, `ADMIN` or `SUPPORT_ADMIN`
+> only. A school colleague arrives through the product's own invite flow, which
+> is exactly what the seeding script walks:
+>
+> ```powershell
+> cd D:\Projects\jp-docs
+> node scripts/seed-school-viewer.mjs
+> ```
+>
+> Owner invites → the invitation lands in
+> `jp-backend\JP.App.Api\App_Data\mail-drop\*.eml` → the token is redeemed
+> through `POST /api/auth/set-password-from-invite`. The application derives the
+> PBKDF2 hash, exactly as it does for a real person. 🔴 **Never hand-roll a hash
+> into SQL.** Re-running the script when the account already works changes
+> nothing and says so.
 
 > 🔴 **The passwords are in `local-accounts.md`, which is gitignored.**
 >

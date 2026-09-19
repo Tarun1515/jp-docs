@@ -1,7 +1,7 @@
 # TEACHER RECRUITMENT PORTAL — PROJECT MEMORY
 
 > **Ye file har kaam ke baad update hogi.** Har naye chat/session mein sabse pehle ye file padho.
-> Last updated: **2026-08-28** | Phase **3 COMPLETE** + **2.5 engine** + **4 jobs COMPLETE** + **2.67 swagger fix** | Next: **Phase 5 — Applications**
+> Last updated: **2026-09-19** | Phase **3 COMPLETE** + **2.5 engine** + **4 jobs COMPLETE** + **2.67 swagger fix** + **PRE-5 (G26 band, 2.68/2.69)** | Next: **Phase 5 — Applications**
 >
 > 🔴 **Ye do line har phase ke close-out mein update hongi.** File 3I tak
 > pahunch chuki thi aur ye header **Phase 0** par khada tha — saat phase purana,
@@ -1899,6 +1899,74 @@ HTTP verification mein kam se kam ek row+JSON dual read hona chahiye.
 ⚠️ **G25 phir bhi band nahi hai, aur band nahi hoga.** Ye us **ghatna** ka
 record hai — do phase tak chupa hua bug — jo bataata hai ki niyam kyun hai.
 Niyam 2.61 mein rehta hai, ghatna yahan.
+
+### G26. `jp_app` ke masters tak koi raasta hi nahi tha — ✅ CLOSED (PRE-5, 2026-09-19)
+
+**Khula: 2026-09-19 · Band: 2026-09-19.** Dono date ek hi din ki hain, aur ye
+jaan-boojh kar hai: cheez 4B (2026-08-28) mein **mili** thi aur wahan likhi bhi
+gayi thi, par usay kabhi **number** nahi mila. Number ke bina wo ek build note
+ke andar ka paragraph thi — G-list mein nahi, isliye kisi checklist mein nahi,
+isliye kisi phase ke close-out mein nahi. Number pehle, band baad mein.
+
+#### Kya toota tha
+
+`m_app_employment_types`, `m_app_job_status`, `m_app_ledger_entry_types`,
+`m_app_ledger_sources`, `m_app_ref_entity_types` — paanch master `jp_app` mein
+hain. `/api/masters/*` sirf `jp_mdm` ki `USP_GetMaster` padhti thi, jismein in
+paanchon ki koi branch hai hi nahi.
+
+⚠️ Ye "table galat jagah hai" wala masla **nahi** hai. `t_app_jobs` aur
+`t_app_feature_ledger` in par **physical FK** rakhti hain, aur 2.2 physical FK
+ko DB ke paar mana karta hai. To master usi database mein aayega jismein use
+point karne wali table hai. Galti read side par thi, storage par nahi.
+
+#### 🔴 Natija — ek vakya mein
+
+**Koi school Part-time, Contract, Visiting ya Temporary vacancy post kar hi
+nahi sakti thi.** Form se field hata di gayi thi (sahi faisla — paanch values
+hardcode karna 2.7 todta), column ka default Full-time lagta tha, aur us
+default ko badalne ka koi tareeka UI mein tha hi nahi.
+
+⚠️ Aur **kuch fail nahi hota tha**. Form save hota tha, job publish hoti thi,
+har suite green thi. Ye us class ki galti hai jo 2.67 ne pakdi thi: cheez us
+tareeke se tooti thi jise dekhne ke liye koi test bana hi nahi tha.
+
+#### Kaise band hua
+
+`USP_GetAppMaster` (`jp_app`) — wahi whitelist-driven CASE, wahi `@Recognised`
+OUTPUT, wahi result-set shape. `MasterService` **pehle jp_mdm se poochta hai,
+aur sirf uske `@Recognised = 0` par jp_app se** — C# mein koi doosri list nahi
+(2.68 dekho, wahan poora tark hai).
+
+Frontend: `MASTER_KEYS.employmentType` pehle se maujood tha (client ne apna
+hissa 4B mein kar rakha tha, server ka aadha nahi tha). Job form mein control
+laga, `pickDefaultEmploymentType` id 1 maan kar nahi chalta, aur 4B wala
+"YE EK REPORTED GAP HAI" comment block nikal gaya — gap band hai to uska
+nishaan bhi jaana chahiye.
+
+#### Saboot — output, daava nahi
+
+```
+GET /api/masters/employment-type
+  HTTP 200 · cache-control private,max-age=3600 · 5 rows
+  FULL_TIME · PART_TIME · CONTRACT · VISITING · TEMPORARY
+
+browser (jobs-screens.mjs 55/55)
+  rendered [Full-time, Part-time, Contract, Visiting, Temporary]
+  wire     [Full-time, Part-time, Contract, Visiting, Temporary]   ← network capture
+  Part-time job banayi -> DB row 2|PART_TIME · JSON employmentTypeId 2
+  2.61 dual read       -> row Is_Active = 1 · JSON isActive true
+```
+
+🔴 `<option>` list ka screenshot saboot **nahi** hai — hardcoded array bhi
+bilkul waisa hi render hota. Isliye assertion wire par se padhi hui response ke
+against hai, na ki us list ke against jo script khud jaanti ho.
+
+#### ⚠️ Jo band NAHI hua
+
+Paanchon values ab bhi **humari** hain, client ki nahi (2.47). Endpoint hone ka
+matlab hai ki unhe badalna ab **data change** hai, deployment nahi — jo poora
+point tha. `Code` stable, `Name` client ka.
 
 ### 2.45 `jp_mdm` — PHASE 2A BUILD NOTES
 
@@ -5339,6 +5407,16 @@ To field form se hata di aur column ka default (Full-time) lagta hai. **Natija
 saaf likha: school abhi Part-time ya Contract vacancy post nahi kar sakta.**
 Isse band karne ke liye ek endpoint chahiye jo Phase 4B ne apne aap nahi joda.
 
+> ✅ **Ab band — PRE-5, 2026-09-19.** Ye paragraph 4B ka record hai, isliye
+> waisa hi rehta hai. Jo hua wo **G26** mein hai aur niyam **2.68** mein:
+> `USP_GetAppMaster` (`jp_app`), `MasterService` ka fall-through, aur job form
+> mein asli dropdown jo wire se aayi list render karta hai.
+>
+> ⚠️ **Sabak isi paragraph ka bacha hua hissa hai:** cheez yahan **saaf likhi
+> hui thi** aur phir bhi teen hafte khadi rahi, kyunki use koi **number** nahi
+> mila. Build note ke andar ka paragraph kisi checklist mein nahi aata; G-list
+> ka number aata hai. Gap report karna kaafi nahi — usay G do.
+
 #### 🔴 Poori chain — ek session, dono app, koi restart nahi
 
 Ye wo cheez hai jo 2.5 aur 2.64 ne aadhi-aadhi sabit ki thi. Ab poori:
@@ -5530,6 +5608,202 @@ JP.Sso.Api/Program.cs                       (CustomSchemaIds)
 jp-docs/scripts/verify/swagger.mjs          (naya — guard)
 jp-docs/package.json                        (verify:swagger)
 ```
+
+---
+
+### 🔒 2.68 MASTERS DO DATABASE MEIN HAIN — EK ENDPOINT, DO GATE (PRE-5, G26)
+
+Naya numbered decision, **2.66 ke neeche note nahi** — aur ye chunav khud ek
+faisla hai.
+
+2.66 Phase 4B ka **record** hai: us phase mein kya bana, kya mila. Uske andar
+ek note likhne ka matlab hota "ye 4B ki kahani ka agla paragraph hai". Ye uska
+paragraph nahi hai — ye ek **niyam** hai jo har agle master par lagta hai, aur
+niyam ko cite kiya jaata hai ("2.68 dekho"), kahani ko nahi. 2.61 ne theek yahi
+kiya tha: ghatna G25 mein rahi, niyam alag number bana. Wahi shakl yahan.
+
+#### 🔴 Niyam
+
+**Master wahan rehta hai jahan uski FK hai. Read dono jagah se hoti hai, aur
+caller ko farak pata nahi chalta.**
+
+| | |
+|---|---|
+| Kahan rakho | Jis table ki physical FK hai, usi database mein (2.2) |
+| Kaise padho | `GET /api/masters/{key}` — **ek** endpoint, dono ke liye |
+| Kaun gate hai | Har database ka apna procedure, apni whitelist |
+| C# mein list | **Ek bhi nahi** |
+
+```
+GET /api/masters/employment-type
+   -> USP_GetMaster (jp_mdm)      @Recognised = 0, khaali set
+   -> USP_GetAppMaster (jp_app)   @Recognised = 1, 5 rows      ← jawab
+```
+
+#### 🔴 Sabse aasaan galat jawab: C# mein paanch key ka HashSet
+
+Wahi ek line likhne ka mann karta hai — "ye paanch jp_app ke hain, baaki
+jp_mdm ke". 2.48 exactly isi ko mana karta hai: **do list jinhe agree karna
+padta hai**, aur jis din wo disagree karti hain ya to ek master dropdown se
+gayab ho jaata hai ya koi naya reachable ho jaata hai jo nahi hona chahiye.
+
+Routing ki topi pehen lene se wo doosri list mit nahi jaati. Isliye fall-through:
+jp_mdm ka `@Recognised = 0` hi wo signal hai jo key ko aage bhejta hai. Har
+procedure apna gate rehta hai, aur naya master jodna aaj bhi **ek file ka edit**
+hai.
+
+⚠️ **Guard `!recognised` par hai, `rows.Count == 0` par NAHI.** Recognised-but-
+empty ek asli jawab hai — `districts`/`cities` dataset aane tak khaali hi dete
+hain (2.47). Khaali par fall through karte to wo do key har request par jp_app
+ko bhi poochti, hamesha, dobara "kuch nahi" sunne ke liye.
+
+#### ⚠️ Do whitelist kabhi overlap na karein
+
+jp_mdm pehle poochi jaati hai. Agar koi key **dono** claim kar lein to jawab
+hamesha jp_mdm ka hoga aur jp_app ki branch kabhi chalegi hi nahi — **chup-chaap**,
+200 dono taraf se, bas dropdown mein galat list.
+
+Ye database enforce nahi kar sakta (do procedure, do DB, koi rishta nahi jise
+constraint bata sake). To `jobs-screens.mjs` **dono procedure ke body**
+`sys.sql_modules` se padhti hai aur intersection khaali hone ki assertion karti
+hai:
+
+```
+🔴 USP_GetMaster and USP_GetAppMaster claim DISJOINT keys
+   jp_mdm 23 · jp_app 5 (EMPLOYMENT_TYPE, JOB_STATUS, LEDGER_ENTRY_TYPE,
+   LEDGER_SOURCE, REF_ENTITY_TYPE) · overlap none
+```
+
+#### 🔴 YE SACHCHE MASTER HAIN. GATING WALI ROK YAHAN LAGTI HI NAHI.
+
+Ye sabse zaroori paragraph hai, aur isse galat padhna aasaan hai.
+
+`MONETIZATION_DESIGN.md` aur `EntitlementRepository` kehte hain: **gating read
+kabhi master cache se nahi aayegi.** Wo rok **do table** ke baare mein hai —
+`m_mdm_features` aur `m_mdm_plan_features` — yaani feature mode aur plan quota.
+Wajah bhi saaf hai: ek ghante ki lag wale kill switch ka matlab hai ki switch
+theek us incident ke dauraan nahi chalta jiske liye dabaya gaya tha, aur
+FREE→METERED ghanta bhar free serve karta rehta hai. Dono **chup-chaap** fail
+hote hain, jabki admin screen poore waqt nayi value dikhati hai.
+
+Is file ki koi cheez un do table mein se nahi hai:
+
+| | Kya hai | Kaise padhi jaati hai |
+|---|---|---|
+| `m_app_employment_types` · `m_app_job_status` | dropdown ki reference data | MasterService, **1 ghanta cache** — theek hai |
+| `m_app_ledger_*` | ledger ki apni vocabulary (Grant/Consume/Reversal/Expiry) ke **naam** | MasterService, 1 ghanta — ye kisi ka quota nahi hai |
+| `m_mdm_features` · `m_mdm_plan_features` | **gating** | `IEntitlementRepository`, seedha, **bina cache**, har consume par |
+
+⚠️ **Dono taraf galti mumkin hai, aur dono mehengi hain:**
+
+- Rok ko wahan ghaseetna jahan wo lagti nahi — yaani employment type ke liye
+  cache hata dena — matlab har form khulne par ek extra round trip, bina kisi
+  fayde ke, aur ek niyam jo apna matlab kho deta hai kyunki wo har jagah lagta
+  hai. **Jo niyam har jagah lagta hai wo kisi ko kuch nahi bataata.**
+- Gating ko is raaste par daalna — "masters hi to hain" — wahi kill switch
+  chup-chaap tod deta hai.
+
+🔴 `entitlement-http.mjs` ki do grep ab bhi is line par pehra deti hain, aur
+PRE-5 ke baad bhi green hain: consume path ki kisi file mein `IMasterService`
+ya koi cache nahi, aur poore backend mein koi `IMemoryCache` nahi.
+
+#### Bundle mein jaan-boojh kar nahi daala
+
+`/api/masters/bulk` `jp_mdm` ka load-time set hai aur **ek** connection par
+chalta hai. Employment types jodne ka matlab hota: har app ke har cold start par
+ek **doosra database** khulna, ek dropdown ke liye jo ek app ki ek screen par
+hai. Per-key endpoint wahi ek ghanta cache carry karta hai aur sirf wahi form
+use karta hai jise chahiye. Tab badlo jab koi jp_app master zyadatar screens par
+chahiye ho.
+
+#### ⚠️ Swagger ka farsh NAHI badla — aur kyun
+
+`{masterKey}` route pehle se maujood tha; PRE-5 ne uske **peeche** ek aur
+database joda, koi naya operation nahi.
+
+```
+JP.Sso.Api  21 operations (floor 21)
+JP.App.Api  76 operations (floor 76)
+```
+
+2.67 kehta hai operation badhein to usi commit mein farsh uthao. Yahan badhe
+hi nahi, to farsh waisa hi hai — **ye ek measurement hai, ek "chhod diya" nahi.**
+
+#### Files
+
+```
+database/jp_app/04_procedures/015_app_masters.sql   (naya — USP_GetAppMaster)
+database/run_all.sql                                 (registered)
+JP.Infrastructure/Repositories/AppMasterRepository.cs (naya — Database => App)
+JP.Infrastructure/Services/MasterService.cs          (fall-through, koi list nahi)
+JP.Infrastructure/DependencyInjection.cs             (registration)
+jp-shared/src/core/models/lookup.model.ts            (3 ledger key + comments)
+jp-school/.../jobs/form/job-form.component.{ts,html,scss}
+jp-docs/scripts/seed-school-viewer.mjs               (naya)
+jp-docs/scripts/verify/jobs-screens.mjs              (fixture retire + G26 proofs)
+```
+
+---
+
+### 🔒 2.69 SCHOOL VIEWER AB EK ASLI ACCOUNT HAI — FIXTURE RETIRE (PRE-5)
+
+4B ke paas koi `SCHOOL_VIEWER` account nahi tha, to `jobs-screens.mjs` ne ek
+bana liya: HR role ke `JOB.CREATE`/`JOB.EDIT` grants ko **soft-delete** kiya,
+read-only assertions chalayin, aur wapas kar diya. Entry aur exit dono par
+grants assert hote the — imaandaar fixture tha, dikhawa nahi.
+
+#### 🔴 Phir bhi galat tha, aur do wajah se
+
+**1. Ek screen test karne ke liye ek SHARED role edit ho raha tha.** Agar run
+beech mein mar jaaye — Ctrl+C, exception, machine reboot — to asli
+`hr.lead@greenwood.edu.in` JOB.VIEW par reh jaata, aur agli baar koi us "bug" ko
+dhoondhta.
+
+**2. Fixture apne hi saboot ko kamzor kar raha tha.** HR **doosri school** mein
+hai, to jo read-only page photo hua wo **khaali** tha — 0 rows. "New job button
+nahi hai" khaali page par bhi sach hota hai, un wajahon se jinka permission se
+koi lena-dena nahi.
+
+#### Ab kya hai
+
+`viewer@greenwood.edu.in` — **owner ki hi school** (Nalanda Vidyalaya, SchoolId 4)
+mein, uske campus par scoped, `JOB.VIEW · APPLICANT.VIEW · REPORT.VIEW`.
+
+```
+🔴 the Viewer SEES the jobs — read-only is not the same as empty   3 rows
+🔴 a JOB.VIEW-only account sees NO New job button                  absent
+🔴 …and NO row action at all — no Edit, no Publish, no Close       0 buttons / 3 rows
+🔴 …and the SERVER refuses a forced publish from the Viewer        HTTP 403 FORBIDDEN
+🔴 the HR role is UNTOUCHED — the fixture that edited it is gone   JOB.CREATE JOB.EDIT JOB.VIEW
+```
+
+#### ⚠️ Password kaise bana — aur kya NAHI kiya gaya
+
+**Koi hash `.sql` mein nahi likha.** `JP.Tools.SeedAdmin` ye account bana hi
+nahi sakta: wo `USP_CreateAdminUser` call karta hai aur `--role` sirf
+`SUPER_ADMIN`/`ADMIN`/`SUPPORT_ADMIN` leta hai. School ka colleague
+administrator nahi hai — wo invite se aata hai:
+
+```
+POST /api/school/team/invite            (owner, jp_sso + jp_app)
+  -> mail-drop mein .eml, ek-baar ka token
+POST /api/auth/set-password-from-invite (app khud PBKDF2 karta hai)
+```
+
+`jp-docs/scripts/seed-school-viewer.mjs` yehi raasta chalti hai, **idempotent**
+hai (account chal raha ho to kuch nahi badalti), aur agar account team par ho
+par password kabhi set na hua ho to **ruk jaati hai** aur forgot-password
+bolti hai — kyunki original token ka sirf hash store hota hai, use dobara bheja
+nahi ja sakta. Password `local-accounts.md` (gitignored) aur `HOW_TO_RUN §4`
+dono mein.
+
+#### ⚠️ Ek heal abhi bhi file mein hai, aur wo LOUD hai
+
+Jo database 4B ka mara hua run dekh chuke hain unke HR grants aaj bhi kam ho
+sakte hain. `jobs-screens.mjs` entry par unhe theek karti hai aur **row count
+chhapti hai** (`0 row(s) repaired` aaj), taaki "kuch nahi hua" dikhe, maana na
+jaaye. Jis din koi database PRE-5 se purana na bache, wo line nikal jaani
+chahiye.
 
 ---
 
@@ -5740,6 +6014,7 @@ naya Code, agla free Id, kuch renumber mat karo.
 | 2026-08-28 | 2.5 | **Entitlement engine** — features, gating modes, the append-only ledger, the atomic consume, and the admin plan × feature matrix. 🔴 Every feature ships FREE with no mappings, so nothing a user can see changed. Two bugs found by running the path rather than reading it: the balance formula invented a credit every time a quota consume was refunded, and a retry of an already-paid action was refused with QUOTA_EXHAUSTED once quota ran out. Engine 34/34, HTTP 31/31, browser 19/19; all four SQL suites and three HTTP regressions unchanged | ✅ Done |
 | 2026-08-28 | fix | **swagger.json 500 — duplicate schema id** — `JP.App.Api`'s OpenAPI document had been answering 500 for EVERY endpoint, probably since 2.5: two DTOs named `PlanSummaryDto` collided on Swashbuckle's short-name schema ids, and the generator abandons the whole document on the first collision. Fixed at the generator (namespace-qualified ids, both APIs) rather than by renaming one DTO, which would have left the next collision waiting. 🔴 It survived because no suite fetches swagger.json — they call endpoints directly, which work fine without a document. `verify:swagger` now guards it, and was watched failing at an inflated floor before being set back. 500 → 200, 0 → 76 operations | ✅ Done |
 | 2026-08-28 | 4B | **Job screens** — list, form, publish/close, permission shaping, and the dashboard's jobs area on real counts. 🔴 The full chain proven end to end across BOTH apps in one session: JOB_POST flipped to METERED in the admin screen, jp-school publishes once, is refused with the quota message and keeps the job as a Draft, flipped back to FREE, publishes free. Two endpoint gaps found and reported rather than quietly filled — one approved and added (`GET /api/jobs/stats`), one left open (employment types have no master endpoint, and the five values were NOT hardcoded). browser 37/37, every earlier suite unchanged | ✅ Done |
+| 2026-09-19 | PRE-5 | **`jp_app` masters reachable — G26 opened and closed the same day** — `USP_GetAppMaster` gives the five masters that live in `jp_app` the same whitelist-driven read as `jp_mdm`'s, and `MasterService` falls through on `@Recognised = 0` rather than keeping a routing list in C# (2.68). 🔴 The employment-type dropdown is real: a school can post Part-time, Contract, Visiting and Temporary again, and the options are asserted against the captured network RESPONSE — a screenshot of five `<option>`s proves nothing a hardcoded array would not. 🔴 These are TRUE masters and the 1-hour cache applies; the gating prohibition is about `m_mdm_features`/`m_mdm_plan_features` only, and `entitlement-http`'s two greps still hold. The 4B grant-juggling Viewer fixture is retired for a real seeded `SCHOOL_VIEWER` created through the invite flow — no hash in any `.sql` (2.69). jobs-screens **55/55** (was 37), swagger floor unchanged at 21/76, `run_all` idempotent. ⚠️ `entitlement-engine` 33/34 — a **pre-existing** calendar bomb in the suite, not a regression; see the close-out | ✅ Done |
 | 2026-08-28 | 4 | **Jobs — backend** — tables, six procedures, the API, and the engine's first real consumer. 🔴 Publish and consume are ONE transaction: a refused consume leaves the job a Draft, and a failure after the consume rolls the ledger row back with it. Two things found by running rather than reading: INSERT ... EXEC made the first design illegal (Msg 3915) and forced the consume into core+wrapper, and a test hook inside the procedure made the atomicity test pass for the wrong reason. Expiry is derived, never stored. jobs-consume 23/23, jobs-lifecycle 34/34, all regressions unchanged. ⚠️ Screens not built — a stated boundary | ✅ Done |
 
 ---
@@ -6320,7 +6595,79 @@ hai aur `/api/masters/*` sirf `jp_mdm` padhti hai — paanch values hardcode
 karna 2.7 todta, to field hi nahi banayi. **Natija: Part-time/Contract vacancy
 abhi post nahi ho sakti.**
 
+> ✅ **Doosra wala ab band — PRE-5, 2026-09-19 (G26, 2.68).**
+
 ⚠️ Applicants area **chhua nahi gaya** — Phase 5 (2.62).
+
+---
+
+## ✅ PRE-5 COMPLETE — 2026-09-19
+
+Phase 5 se pehle ka ek chhota, band karne wala kaam. **G26 khuli aur usi din
+band hui**, aur Viewer ka fixture retire hua.
+
+```
+browser  jobs-screens 55/55   (tha 37 — G26 ke 9 naye proof, Viewer asli account se)
+regression  swagger 10/10 · jobs-consume 23/23 · jobs-lifecycle 34/34
+            entitlement-http 34/34 · dashboards 27/27 · team 49/49
+            profile-branches 37/37
+            ⚠️ entitlement-engine 33/34 — neeche padho
+build    paanchon frontend prod · backend 0/0 · run_all do baar, zero naye object
+swagger  SSO 21 (floor 21) · App 76 (floor 76) — farsh nahi badla, naya
+         operation bana hi nahi
+```
+
+🔴 **Ab koi bhi school Part-time, Contract, Visiting ya Temporary vacancy post
+kar sakti hai** — paanchon values master table se, ek bhi hardcoded nahi.
+
+🔴 **Dropdown ka saboot network response hai, screenshot nahi.** Playwright ne
+`/api/masters/employment-type` ki asli response pakdi aur rendered `<option>`
+uske against milaye. Hardcoded array bilkul waisa hi dikhta — isliye
+`<option>` ginna saboot nahi hai.
+
+🔴 **Gating wali rok apni jagah hai, phaili nahi.** Employment types sachche
+master hain aur unpar wahi 1 ghante ka cache lagta hai (2.48). `m_mdm_features`
+/ `m_mdm_plan_features` aaj bhi `IEntitlementRepository` se seedha, bina cache
+padhe jaate hain — `entitlement-http.mjs` ki dono grep green hain.
+
+#### ⚠️ Ek suite red hai, aur wo PRE-5 ki wajah se nahi
+
+`entitlement-engine.mjs` **33/34**. Toota hua assertion:
+
+```
+FAIL  …and the balance counts them in DIFFERENT months
+      — August 1 used, September 5 used
+```
+
+Ye **test ka calendar bomb** hai, product ka bug nahi:
+
+- Suite ke pehle section 4 consume likhte hain, aur `USP_ConsumeFeature`
+  `OccurredOn = SYSUTCDATETIME()` daalti hai.
+- Section 6 do row `2026-08-31 18:29:59Z` aur `18:30:00Z` par daal kar assert
+  karta hai `augUsed >= 1 && sepUsed === 1`.
+- August 2026 mein — jab ye likha gaya — pehle waale chaar **August** period
+  mein girte the, jise `>= 1` maaf kar deta hai. Aaj (19 Sep 2026)
+  `fn_QuotaPeriodForUtc(SYSUTCDATETIME())` **2026-09-01** deta hai, to wahi
+  chaar September mein girte hain aur `sepUsed` 1 ki jagah 5 ho jaata hai.
+- Window math wali dono assertion **pass** hain (`18:29:59Z -> 2026-08-01`,
+  `18:30:00Z -> 2026-09-01`) — yaani jis cheez ka ye test hai wo sahi hai.
+
+🔴 **Jaan-boojh kar theek nahi kiya.** Kisi aur ki suite ki assertion ko pass
+karaane ke liye badalna theek wahi aadat hai jo suite ko bekaar banati hai, aur
+ye PRE-5 ke scope mein tha hi nahi. **Sujhaya hua fix:** section 6 ki do
+boundary row ko apna alag `OwnerUid` do — tab ginti mein koi aur row aati hi
+nahi aur assertion `=== 1` rehte hue calendar se azaad ho jaati hai (`>= 1`
+kar dena use kamzor kar dega: phir wo sabit nahi karega ki 18:30:00Z wali row
+September mein giri, August mein nahi).
+
+#### ⚠️ Do build warning, dono purani
+
+Dono PRE-5 se pehle ki hain — jin file mein hain unhe is kaam ne chhua hi nahi:
+
+| Kahan | Warning |
+|---|---|
+| `jp-school` `job-list.component.ts` | NG8113 — `UiButtonComponent` import hai, template use nahi karta |
+| `jp-admin` `entitlement-matrix.component.scss` | budget 4.00 kB, actual 4.92 kB |
 
 ---
 
