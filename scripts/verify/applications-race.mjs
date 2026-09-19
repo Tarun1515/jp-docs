@@ -15,6 +15,28 @@
      overlap is not a race test; it is a test that usually runs sequentially and
      passes however the procedure is written.
 
+     ⚠️ AND THE ARMING IS NOT TAKEN ON TRUST. Until this was added, every
+     assertion here was about the OUTCOME — one row, one inserter, one
+     ALREADY_APPLIED — and every one of them is also satisfied by two applies
+     that ran SECONDS APART. If a session connected late and its WAITFOR TIME
+     had already passed, it would return immediately, the pair would run
+     sequentially, and this suite would have gone green while testing the plain
+     double-tap path that the "sequential repeat" check below already covers.
+     An armed race that silently disarms is the exact shape of a test that
+     passes for the wrong reason.
+
+     So each session now captures SYSUTCDATETIME() the instant its WAITFOR
+     RETURNS, and the suite asserts the two are the same instant. Measured over
+     ten runs before the tolerance was chosen: both sessions leave the gate in
+     the SAME MILLISECOND every time, with their execution windows overlapping
+     by ~32 ms. The tolerance is 50 ms — above the ~16 ms Windows timer tick
+     that quantises both readings, and far below any real stagger.
+
+     🔴 AND THE CHECK IS SHOWN TO HAVE TEETH. Section 1B runs the identical
+     pair deliberately staggered by 2.5 s and asserts the SAME predicate
+     REJECTS it. A concurrency check that has never been seen to fail is a
+     concurrency check you are assuming.
+
   2. 🔴 THE 3C NEGATIVE — THE CATCH MUST CHECK *WHICH* INDEX COLLIDED.
 
      Phase 3C shipped a CATCH that claimed ALREADY_PROVISIONED on any 2601
@@ -173,32 +195,117 @@ try {
     milliseconds of each other. This is the pattern that caught the approval
     engine's concurrency bug in 2C and the entitlement engine's in 2.5.
   */
-  const startAt = new Date(Date.now() + 4000);
-  const hhmmss = startAt.toTimeString().slice(0, 8);
+  /*
+    🔴 EACH SESSION STAMPS THE INSTANT ITS WAITFOR RETURNS.
 
-  const racer = () => execFileAsync('sqlcmd', [...ARGS, '-Q',
+    `@t0` is taken on the very next statement after the gate opens, before the
+    procedure is entered, and `@t1` after it returns. Those two instants are
+    what turn "armed" into "ran together": without them this section asserts
+    only the outcome, and the outcome is identical for two applies a minute
+    apart.
+
+    ⚠️ The lock-wait delta is captured too — `sys.dm_exec_session_wait_stats`
+    before and after, LCK_* only. It is REPORTED, not asserted: whether the
+    loser actually blocks on the winner's key lock depends on how long the
+    winner holds it, and a transaction this short may commit before the loser
+    ever waits. Asserting it would make this suite flaky for a reason that has
+    nothing to do with correctness.
+  */
+  const probe = (hhmmss, jobId) => execFileAsync('sqlcmd', [...ARGS, '-Q',
     `SET NOCOUNT ON; USE jp_app;
+     DECLARE @spid int = @@SPID;
+     DECLARE @lck0 bigint = ISNULL((SELECT SUM(wait_time_ms) FROM sys.dm_exec_session_wait_stats
+                                    WHERE session_id = @spid AND wait_type LIKE 'LCK[_]%'), 0);
      WAITFOR TIME '${hhmmss}';
-     EXEC USP_ApplyToJob @TeacherId=${teacherId}, @JobId=${jobA}, @CoverNote=N'race';`],
+     DECLARE @t0 datetime2(7) = SYSUTCDATETIME();
+     EXEC USP_ApplyToJob @TeacherId=${teacherId}, @JobId=${jobId}, @CoverNote=N'race';
+     DECLARE @t1 datetime2(7) = SYSUTCDATETIME();
+     SELECT 'MARK|' + CONVERT(varchar(30), @t0, 126)
+          + '|' + CONVERT(varchar(30), @t1, 126)
+          + '|' + CAST(@spid AS varchar(12))
+          + '|' + CAST(ISNULL((SELECT SUM(wait_time_ms) FROM sys.dm_exec_session_wait_stats
+                               WHERE session_id = @spid AND wait_type LIKE 'LCK[_]%'), 0)
+                       - @lck0 AS varchar(20));`],
     { encoding: 'utf8' });
 
-  console.log(`  both sessions armed for ${hhmmss} …`);
-
-  const [a, b] = await Promise.all([racer(), racer()]);
+  const lines = (r) => r.stdout.split(/\r?\n/).map((l) => l.trim())
+    .filter((l) => l && !/Changed database context/.test(l));
 
   const parse = (r) => {
-    const line = r.stdout.split(/\r?\n/).map((l) => l.trim())
-      .filter((l) => l && !/Changed database context/.test(l))[0] ?? '';
+    const line = lines(r).find((l) => !l.startsWith('MARK|')) ?? '';
     const c = line.split('|').map((x) => x.trim());
 
     return { raw: line, status: Number(c[0]), code: c[1] === 'NULL' ? null : c[1] };
   };
 
+  /** The gate instants, as milliseconds. Both parsed the same way, so the
+      DIFFERENCE is exact whatever the local timezone does to the absolute. */
+  const mark = (r) => {
+    const line = lines(r).find((l) => l.startsWith('MARK|')) ?? '';
+    const [, t0, t1, spid, lock] = line.split('|');
+
+    return {
+      raw: line,
+      t0Text: t0,
+      t0: new Date(t0).getTime(),
+      t1: new Date(t1).getTime(),
+      spid,
+      lockMs: Number(lock),
+    };
+  };
+
+  /*
+    🔴 THE PREDICATE. Used on the real pair below AND on the deliberately
+    staggered control in 1B — the same function, so "it passes here and fails
+    there" is a statement about one piece of code rather than two.
+
+    50 ms: measured, not guessed. Ten armed runs all released in the SAME
+    millisecond; the floor on resolution is the ~16 ms Windows timer tick that
+    quantises both SYSUTCDATETIME() readings, and any genuine stagger is
+    hundreds of milliseconds at minimum.
+  */
+  const SAME_INSTANT_MS = 50;
+  const entryGap = (A, B) => Math.abs(A.t0 - B.t0);
+  const ranTogether = (A, B) => entryGap(A, B) <= SAME_INSTANT_MS;
+
+  const startAt = new Date(Date.now() + 4000);
+  const hhmmss = startAt.toTimeString().slice(0, 8);
+
+  console.log(`  both sessions armed for ${hhmmss} …`);
+
+  const [a, b] = await Promise.all([probe(hhmmss, jobA), probe(hhmmss, jobA)]);
+
   const ra = parse(a);
   const rb = parse(b);
+  const ma = mark(a);
+  const mb = mark(b);
 
   console.log(`\n  session A: ${ra.raw}`);
   console.log(`  session B: ${rb.raw}\n`);
+
+  const overlapMs = Math.min(ma.t1, mb.t1) - Math.max(ma.t0, mb.t0);
+
+  console.log(`  🔴 WHEN EACH SESSION LEFT THE GATE (SYSUTCDATETIME, right after WAITFOR):`);
+  console.log(`     A  spid ${ma.spid}  ${ma.t0Text}   ran ${ma.t1 - ma.t0} ms, LCK waits ${ma.lockMs} ms`);
+  console.log(`     B  spid ${mb.spid}  ${mb.t0Text}   ran ${mb.t1 - mb.t0} ms, LCK waits ${mb.lockMs} ms`);
+  console.log(`     entry gap ${entryGap(ma, mb)} ms   ·   execution windows overlap ${overlapMs} ms\n`);
+
+  /*
+    🔴 THE ASSERTION THIS SECTION WAS MISSING.
+
+    Everything below is about the OUTCOME, and every outcome assertion is also
+    satisfied by two applies that ran a minute apart. This is the one that says
+    they did not.
+  */
+  check('🔴 THE TWO SESSIONS LEFT THE GATE IN THE SAME INSTANT — they actually raced',
+    ranTogether(ma, mb),
+    `A ${ma.t0Text} · B ${mb.t0Text} · gap ${entryGap(ma, mb)} ms (tolerance ${SAME_INSTANT_MS} ms)`);
+
+  check('…on two different SQL sessions, not one connection reused',
+    ma.spid !== mb.spid && !!ma.spid && !!mb.spid, `spids ${ma.spid} and ${mb.spid}`);
+
+  check('…and their execution windows overlapped — one was inside the procedure while the other was',
+    overlapMs > 0, `${overlapMs} ms of overlap`);
 
   const rows = Number(scalar(`SET NOCOUNT ON; USE jp_app;
     SELECT COUNT(*) FROM t_app_applications WHERE TeacherId=${teacherId} AND JobId=${jobA} AND Is_Deleted=0;`));
@@ -233,6 +340,112 @@ try {
     scalar(`SET NOCOUNT ON; USE jp_app;
       SELECT COUNT(*) FROM t_app_applications WHERE TeacherId=${teacherId} AND JobId=${jobA};`) === '1',
     '1 row');
+
+  // =========================================================================
+  console.log('\n=== 1B. 🔴 THE CONCURRENCY CHECK, SHOWN TO FAIL WHEN THEY RUN APART ===');
+
+  /*
+    🔴 WHY THIS SECTION EXISTS.
+
+    The check above passed. That tells us the two sessions left the gate
+    together — but only if the check is capable of noticing when they do not.
+    A tolerance of, say, ten seconds would also have passed, and so would a
+    predicate with a typo in it.
+
+    ⚠️ This is the same lesson as the 3C negative below, one layer up: a guard
+    that has never been seen to fire is a guard you are ASSUMING. So the
+    identical pair is run again, deliberately staggered, through the SAME
+    `ranTogether` function — and that function must say no.
+
+    The stagger is 2.5 s: an order of magnitude beyond the 50 ms tolerance and
+    beyond anything scheduling jitter produces, but the same order as a real
+    disarm (a session connecting after its WAITFOR TIME has already passed,
+    which returns immediately).
+  */
+  const jobC = Number(scalar(`SET NOCOUNT ON; USE jp_app;
+    INSERT INTO t_app_jobs (SchoolId, BranchId, JobTitle, SubjectId, DesignationId,
+                            EmploymentTypeId, NoOfVacancies, JobStatusId, LastDateToApply, PublishedOn)
+    VALUES (${schoolId}, ${branchId}, '5A race fixture C', 1, 1, 1, 1, 2, '2026-12-31', SYSUTCDATETIME());
+    SELECT CAST(SCOPE_IDENTITY() AS bigint);`));
+
+  /*
+    ⚠️ ROUNDED UP TO A WHOLE SECOND FIRST, and that detail matters.
+
+    WAITFOR TIME takes 'hh:mm:ss' — seconds, no fraction — so the arming
+    instant is truncated. The first version of this asked for 2.5 s and
+    measured 1997 ms, because truncating two sub-second bases lands them on
+    adjacent seconds rather than 2.5 s apart. Rounding the base to a whole
+    second makes the stagger exactly the number written here, which is the
+    difference between an assertion and an approximation.
+  */
+  const controlBase = new Date(Math.ceil((Date.now() + 4000) / 1000) * 1000);
+  const controlA = controlBase.toTimeString().slice(0, 8);
+  const controlB = new Date(controlBase.getTime() + 3000).toTimeString().slice(0, 8);
+
+  console.log(`  control: A armed for ${controlA}, B armed for ${controlB} — 3 s apart, on purpose`);
+
+  const [ca, cb] = await Promise.all([probe(controlA, jobC), probe(controlB, jobC)]);
+
+  const mca = mark(ca);
+  const mcb = mark(cb);
+
+  console.log(`\n     A  spid ${mca.spid}  ${mca.t0Text}`);
+  console.log(`     B  spid ${mcb.spid}  ${mcb.t0Text}`);
+  console.log(`     entry gap ${entryGap(mca, mcb)} ms\n`);
+
+  check('🔴 the SAME predicate REJECTS a deliberately staggered pair — the check has teeth',
+    ranTogether(mca, mcb) === false,
+    `gap ${entryGap(mca, mcb)} ms > tolerance ${SAME_INSTANT_MS} ms`);
+
+  check('…and the gap is the stagger we asked for, not an accident',
+    entryGap(mca, mcb) >= 2500 && entryGap(mca, mcb) <= 3500,
+    `${entryGap(mca, mcb)} ms, expected ~3000`);
+
+  /*
+    ⚠️ AND THE OUTCOME IS STILL CORRECT — which is exactly the point.
+
+    Run apart, these two calls produce one row and one ALREADY_APPLIED, just as
+    the race did. Every OUTCOME assertion in section 1 is satisfied here too.
+    That is the whole reason the gate instants had to be captured: without
+    them, this sequential pair is indistinguishable from a genuine race.
+  */
+  const controlRows = scalar(`SET NOCOUNT ON; USE jp_app;
+    SELECT COUNT(*) FROM t_app_applications WHERE TeacherId=${teacherId} AND JobId=${jobC} AND Is_Deleted=0;`);
+
+  const cOutcomes = [parse(ca), parse(cb)];
+  const cInserters = cOutcomes.filter((r) => r.status === 1 && r.code === null).length;
+  const cDuplicates = cOutcomes.filter((r) => r.status === 1 && r.code === 'ALREADY_APPLIED').length;
+
+  check('⚠️ …while the OUTCOME is identical — one row, one inserter, one ALREADY_APPLIED',
+    controlRows === '1' && cInserters === 1 && cDuplicates === 1,
+    `${controlRows} row, ${cInserters} inserter, ${cDuplicates} duplicate — indistinguishable from a race by outcome alone`);
+
+  /*
+    🔴 AND THE CONTROL CLEANS UP BEFORE SECTION 2 RUNS.
+
+    ⚠️ The first version of this section did not, and section 2 died on
+    `Msg 1505 … duplicate key value is (10)`. The 3C negative works by creating
+    a TEMPORARY unique index on TeacherId ALONE — which requires this teacher to
+    hold exactly one application at that moment. The control's second row made
+    that index impossible to create, so a section about the CATCH guard failed
+    for a reason that had nothing to do with the CATCH guard.
+
+    ⚠️ FIFTH time in this project a fixture has outlived the assertion it was
+    made for: the 2.5 period-boundary rows, the 4B ledger owner, 5A's unverified
+    teacher, 5B's resume upload, now this. The rule has not changed and neither
+    has the cost of ignoring it — a fixture is cleaned where it is made, not at
+    the end of the file.
+  */
+  sql(`SET NOCOUNT ON; USE jp_app;
+    DELETE FROM t_app_application_status_history
+     WHERE ApplicationId IN (SELECT ApplicationId FROM t_app_applications WHERE JobId = ${jobC});
+    DELETE FROM t_app_applications WHERE JobId = ${jobC};
+    DELETE FROM t_app_jobs WHERE JobId = ${jobC};`);
+
+  check('…and the control fixture is removed before the 3C negative needs the table',
+    scalar(`SET NOCOUNT ON; USE jp_app;
+      SELECT COUNT(*) FROM t_app_applications WHERE TeacherId = ${teacherId} AND Is_Deleted = 0;`) === '1',
+    'teacher is back to exactly one application — which is what the temporary index requires');
 
   // =========================================================================
   console.log('\n=== 2. 🔴 THE 3C NEGATIVE — A DIFFERENT INDEX MUST NOT WEAR THIS ONE\'S CLOTHES ===');

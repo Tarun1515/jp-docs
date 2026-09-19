@@ -5969,7 +5969,7 @@ ZINDA hua hai.**
 
 ```
 consent   applications-consent.mjs    31/31   (boundary, dono taraf se)
-race      applications-race.mjs       21/21   (parallel apply + 3C negative)
+race      applications-race.mjs       28/28   (parallel apply + gate instants + 3C negative)
 HTTP      applications-lifecycle.mjs  70/70   (snapshot, map, scope, permissions)
 swagger   swagger.mjs                 13/13   (farsh 76 -> 89)
 regression  jobs-consume 23/23 · jobs-lifecycle 34/34 · jobs-screens 55/55
@@ -6071,6 +6071,50 @@ session A: 1|NULL|NULL|7                                   <- isne insert kiya
 session B: 1|ALREADY_APPLIED|You have already applied...|7 <- ise index ne roka
 row count: 1 · history: 1
 ```
+
+##### 🔴 FOLLOW-UP (2026-09-19): arming par bharosa kiya ja raha tha, naapa nahi ja raha tha
+
+⚠️ **5A/5B tak is section ki har assertion OUTCOME ke baare mein thi** — ek row,
+ek inserter, ek `ALREADY_APPLIED`. **Teeno ko do aise apply bhi santusht karte
+hain jo kai second alag chale.** Agar koi session late connect karta aur uska
+`WAITFOR TIME` nikal chuka hota, to wo turant return karta, jodi sequential
+chalti, aur suite green rehti — jabki wo asal mein wahi plain double-tap path
+test kar rahi hoti jise neeche ka "sequential repeat" check pehle se dekhta hai.
+**Ek armed race jo chupchaap disarm ho jaye — yahi us test ka aakaar hai jo
+galat wajah se pass hota hai.**
+
+Ab har session apna `SYSUTCDATETIME()` **WAITFOR ke return hote hi** stamp
+karta hai, aur suite assert karti hai ki dono ek hi instant hain:
+
+```
+A  spid 51  2026-09-19T14:39:02.0192818   ran 27 ms, LCK waits 11 ms
+B  spid 53  2026-09-19T14:39:02.0192818   ran 19 ms, LCK waits 11 ms
+entry gap 0 ms   ·   execution windows overlap 19 ms
+```
+
+🔴 Dono instant **100-nanosecond digit tak identical**, alag spid, aur windows
+overlap karti hain. Tolerance **50 ms** — naapkar chuni gayi: das armed run
+sabhi **same millisecond** mein gate chhode (Windows ka ~16 ms timer tick dono
+readings ko ek hi tick par quantise karta hai), aur koi bhi asli stagger sau
+milliseconds se upar hota hai.
+
+⚠️ **LCK waits report hoti hain, assert nahi.** Haarne wala aksar jeetne wale ke
+key lock par blocked hota hai (12–28 ms dekha gaya), par transaction itni chhoti
+hai ki kabhi jeetne wala pehle hi commit kar deta hai — assert karna suite ko
+aise kaaran se flaky banata jiska correctness se koi lena-dena nahi.
+
+🔴 **Aur check ke daant dikhaye gaye — section 1B.** Wahi jodi jaan-boojh kar
+3 s stagger ke saath chalti hai aur **wahi `ranTogether` function** use REJECT
+karta hai (gap 3000 ms). Us staggered jodi ka OUTCOME bilkul same hota hai —
+ek row, ek inserter, ek `ALREADY_APPLIED` — **yahi poori wajah hai ki gate ke
+instant capture karne pade.** Jo concurrency check kabhi fail hote nahi dekha
+gaya, wo check nahi, anumaan hai.
+
+⚠️ **Aur usi section ne PAANCHVI fixture contamination bana di:** control ka
+doosra application section 2 ko tod deta tha (`Msg 1505` — 3C negative ko
+TeacherId par temporary unique index chahiye, jo do row ke saath ban hi nahi
+sakta). Ab control apna fixture **wahin** saaf karta hai, file ke aakhir mein
+nahi. 21/21 se **28/28**.
 
 🔴 `ALREADY_APPLIED` **Status 1 hai — success**. Teacher chahta tha ki usne
 apply kar diya ho, aur kar diya hai. Double-tap ko error banana matlab kisi ko
@@ -6281,7 +6325,7 @@ area, aur **1D ka applicants mockup delete.** Phase 5 ab poora hai.
 ```
 screens   applications-screens.mjs    86/86   (browser, dono app, negatives sameti)
 swagger   13/13 (floor 89 — 5B ne koi route nahi joda, sirf ek DTO)
-regression: consent 31 · race 21 · lifecycle 75 · jobs-consume 23 ·
+regression: consent 31 · race 28 · lifecycle 75 · jobs-consume 23 ·
             jobs-lifecycle 34 · jobs-screens 56 · entitlement 34+34 ·
             dashboards-3i 28 · screens-3i 17 · screens-3h 21 · screens-3f 25 ·
             screens-25 19 · team 49 · profile-branches 37 · teacher-profile 33
@@ -7416,6 +7460,15 @@ bhi nahi chali.** `git show` se confirm kiya. Ab 21/21.
 chhod diya tha. Ab snapshot **normalise ke baad** liya jaata hai aur restore
 `finally` mein hai — pehli koshish mein snapshot pehle liya tha, to "restore"
 ne contamination wapas daal di.
+
+🔴 **Phase band karne ke baad ek aur cheez owed nikli: race sach mein saath
+chali, ye kabhi naapa hi nahi gaya tha.** `applications-race.mjs` sessions ko
+arm karti thi aur sirf OUTCOME assert karti thi — aur wahi outcome do alag-alag
+waqt chale apply bhi deta hai. Ab dono session `WAITFOR` ke return hote hi
+`SYSUTCDATETIME()` stamp karte hain (**gap 0 ms**, alag spid, overlapping
+windows, LCK waits report), aur **section 1B wahi predicate ek jaan-boojh kar
+3 s staggered jodi par fail karke dikhata hai.** 21/21 se 28/28. Poora
+vivaran 2.70 ke RACE section ke follow-up mein.
 
 ---
 
