@@ -46,9 +46,21 @@ const APIS = [
     name: 'JP.App.Api',
     url: 'http://localhost:5299/swagger/v1/swagger.json',
 
-    // Baseline recorded 2026-08-28 (Phase 4B), the first run in which this
-    // document could be generated at all.
-    minOperations: 76,
+    /*
+      Baseline first recorded 2026-08-28 (Phase 4B), the first run in which
+      this document could be generated at all: 76.
+
+      🔴 RAISED TO 89 ON 2026-09-19 (PHASE 5A — applications backend), in the
+      same change that added the routes, which is what the rule above asks for.
+      The thirteen are five school-side (`/api/applicants` ×2, `{id}`,
+      `{id}/resume`, `{id}/status`) and eight teacher-side (`/api/teacher/jobs`
+      ×2 + `{id}/save` + `/saved`, `/api/teacher/applications` ×3 + `{id}`).
+
+      ⚠️ Raising the floor is the whole value of this guard. Leaving it at 76
+      would mean all thirteen could silently disappear again and this suite
+      would still be green.
+    */
+    minOperations: 89,
   },
 ];
 
@@ -129,6 +141,25 @@ try {
     !!matrix, matrix ? `operationId ${matrix.operationId ?? '(none)'}` : 'MISSING');
   check('…and so is the job stats endpoint added in 4B',
     !!stats, stats ? `operationId ${stats.operationId ?? '(none)'}` : 'MISSING');
+
+  /*
+    🔴 Phase 5A's two sides, named.
+
+    A count alone would still pass if the whole teacher surface vanished and
+    thirteen school routes appeared. These two are the ones the phase exists
+    for: the school reading an applicant (where the contact block lives) and
+    the teacher applying (consent path 1 — 2.56).
+  */
+  const applicant = doc?.paths?.['/api/applicants/{applicationId}']?.get;
+  const apply = doc?.paths?.['/api/teacher/applications']?.post;
+  const resume = doc?.paths?.['/api/applicants/{applicationId}/resume']?.get;
+
+  check('the applicant detail operation is documented (Phase 5A)',
+    !!applicant, applicant ? 'present' : 'MISSING');
+  check('…and the apply operation — consent path 1 (2.56)',
+    !!apply, apply ? 'present' : 'MISSING');
+  check('…and the resume snapshot fetch, which RESUME.DOWNLOAD gates',
+    !!resume, resume ? 'present' : 'MISSING');
 } catch (error) {
   check('the entitlement matrix operation is documented', false, error.message);
 }

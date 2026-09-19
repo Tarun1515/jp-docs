@@ -1,7 +1,7 @@
 # TEACHER RECRUITMENT PORTAL — PROJECT MEMORY
 
 > **Ye file har kaam ke baad update hogi.** Har naye chat/session mein sabse pehle ye file padho.
-> Last updated: **2026-09-19** | Phase **3 COMPLETE** + **2.5 engine** + **4 jobs COMPLETE** + **2.67 swagger fix** + **PRE-5 (G26 band, 2.68/2.69)** + **PRE-5b (baseline green)** | Next: **Phase 5 — Applications**
+> Last updated: **2026-09-19** | Phase **3 COMPLETE** + **2.5 engine** + **4 jobs COMPLETE** + **2.67 swagger fix** + **PRE-5 (G26 band, 2.68/2.69)** + **PRE-5b (baseline green)** + **5A applications BACKEND COMPLETE (2.70, G28)** | Next: **Phase 5B — Applications ke screens**
 >
 > 🔴 **Ye do line har phase ke close-out mein update hongi.** File 3I tak
 > pahunch chuki thi aur ye header **Phase 0** par khada tha — saat phase purana,
@@ -1991,6 +1991,64 @@ comment mein likhi hui baat kisi checklist par nahi aati.
 **Band kaise hoga:** dono pattern `jp-shared/src/styles/` mein jaayein, chhe
 copy hatein, teeno app rebuild aur screens dobara verify (screens-25 aur
 jobs-screens). Naapa hua nahi — anumaan ~60 min.
+
+### G28. Teacher application WITHDRAW nahi kar sakta — 🟡 OPEN, jaan-boojh kar (5A, 2026-09-19)
+
+Phase 5A mein apply hai, save/unsave hai, school ki taraf poora status machine
+hai — **withdraw nahi hai.** Na endpoint, na procedure, na button.
+
+#### 🔴 Kyun chhoda — kyunki withdraw ek button nahi, ek REVOCATION hai
+
+`t_app_applications` ki row hi wo cheez hai jo school ko teacher ka phone number
+aur email deti hai (2.56 ka raasta 1). To "withdraw" ka matlab hai:
+
+> ek school ne jo contact details **jaayaz taur par dekh liye hain**, unhe wapas
+> le lena.
+
+Aur wahi sawaal khula hai jiska jawaab hamare paas nahi:
+
+| Sawaal | Kyun aasan nahi |
+|---|---|
+| Contact dobara lock ho? | School wo number **dekh chuka** hai. Lock karna sach nahi badalta, sirf record mita deta hai |
+| School ki list se row gayab ho jaaye? | Jis school ne shortlist kar liya, interview schedule kar liya — uske liye candidate **chup-chaap** gayab ho jaayega |
+| History ka kya? | 024 kehta hai row kabhi hard-delete nahi hogi — di hui sehmati ek **tathya** hai |
+| Rejected ke baad withdraw? | Uska matlab kya hai? |
+
+⚠️ **Aadha-bana withdraw sabse bura natija hai.** Agar wo row ko soft-delete kar
+deta to `fn_TeacherContactUnlocked` ka `Is_Deleted = 0` filter apne aap contact
+wapas le leta — **ek raaste se jo kisi ne design nahi kiya**, sirf nikal aaya.
+Isi liye 024 ne `UQ_t_app_applications_JobTeacher` ko `WHERE Is_Deleted = 0`
+par filter kiya hai: darwaaza **khula chhoda gaya hai**, kholna abhi baaki hai.
+Schema change nahi chahiye hoga.
+
+#### Kab dobara dekhna hai — trigger likha hua hai
+
+Do mein se koi ek:
+
+1. **Client maange** — "teacher apply cancel kar paaye" spec mein aaye ya
+   demo ke baad poocha jaaye; ya
+2. **Phase 8 UAT** — asli teacher asli portal par chalein. Agar wo galat job par
+   apply karke use hata nahi paate, wo UAT mein **turant** dikhega, aur tab
+   humare paas asli behaviour hoga jispar faisla lena hai, kalpana nahi.
+
+Jo bhi pehle aaye. Tab tak teacher ka raasta imaandaar hai: apply ek
+**jaan-boojh kar liya gaya, ek-tarfa** kadam hai, aur screen 5B mein yahi
+kahegi.
+
+#### 🔴 Isi gap ke saath: `ApplicationCount` ko koi "fix" na kare
+
+`t_app_jobs.ApplicationCount` column maujood hai aur **hamesha 0 rahega**. Ye
+bhoolna nahi hai — 5A ne use jaan-boojh kar unmaintained chhoda aur har jagah
+`COUNT(*)` se derive kiya (2.70).
+
+⚠️ Jo bhi column ko 0 dekh kar "trigger laga deta hoon" ya "apply proc mein ek
+UPDATE" sochta hai, wo ek **doosra source of truth** bana raha hai jo chup-chaap
+drift karega: screen par number list se match karna band kar dega aur **kuch
+error nahi hoga**. 2.5 ne balances ke liye, 4 ne expiry ke liye, 5A ne iske liye
+— teeno baar wahi tark.
+
+Column hataya isliye nahi gaya kyunki `DB_TABLE_STRUCTURE.md` mein hai aur
+drop karna ek migration hai jiska koi faayda nahi. **Use padho mat, likho mat.**
 
 ### 2.45 `jp_mdm` — PHASE 2A BUILD NOTES
 
@@ -5831,6 +5889,314 @@ chahiye.
 
 ---
 
+### 🔒 2.70 APPLICATIONS — PHASE 5A (BACKEND)
+
+Applications ki tables, das procedures, API aur verification ban gayi. **2.56 —
+jo Phase 3D se likha hua tha aur aaj tak kabhi trigger nahi hua — pehli baar
+ZINDA hua hai.**
+
+```
+consent   applications-consent.mjs    31/31   (boundary, dono taraf se)
+race      applications-race.mjs       21/21   (parallel apply + 3C negative)
+HTTP      applications-lifecycle.mjs  70/70   (snapshot, map, scope, permissions)
+swagger   swagger.mjs                 13/13   (farsh 76 -> 89)
+regression  jobs-consume 23/23 · jobs-lifecycle 34/34 · jobs-screens 55/55
+            entitlement-engine 34/34 · entitlement-http 34/34
+            dashboards-3i 27/27 · team-contract 49/49 · profile-branches 37/37
+build     backend 0 warning 0 error · run_all dobara chalane par 0 naye object
+```
+
+⚠️ **Screens abhi nahi bane** — 5B baaki hai. Ye phase 4 ki tarah hi toda gaya:
+backend poora aur verified pehle, screens baad mein, kabhi aadha-aadha nahi.
+
+#### 🔴 APPLY KARNA HI CONSENT HAI — 2.56 ka pehla raasta
+
+`fn_TeacherContactUnlocked` 3D se likha hua tha aur hamesha `RETURN 0` karta
+tha, us note ke saath ki "Phase 5 ise badlegi". Ab uska poora body **ek EXISTS**
+hai:
+
+```sql
+EXISTS (SELECT 1 FROM t_app_applications
+        WHERE TeacherId = @TeacherId AND SchoolId = @ViewerSchoolId AND Is_Deleted = 0)
+```
+
+⚠️ **Ek EXISTS, aur bas.** Job ka join nahi, subscription ka nahi, plan ka nahi,
+invite ka nahi. Har extra clause contact leak karne ka ek naya raasta hai, aur
+poore product mein **yehi ek jagah** hai jo ye faisla karti hai.
+
+Verification ne ise seemaa (boundary) ki tarah naapa, feature ki tarah nahi:
+
+```
+apply se PEHLE  browse JSON mein contactEmail/contactMobile/resumePath ke
+                NAAM tak nahi hain — raw BYTES par assert kiya, parsed
+                property par nahi (serializer/mapper bhi field jod sakta hai)
+                GET /teachers/{uid}/contact -> 403
+apply           ek teacher, ek job, ek school
+apply ke BAAD   wahi call -> 200, asli email + mobile
+                fn_TeacherContactUnlocked(10, 4) = 1
+DOOSRA school   apni active job ke saath bhi -> abhi bhi 403, fn(...) = 0
+SAVE karna      teacher ne doosre school ki job SAVE ki -> fn(...) 0 hi raha,
+                403 hi raha. 🔴 Save karna dilchaspi hai, sehmati nahi.
+teardown        row hatate hi contact dobara LOCK — consent row hi gate hai
+```
+
+🔴 **List mein contact ke column hain hi nahi.** Har applicant ne sehmati di
+hui hai, to `contactEmail` dena niyam nahi todta — **shape** todta hai. List ek
+browse surface hai jo log, export aur screenshot mein jaati hai; contact ek
+aadmi par liya gaya jaan-boojh kar faisla hai, aur wo **detail** endpoint hai.
+Wahi tark 3D ne browse proc ke liye diya tha.
+
+#### 🔴 APPLY MUFT HAI — is poore feature mein ek bhi consume nahi hai
+
+`ConsumeAsync` nahi, quota read nahi, plan check nahi — na SQL mein, na
+`TeacherApplicationService` mein, na DI wiring mein. Kharch karne wali action is
+product mein **school ka PUBLISH** hai (2.64).
+
+⚠️ Agar kabhi apply ke raaste par `QUOTA_EXHAUSTED` aaye, to matlab kisi ne
+teacher se **kaam dhoondhne ka paisa** maang liya. Wo pricing ka faisla nahi
+hai — wo bug hai. Isi liye `ErrorCodes` ke Phase 5 block par ye baat likhi hui
+hai, comment mein nahi chhodi.
+
+#### 🔴 3C KA GUARD AAKHIRKAAR CHALAYA GAYA — likha hua tha, sabit nahi
+
+`USP_ApplyToJob` ka CATCH 2601 ko "already applied" tabhi maanta hai jab
+collision **usi index** par ho:
+
+```sql
+IF @E IN (2601, 2627) AND @M LIKE '%UQ_t_app_applications_JobTeacher%'
+```
+
+⚠️ **Ye LIKE aaj tak kabhi fire nahi hua tha.** Har 2601 usi index se aaya jiska
+naam usme likha hai — yaani agar koi `AND @M LIKE ...` **uda deta**, is project
+ka har test phir bhi green rehta. Jo guard kabhi chala hi na ho, wo guard nahi,
+**anumaan** hai.
+
+To verification ne ek **TEMPORARY doosra unique index** banaya
+(`TeacherId` par), ussi par 2601 karaya, aur sabit kiya:
+
+```
+ALREADY_APPLIED kahin nahi aaya                    ✅
+error apne aap ki tarah upar aaya — Msg 2601,      ✅  UQ_TEMP_5A_3C_...
+   naam TEMP index ka, JobTeacher ka nahi
+koi row nahi likhi gayi — transaction rollback     ✅  1 before, 1 after
+t_app_error_log mein 2601 log hua, phir THROW      ✅  2601|USP_ApplyToJob
+index drop kiya -> WAHI call ab SUCCEED karti hai  ✅  sirf wahi index rok raha tha
+```
+
+Index entry par bhi drop hota hai, sirf exit par nahi: agar run beech mein mare
+to wo **asli table** par lag kar har teacher ki doosri application chup-chaap
+rok deta.
+
+#### 🔴 RACE — do sach mein parallel apply
+
+`WAITFOR TIME` se dono session ek hi wall-clock instant par armed (2C pattern).
+Do process spawn karke ummeed karna race test nahi hai — wo aisa test hai jo
+zyadatar sequential chalta hai aur procedure chahe jaisa likha ho, pass ho
+jaata hai.
+
+```
+session A: 1|NULL|NULL|7                                   <- isne insert kiya
+session B: 1|ALREADY_APPLIED|You have already applied...|7 <- ise index ne roka
+row count: 1 · history: 1
+```
+
+🔴 `ALREADY_APPLIED` **Status 1 hai — success**. Teacher chahta tha ki usne
+apply kar diya ho, aur kar diya hai. Double-tap ko error banana matlab kisi ko
+ek **chalti hui** application ke liye support par bhejna.
+
+#### 🔴 SNAPSHOT — school ko wahi milta hai jo use diya gaya tha
+
+`ResumePathSnapshot` apply ke waqt **copy** hota hai, `t_app_teachers.ResumePath`
+ka join nahi. Verification ne isse **BYTES par** naapa, path string par nahi:
+
+```
+apply ke waqt resume : ...49162817....pdf   (% SNAPSHOT-ORIGINAL-A)
+profile par ab       : ...d8ca2040....pdf   (% REPLACED-LATER-B)
+school ko detail mein: ...49162817....pdf
+school jo file DOWNLOAD karta hai: "% SNAPSHOT-ORIGINAL-A"
+```
+
+⚠️ Ye is phase mein galat karne wali sabse aasan cheez hai, kyunki applicant
+detail proc mein teacher ki row **pehle se joined** hai (naam aur photo ke liye)
+— live column ek keystroke door hai. Isi liye proc mein likha hai: resume column
+`a.` se aata hai, `t.` se kabhi nahi.
+
+#### 🔴 STATUS MACHINE — poora map, dono taraf se naapa
+
+```
+12 legal transition   -> sab accept, 12 history row, har row par ACTING USER
+18 illegal            -> sab INVALID_TRANSITION
+6 Rejected -> 3       -> INVALID_TRANSITION   (terminal, faisla hai, chook nahi)
+7 / 8 / 9 / 10        -> OFFER_STAGE_UNAVAILABLE (chaaron alag-alag try kiye)
+wahi status dobara    -> Status 1, NO_CHANGE
+```
+
+🔴 **Teen alag code, kyunki teen alag baat hai:** "yahan se wahan nahi ja sakte"
+(application ka apna itihaas), "abhi nahi aaya" (product ka calendar — 2.62 ka
+not-yet), aur "pehle se wahi hai" (2.48). Do ko ek karna kisi ek screen ko
+jhooth bulwana hai.
+
+⚠️ **Applied -> Viewed automatic hai, aur jaan-boojh kar.** School application
+KHOLTA hai — wahi dekhna hai, aur teacher ki list usi ke bharose "Seen by the
+school" kehti hai. Alag button hota to flag ye batata ki kisi ko button dabana
+yaad raha ya nahi. Idempotent hai: teen baar kholne par ek history row.
+
+🔴 Stamp **read ke BAAD** hota hai aur uska fail hona read ko fail nahi karta.
+Ek status write hichki lene se school applicant dekh hi na paaye — wo missing
+timestamp se kahin bura natija hai.
+
+#### 🔴 EK NEAR-MISS JO CODE LIKHTE WAQT PAKDA GAYA — history ka naam
+
+School ki history mein "kisne badla" dikhana hai. Seedha tareeka ye lagta hai:
+actor ko `jp_sso` se join karo, display name na ho to **Email** dikha do.
+
+**Wo teacher ka email leak karta hai.** Har application ki **pehli** history row
+TEACHER likhta hai (`USP_ApplyToJob` unka user id actor ki tarah pass karta
+hai). Yaani wo fallback har applicant ke detail screen par school ko teacher ka
+sign-in address de deta — unlocked ho ya na ho, kisi gate ke bina.
+
+To naam **sirf us school ki apni** `t_app_school_users` list se resolve hota
+hai. Jo actor us school ka colleague nahi hai — yaani teacher — uska naam
+**NULL**. Koi fallback nahi, aur kabhi hona bhi nahi chahiye.
+Verification is par assert karti hai: kisi bhi `changedByName` mein `@` nahi.
+
+#### 🔴 ApplicationCount DERIVED HAI — aur 014 ise stale padh raha tha
+
+`t_app_jobs.ApplicationCount` column maujood hai, **0 par rehta hai**, aur kahin
+se likha nahi jaata. Har jagah `COUNT(*)` se nikalta hai.
+
+⚠️ **Aur ek asli bug yahin mila:** `USP_GetJobList` aur `USP_GetJobById` us
+column ko **project kar rahe the**. Jab tak jawaab hamesha 0 tha tab tak sahi
+tha; `t_app_applications` ki pehli row ke saath hi galat ho gaya. School ki job
+list "0 applicants" dikhati jabki neeche list mein log khade hote — **aur kuch
+error nahi hota**. Dono ab derived hain.
+
+```
+t_app_jobs.ApplicationCount (column) : 0
+live rows COUNT(*)                   : 1
+GET /api/jobs bolta hai              : 1
+teacher ka browse bolta hai          : 1
+```
+
+Maintained counter ek doosra source of truth hai jo chup-chaap drift karta hai —
+2.5 ne balances ke liye, 4 ne expiry ke liye yehi tark diya tha. **Ise "fix" mat
+karna** (G28 dekho).
+
+#### Permissions seed se — aur seed wo nahi kehti jo role ka naam kehta hai
+
+```
+SCHOOL_OWNER   VIEW · SHORTLIST · REJECT · RESUME.DOWNLOAD
+SENIOR_HR      VIEW · SHORTLIST · REJECT · RESUME.DOWNLOAD
+HR             VIEW · SHORTLIST ·          RESUME.DOWNLOAD   🔴 REJECT nahi
+SCHOOL_VIEWER  VIEW                                          🔴 download nahi
+```
+
+🔴 **HR shortlist kar sakta hai, reject nahi.** Kisi ko mana karna wo faisla hai
+jo ek insaan se baatcheet khatam karta hai, aur seed use Owner/Senior HR ke paas
+rakhti hai. Verification ne dono chalayi: shortlist 200, reject 403, aur refusal
+ke baad application **Shortlisted hi rahi**.
+
+🔴 **Viewer resume download nahi kar sakta.** Resume ki pehli teen line mein
+phone number hota hai — **resume ek contact detail HAI** (2.56). To read-only
+account dekh sakta hai ki resume maujood hai (`hasResume`) aur file khol nahi
+sakta. Endpoint `APPLICANT.VIEW` **ke upar** `RESUME.DOWNLOAD` maangta hai.
+
+Kis permission ki zaroorat hai wo **manzil** par depend karta hai: `toStatusId
+= 6` par `APPLICANT.REJECT`, baaki sab par `APPLICANT.SHORTLIST`. Permission map
+se **pehle** check hoti hai, taaki jiske paas grant nahi use "aap ye nahi kar
+sakte" mile, na ki "ye move illegal hai" — do alag samasya hain aur galat waali
+batana aadmi ko support par bhejta hai.
+
+#### Scope — teacher, school aur campus, teeno
+
+```
+teacher A -> teacher B ki application   404 (403 nahi — 403 bata deta ki hai)
+school 2  -> school 4 ka applicant      404
+school 2  ki list                        0 rows (kam nahi, ZERO)
+branch-bound account                     2 campus mein se 1 hi dikha
+   …doosre campus ka applicant           404
+   …dashboard tile bhi branch-scoped     owner 2, viewer 1
+koi bhi response mein SchoolId           nahi hai (2.39)
+```
+
+⚠️ Dashboard ka total bhi branch-scoped hai. Agar tile 2 kehta aur list 1
+dikhati, to log list ko bug samajhte.
+
+#### Teacher ko kya bataya jaata hai, aur kya nahi
+
+School ne type kiya: *"Needs IB curriculum experience."*
+Teacher ki list kehti hai: **"Not selected"**.
+
+`RejectionReason` aur history ke `Remarks` kisi bhi teacher-facing proc ya DTO
+mein **hain hi nahi** — blank nahi, GAYAB. Verification raw bytes par assert
+karti hai: na `rejectionReason` property, na wo text, na actor.
+`TeacherFacingName` hi ek matra naam hai jo teacher ki taraf jaata hai — `st.Name`
+bhi jaan-boojh kar nahi bheja, warna "Rejected" aur "Not selected" ek saath wire
+par hote aur chunav screen par chhod diya jaata (023 ne wahi chunav chheena tha).
+
+#### ⚠️ Ek purani galti mili — CONTACT_LOCKED client tak pahunchta hi nahi
+
+`USP_GetTeacherContactForSchool` code `CONTACT_LOCKED` lautati hai aur SQL suite
+(`99_tests/002`) usi par assert karti hai. **API use aage nahi bhejti:**
+`TeacherDirectoryService` `ForbiddenException` phenkti hai jiska code generic
+`FORBIDDEN` hai.
+
+2.12 kehta hai client **code** par branch kare, message par kabhi nahi — aur aaj
+koi screen "is teacher ne sehmati nahi di" ko baaki kisi bhi 403 se alag nahi
+kar sakti. **3E ki purani baat hai, Phase 5 ki regression nahi.** Abhi koi ise
+consume nahi karta (teacher-search screen hai hi nahi), isliye is phase mein
+**badla nahi gaya** — shipped contract badalna 5A ka kaam nahi tha — par
+verification ise jaisa hai waisa assert karti hai aur usi comment mein likha hai
+ki galat kya hai. Jo 403 ko abhi kaam ka rakhta hai wo **message** hai, jo
+dono unlock ke raaste naam se batata hai, aur uspar bhi assert hai.
+
+#### Do audience, do shape — 016 likhti hai, 017 padhti hai
+
+Read procedures alag file mein hain kyunki school ko application ka jo roop
+dikhta hai aur teacher ko usi row ka jo roop dikhta hai, wo **do alag cheezein**
+hain. Ek proc jisme audience ka flag ho, wo ek din galat roop galat aadmi ko
+dikha dega — wahi tark 3D ne browse/contact ke liye diya tha (2.53), aur wahi
+C# mein bhi hai: **do service, ek repository**.
+
+#### Files
+
+```
+database/jp_app/01_tables/023_application_masters.sql   (naya — 10 status, 6 reachable)
+database/jp_app/01_tables/024_t_app_applications.sql    (naya — 3 table)
+database/jp_app/04_procedures/010_teacher_public_profile.sql (fn_TeacherContactUnlocked ASLI)
+database/jp_app/04_procedures/014_jobs.sql              (ApplicationCount ab DERIVED)
+database/jp_app/04_procedures/016_applications.sql      (naya — write: apply, status, viewed, save)
+database/jp_app/04_procedures/017_application_reads.sql (naya — 10 read proc)
+database/run_all.sql                                    (wiring)
+JP.Core/Constants/AppConstants.cs                       (APPLICANT.* + RESUME.DOWNLOAD)
+JP.Core/Constants/ErrorCodes.cs                         (Phase 5 ke 7 code)
+JP.Domain/Applications/ApplicationContracts.cs          (naya)
+JP.Infrastructure/Repositories/ApplicationRepository.cs (naya)
+JP.Infrastructure/Services/ApplicantService.cs          (naya — school)
+JP.Infrastructure/Services/TeacherApplicationService.cs (naya — teacher)
+JP.Infrastructure/DependencyInjection.cs                (wiring)
+JP.App.Api/Controllers/ApplicantsController.cs          (naya — 5 route)
+JP.App.Api/Controllers/TeacherApplicationsController.cs (naya — 8 route)
+jp-docs/scripts/verify/applications-consent.mjs         (naya)
+jp-docs/scripts/verify/applications-race.mjs            (naya)
+jp-docs/scripts/verify/applications-lifecycle.mjs       (naya)
+jp-docs/scripts/verify/swagger.mjs                      (farsh 76 -> 89)
+```
+
+#### ⚠️ Kya baaki hai — 5B
+
+Screens: teacher ka job browse + apply, teacher ki "My applications",
+school ka applicants screen (design `jp-school/src/app/_design-reference/applicants/`
+mein rakha hai), aur dono dashboard ke applicants area — jo abhi tak
+jaan-boojh kar not-yet khade hain, aur ab unke peeche asli count hai.
+
+🔴 `SCHOOL_APPLICANTS` menu row abhi bhi `IsMenuVisible = 0` hai (3I ne chhupaya
+tha). **5B use wapas dikhayega** — aur `dashboards-3i.mjs` ki wo do assertion
+usi commit mein badalni hongi, warna wo suite red ho jaayegi. Ye likha ja raha
+hai kyunki wo guard theek kaam kar raha hai, tootne par nahi.
+
+---
+
 ## 3. SCOPE (Client spec ke against)
 
 ### IN SCOPE — MVP
@@ -6041,6 +6407,7 @@ naya Code, agla free Id, kuch renumber mat karo.
 | 2026-09-19 | PRE-5b | **Baseline green** — the calendar bomb in `entitlement-engine` defused exactly as the PRE-5 close-out suggested: the two boundary rows get their own `OwnerUid`, and the assertion got STRONGER (`=== 1` on both sides, not the `>= 1` that had been swallowing the contamination). 🔴 It was green for a month and then deterministically red, with nothing about the engine having changed — the third time this project has caught a test passing for the wrong reason. Both stale build warnings cleared: the unused import removed, and the SCSS budget re-thresholded with its reasoning written down rather than silently raised — which also surfaced **G27**, `.tabs` and `.banner` hand-rolled in three components each with neither in the design system (2.23). 34/34, every suite unchanged, builds warning-free | ✅ Done |
 | 2026-09-19 | PRE-5 | **`jp_app` masters reachable — G26 opened and closed the same day** — `USP_GetAppMaster` gives the five masters that live in `jp_app` the same whitelist-driven read as `jp_mdm`'s, and `MasterService` falls through on `@Recognised = 0` rather than keeping a routing list in C# (2.68). 🔴 The employment-type dropdown is real: a school can post Part-time, Contract, Visiting and Temporary again, and the options are asserted against the captured network RESPONSE — a screenshot of five `<option>`s proves nothing a hardcoded array would not. 🔴 These are TRUE masters and the 1-hour cache applies; the gating prohibition is about `m_mdm_features`/`m_mdm_plan_features` only, and `entitlement-http`'s two greps still hold. The 4B grant-juggling Viewer fixture is retired for a real seeded `SCHOOL_VIEWER` created through the invite flow — no hash in any `.sql` (2.69). jobs-screens **55/55** (was 37), swagger floor unchanged at 21/76, `run_all` idempotent. ⚠️ `entitlement-engine` 33/34 at the time — a **pre-existing** calendar bomb in the suite, not a regression. **Defused in PRE-5b the same day; it is 34/34 now** | ✅ Done |
 | 2026-08-28 | 4 | **Jobs — backend** — tables, six procedures, the API, and the engine's first real consumer. 🔴 Publish and consume are ONE transaction: a refused consume leaves the job a Draft, and a failure after the consume rolls the ledger row back with it. Two things found by running rather than reading: INSERT ... EXEC made the first design illegal (Msg 3915) and forced the consume into core+wrapper, and a test hook inside the procedure made the atomicity test pass for the wrong reason. Expiry is derived, never stored. jobs-consume 23/23, jobs-lifecycle 34/34, all regressions unchanged. ⚠️ Screens not built — a stated boundary | ✅ Done |
+| 2026-09-19 | 5A | **Applications — backend** — tables, das read procedures upar 016 ke paanch write procedures ke, dono taraf ka API, aur teen nayi verification. 🔴 **2.56 pehli baar ZINDA hua**: `fn_TeacherContactUnlocked` 3D se `RETURN 0` tha, ab ek EXISTS hai — apply karte hi contact **us ek school** ke liye khulta hai, doosre ke liye nahi, aur job SAVE karne se kuch nahi khulta. 🔴 **3C ka guard aakhirkaar chalaya gaya**: ek temporary doosra unique index bana kar 2601 karaya, aur procedure ne ALREADY_APPLIED **nahi** kaha — error apne aap ki tarah upar aaya, log hua, rollback hua. 🔴 Apply **muft** hai — poore feature mein ek bhi consume nahi (2.64). Do asli bug mile: `USP_GetJobList`/`GetJobById` stale `ApplicationCount` column project kar rahe the (ab derived), aur history ka "kisne badla" naam agar email par fallback karta to **teacher ka email** har applicant screen par leak karta — pehli history row teacher hi likhta hai. consent 31/31, race 21/21, lifecycle 70/70, swagger farsh 76 -> 89, saari purani suites unchanged, `run_all` idempotent. ⚠️ Screens nahi bane — 5B, ek likhi hui seema | ✅ Done |
 
 ---
 
@@ -6722,17 +7089,38 @@ milakar ~800 byte source hain (~500 minified), overshoot 923 byte ka tha.
 
 ---
 
-## ▶️ NEXT: PHASE 5 — APPLICATIONS
+## ✅ PHASE 5A COMPLETE — 2026-09-19 (BACKEND)
 
-`t_app_applications`, teacher ka apply flow, aur school ka applicants screen —
-jiska design `jp-school/src/app/_design-reference/applicants/` mein rakha hai.
+`t_app_applications`, apply flow, status machine, dono taraf ke reads aur API
+ban gaye. Details **2.70**.
 
-🔴 **2.56 yahin zinda hoti hai:** apply karte hi contact khulta hai. Wahi wo
-pehla raasta hai jo `fn_TeacherContactUnlocked` (2.54) mein likha hai aur aaj
-tak kabhi trigger nahi hua.
+🔴 **2.56 ZINDA HO GAYA.** `fn_TeacherContactUnlocked` 3D se `RETURN 0` tha;
+ab wo ek EXISTS hai. Apply karte hi contact **us ek school** ke liye khulta hai
+— doosre school ke liye nahi, aur job SAVE karne se bilkul nahi. Dono taraf se
+naapa gaya.
 
-⚠️ Dashboard ka applicants area tabhi asli hoga — abhi wo jaan-boojh kar
-not-yet hai.
+⚠️ **Screens nahi bane — wo 5B hai.** Phase 4 bhi isi line par toda gaya tha:
+backend poora aur verified pehle, screens baad mein, kabhi aadha-aadha nahi.
+
+---
+
+## ▶️ NEXT: PHASE 5B — APPLICATIONS KE SCREENS
+
+- teacher: job browse + job detail + apply, aur "My applications"
+- school: applicants list + applicant detail (design
+  `jp-school/src/app/_design-reference/applicants/` mein rakha hai)
+- dono dashboard ka applicants area — ab uske peeche asli count hai
+  (`GET /api/applicants/stats`, `GET /api/teacher/applications/stats`)
+
+🔴 **`SCHOOL_APPLICANTS` menu row abhi `IsMenuVisible = 0` hai** (3I ne
+chhupaya tha, kyunki screen mockup par thi). 5B use wapas dikhayega — **aur usi
+commit mein `dashboards-3i.mjs` ki do assertion badalni hongi**, warna wo suite
+red ho jaayegi. Wo guard theek kaam kar raha hai; use tootne par mat samajhna.
+
+⚠️ **Screen se pehle 2.70 padho**, khaas taur par: list mein contact ke column
+kyun nahi hain, teacher ko `TeacherFacingName` hi kyun jaata hai, aur
+`ApplicationCount` kyun derived hai. Teeno par server pehle se sahi hai — screen
+ko unhe todna aasan hai.
 
 ---
 
