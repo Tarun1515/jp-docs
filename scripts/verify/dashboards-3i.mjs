@@ -16,6 +16,7 @@
 
   Run: node scripts/verify/dashboards-3i.mjs   (both APIs up)
 */
+import fs from 'node:fs';
 import { execFileSync } from 'node:child_process';
 
 const SSO = 'http://localhost:5199/api';
@@ -268,20 +269,42 @@ check('…with the school-area message, which 3E fixed and this inherits',
   teacherOnSchool.body?.message);
 
 // ---------------------------------------------------------------------------
-console.log('\n=== 7. THE MOCKUP IS OUT OF REACH ===');
+console.log('\n=== 7. THE MOCKUP IS GONE, AND THE REAL SCREEN IS BACK ===');
 
+/*
+  🔴 THIS SECTION ASSERTED THE OPPOSITE UNTIL PHASE 5B, AND THAT WAS CORRECT.
+
+  3I hid SCHOOL_APPLICANTS (IsMenuVisible = 0) and removed its route, because
+  /applicants was a static mockup — fifty rows from a fixture file with no HTTP
+  call (G6) — and menus are data (2.37), so a visible row would have put a 404
+  in every school's sidebar.
+
+  5B built the real screen against t_app_applications and flipped the row back
+  in the same commit. The shipped state changed, so the assertion changed with
+  it: what this section proves now is that the row is visible AND the mockup it
+  was hidden for is deleted rather than merely unrouted.
+
+  ⚠️ The pairing is the point. A visible menu row on its own is what 3I refused
+  to ship; a deleted mockup on its own says nothing about what a school sees.
+  Both, together, are the claim.
+*/
 const menuRow = sql(`SET NOCOUNT ON; SELECT CAST(IsMenuVisible AS varchar(2)) + '|' + CAST(Is_Active AS varchar(2))
   FROM jp_sso.dbo.m_sso_menus WHERE MenuCode = 'SCHOOL_APPLICANTS'`);
 
-check('🔴 the SCHOOL_APPLICANTS menu row is hidden (menus are data — 2.37)',
-  menuRow.startsWith('0|'), `IsMenuVisible|Is_Active = ${menuRow}`);
+check('🔴 the SCHOOL_APPLICANTS menu row is visible again — 5B (menus are data, 2.37)',
+  menuRow.startsWith('1|1'), `IsMenuVisible|Is_Active = ${menuRow}`);
 
 const menus = await j(`${SSO}/menus`, { headers: head(schoolToken) });
 const menuPaths = (menus.body?.data ?? []).filter((m) => m.isMenuVisible).map((m) => m.routePath);
 
-check('…so GET /api/menus no longer offers /applicants to a school',
-  !menuPaths.includes('/applicants'),
+check('…so GET /api/menus offers /applicants to a school once more',
+  menuPaths.includes('/applicants'),
   `${menuPaths.length} visible: ${menuPaths.join(' ')}`);
+
+// 🔴 And the thing it was hidden FOR is gone from the repository entirely.
+check('🔴 …and the mockup it was hidden for is DELETED, not merely unrouted',
+  !fs.existsSync('D:/Projects/jp-school/src/app/_design-reference'),
+  '_design-reference/ removed in 5B');
 
 // ---------------------------------------------------------------------------
 const failed = results.filter((r) => !r.pass);

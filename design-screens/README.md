@@ -17,8 +17,21 @@ the next time its phase's verification runs.
 | `school-jobs-*`, `school-job-form-*`, `school-job-locked-*` | The jobs list, the form, and a published job with its matching fields locked | `jobs-screens.mjs` |
 | `school-jobs-quota-1440` | 🔴 The quota refusal as a person sees it: the plan's limit, when it resets, and that the job is safe as a draft. No upgrade CTA — purchase screens are 6.5 | `jobs-screens.mjs` |
 | `school-jobs-hr-1440`, `school-jobs-readonly-1440` | The same list as HR (no Publish) and as a JOB.VIEW-only account (no New job, read-only banner). ⚠️ The read-only one is a fixture — no Viewer account is seeded, so HR's grants were reduced to JOB.VIEW and restored | `jobs-screens.mjs` |
-| `school-dashboard-jobs-1440` | The dashboard with real job counts. ⚠️ The applicants area beside it is deliberately unchanged — Phase 5 | `jobs-screens.mjs` |
+| `school-dashboard-jobs-1440` | The dashboard with real job counts. ⚠️ Captured in 4B, when the applicants area beside it was still a placeholder. `school-dashboard-applicants-1440` is the same screen with both halves real | `jobs-screens.mjs` |
 | `admin-plans-metered-1440` | JOB_POST set to METERED through the admin screen, mid-chain | `jobs-screens.mjs` |
+| **Phase 5B — applications** | | |
+| `school-applicants-1440`, `school-applicants-375` | 🔴 The applicants list, on real rows. The design the 1D mockup proved — margin rule, roll as a histogram, ruling instead of zebra striping — against `t_app_applications`. The mockup it replaces is deleted | `applications-screens.mjs` |
+| `school-applicant-detail-1440`, `school-applicant-detail-375` | 🔒 One applicant, with the contact block. This is 2.56 made visible: the email is there because the teacher applied, and for no other reason | `applications-screens.mjs` |
+| `school-applicant-rejected-1440` | 🔴 A rejected application: no status buttons at all, because Rejected is terminal and the server sends an empty `allowedTransitions`. Absent, not disabled | `applications-screens.mjs` |
+| `school-applicant-viewer-1440` | 🔴 The same applicant as a read-only account — no status actions, no resume button, one honest line saying why. The server refuses both anyway, in the same script | `applications-screens.mjs` |
+| `school-dashboard-applicants-1440` | The school dashboard with BOTH halves real — jobs (4B) and applicants (5B) | `applications-screens.mjs` |
+| `teacher-jobs-browse-1440`, `teacher-jobs-browse-375` | Find jobs. Every posting here is open by the server's effective status; an expired one drops off on its own | `applications-screens.mjs` |
+| `teacher-job-detail-1440`, `teacher-job-detail-375` | One posting, with the apply panel. 🔒 The consequence is stated above the button: applying shares contact with that school, and cannot be undone | `applications-screens.mjs` |
+| `teacher-apply-resume-required-1440` | 🔴 The refusal rendered IN PLACE — the missing piece named, a link straight to the resume section, and the Apply control still there because it will stop being true (2.62) | `applications-screens.mjs` |
+| `teacher-my-applications-1440`, `teacher-my-applications-375` | My applications, in the teacher's vocabulary — "Not selected", never "Rejected" | `applications-screens.mjs` |
+| `teacher-saved-jobs-375` | Saved jobs. The screen says the list is private: saving is interest, applying is consent | `applications-screens.mjs` |
+| `teacher-dashboard-applications-1440` | The teacher dashboard with its applications area on real counts | `applications-screens.mjs` |
+| `applicants-route-restored-1440` | 🔴 `/applicants` resolving again — the real screen where 3I's screenshot showed a 404 | `screens-3i.mjs` |
 | `login-*`, `signup-*`, `account-status-*`, `sidebar-375` | Auth and chrome | Phase 1D |
 | `public-*`, `continue-*` | The public site | Phase 1 |
 | `federation-*`, `wrong-app-guard` | Module Federation and the cross-app guard | Phase 1 |
@@ -31,8 +44,8 @@ organised by phase.
 
 | Files | What |
 |---|---|
-| `applicants-1440`, `applicants-375` | ⚠️ **The applicants mockup.** Fifty rows of fixture data, no HTTP call. Its route was removed in 3I and the component moved to `jp-school/src/app/_design-reference/`. These are kept because Phase 5 builds the real screen from this design — the margin rule, the roll as a histogram, ruling instead of zebra striping. Accurate as design, fictional as data. |
-| `applicants-route-removed-1440` | The 404 that now answers `/applicants` — the evidence the mockup is out of reach. |
+| `applicants-1440`, `applicants-375` | ⚠️ **The applicants mockup, kept as history.** Fifty rows of fixture data and no HTTP call (G6). Its route went in 3I, the component lived under `jp-school/src/app/_design-reference/` until Phase 5B, and that folder is now **deleted** — its design is in the real screen, and two applicant screens in one repo is how the wrong one gets edited. These two pictures stay because they are what the real screen was built from: compare them against `school-applicants-*` and the margin rule, the roll and the ruling are the same. Accurate as design, fictional as data. |
+| `applicants-route-removed-1440` | ⚠️ **Superseded.** The 404 that answered `/applicants` between 3I and 5B. `applicants-route-restored-1440` is the same URL today. |
 
 ## Removed
 

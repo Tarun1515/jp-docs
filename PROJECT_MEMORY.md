@@ -1,7 +1,7 @@
 # TEACHER RECRUITMENT PORTAL — PROJECT MEMORY
 
 > **Ye file har kaam ke baad update hogi.** Har naye chat/session mein sabse pehle ye file padho.
-> Last updated: **2026-09-19** | Phase **3 COMPLETE** + **2.5 engine** + **4 jobs COMPLETE** + **2.67 swagger fix** + **PRE-5 (G26 band, 2.68/2.69)** + **PRE-5b (baseline green)** + **5A applications BACKEND COMPLETE (2.70, G28)** | Next: **Phase 5B — Applications ke screens**
+> Last updated: **2026-09-19** | Phase **3 COMPLETE** + **2.5 engine** + **4 jobs COMPLETE** + **2.67 swagger fix** + **PRE-5 (G26 band, 2.68/2.69)** + **PRE-5b (baseline green)** + **5A applications BACKEND (2.70, G28)** + **5B applications SCREENS COMPLETE — PHASE 5 POORA (2.71, G30)** | Next: **Phase 6 — Offers, invites, notifications, teacher search**
 >
 > 🔴 **Ye do line har phase ke close-out mein update hongi.** File 3I tak
 > pahunch chuki thi aur ye header **Phase 0** par khada tha — saat phase purana,
@@ -1992,6 +1992,30 @@ comment mein likhi hui baat kisi checklist par nahi aati.
 copy hatein, teeno app rebuild aur screens dobara verify (screens-25 aur
 jobs-screens). Naapa hua nahi — anumaan ~60 min.
 
+#### ⚠️ 5B update — ginti wahi hai, aur ye ittefaq nahi
+
+5B ne **chhe naye screen** banaye. Seedha raasta tha har ek mein wahi chrome
+dobara likhna — tab ginti 3 se 8-9 ho jaati, aur "baad mein theek karenge"
+itna bada ho jaata ki kabhi na hota.
+
+Isliye naye screens design system se lete hain (`.page`, `.page__header`,
+`.table-wrap`, `.table`, `.table-pager`, `.note`, `.badge`), aur jo
+pattern **do app mein** chahiye tha wo system mein **daala** gaya:
+`.page__toolbar` ke children (`__search`, `__control`, `__toggle`,
+`__clear`). `.page__toolbar` pehle se tha, bina children ke — 1D ne unhe
+mockup mein `.filters__*` likha tha.
+
+🔴 **`.tabs` phir bhi nahi dala, jaan-boojh kar.** Teeno maujooda copy
+ek-doosre se alag hain — `margin-bottom`, `overflow-x`, `background`/`border`
+reset, `white-space`. Global version un properties ko leak karta jinhe koi
+screen jaan-boojh kar chhodti hai, aur wo 5B ke beech lene laayak risk nahi
+tha. Teacher ki "My applications" par isliye tabs nahi, wahi toolbar hai.
+
+⚠️ **Band karte waqt yahi kaam hai:** teeno copy ko ek-doosre se milao, farak
+jaan-boojh ka hai ya drift — ye tay karo, phir ek version system mein daal kar
+teeno hatao. Screens dobara verify (screens-25, jobs-screens,
+applications-screens).
+
 ### G28. Teacher application WITHDRAW nahi kar sakta — 🟡 OPEN, jaan-boojh kar (5A, 2026-09-19)
 
 Phase 5A mein apply hai, save/unsave hai, school ki taraf poora status machine
@@ -2049,6 +2073,47 @@ error nahi hoga**. 2.5 ne balances ke liye, 4 ne expiry ke liye, 5A ne iske liye
 
 Column hataya isliye nahi gaya kyunki `DB_TABLE_STRUCTURE.md` mein hai aur
 drop karna ek migration hai jiska koi faayda nahi. **Use padho mat, likho mat.**
+
+### G29. Applicants list par search aur paging CLIENT-side hai — 🟡 OPEN (5B, 2026-09-19)
+
+`USP_GetApplicantList` `@Top = 200` deti hai. Screen par search box aur pager
+hai, par dono **jo rows aa chuki hain** unhi par chalte hain — endpoint par
+search parameter hai hi nahi, aur paging bhi server par nahi hai.
+
+🔴 **Abhi ye jhooth nahi bolta, aur wo jaan-boojh kar hai.** Search box ka
+placeholder literally "Search the applicants shown" kehta hai, aur jis din
+theek 200 rows aati hain screen ek line dikhata hai: "Showing the most recent
+200 — stage se filter karo ya ek job kholo". Chupchaap kaat kar dikhana wo
+failure hai jisse ek browse screen marti hai, aur hiring decision lene wale ko
+pata bhi nahi chalta.
+
+⚠️ **Kab theek karna hai:** jis din koi school 200 se upar jaaye. Tab search,
+sort aur paging **teeno saath** server par jaate hain — `ui-table` pehle se
+server-side sort expect karta hai, aur `_design-reference/README.md` ne bhi
+yahi likha tha jab wo mockup tha. Aadha karna (sirf paging) sabse bura hoga:
+pager sahi lagta hai aur search us page par hi chalti hai.
+
+### G30. `ui-empty-state` ka `actionLink` 4B se dead tha — ✅ CLOSED (5B, 2026-09-19)
+
+4B se teen jagah `actionLink="/jobs/new"` likha ja raha tha — jobs list ka
+empty state aur school dashboard ke dono. **Input maujood hi nahi tha.**
+
+🔴 Angular ne use plain attribute samajh kar host element par set kiya aur
+chhod diya: button render hota tha, click `action` emit karta tha, koi sun
+nahi raha tha. **"Post a job" kuch nahi karta tha, chaar hafte tak.**
+
+⚠️ **Type error bhi nahi aata.** `[actionLink]="…"` pehle din build todta;
+`actionLink="…"` legal HTML hai aur khushi se compile hota hai. Yahi poora bug
+hai — isliye ilaaj teen call-site badalna nahi, **input banana** tha.
+
+**Band kaise hua:** `actionLink` ab asli input hai; set hone par action `<a>`
+banta hai (to middle-click aur "open in new tab" bhi chalte hain), aur
+`actionDisabled` ke saath ignore hota hai — "not yet" wala action click karne
+laayak nahi hona chahiye.
+
+🔴 **Sabak:** ek attribute jo kisi input se match nahi karta, chup-chaap girta
+hai. Naya input add karte waqt uske call-site `[bracket]` form mein likho, ya
+kam se kam ek baar click karke dekho ki hota kya hai.
 
 ### 2.45 `jp_mdm` — PHASE 2A BUILD NOTES
 
@@ -4874,6 +4939,13 @@ placeholder par design nahi hoti — 50 row, 8 column, filter bar aur pager par 
 table ka direction sabit hua tha (margin rule, roll as histogram, ruling instead
 of zebra). Wo kaam abhi bhi sahi hai; Phase 5 usi se banegi.
 
+> 🔴 **5B UPDATE (2026-09-19): ab DELETE ho chuka hai.** Screen `t_app_applications`
+> par ban gaya aur design usme chala gaya, to `_design-reference/` poora hata
+> diya — do applicant screen ek repo mein rakhne ka matlab hai ki kisi din galat
+> wali edit hogi. Menu row wapas `IsMenuVisible = 1` hai. Upar likha "Phase 5
+> usi se banegi" **hua** — comparison ke liye `design-screens/applicants-1440.png`
+> aur `school-applicants-1440.png` saath rakhe hain. Dekho 2.71.
+
 Verify kiya: fixture ka koi string (`Aarti Deshpande`) **kisi built chunk mein
 nahi** — tree-shaking ne poora nikaal diya.
 
@@ -6183,17 +6255,177 @@ jp-docs/scripts/verify/applications-lifecycle.mjs       (naya)
 jp-docs/scripts/verify/swagger.mjs                      (farsh 76 -> 89)
 ```
 
-#### ⚠️ Kya baaki hai — 5B
+#### ✅ Kya baaki tha — 5B, ab HO GAYA (2.71 dekho)
 
 Screens: teacher ka job browse + apply, teacher ki "My applications",
 school ka applicants screen (design `jp-school/src/app/_design-reference/applicants/`
 mein rakha hai), aur dono dashboard ke applicants area — jo abhi tak
 jaan-boojh kar not-yet khade hain, aur ab unke peeche asli count hai.
 
-🔴 `SCHOOL_APPLICANTS` menu row abhi bhi `IsMenuVisible = 0` hai (3I ne chhupaya
-tha). **5B use wapas dikhayega** — aur `dashboards-3i.mjs` ki wo do assertion
-usi commit mein badalni hongi, warna wo suite red ho jaayegi. Ye likha ja raha
-hai kyunki wo guard theek kaam kar raha hai, tootne par nahi.
+🔴 `SCHOOL_APPLICANTS` menu row `IsMenuVisible = 0` tha (3I ne chhupaya tha).
+**5B ne use wapas dikhaya**, aur `dashboards-3i.mjs` ki wo do assertion usi
+commit mein badli — jaisa yahan likha tha. ⚠️ Ek suite aur bhi thi jo yahan
+likhi nahi gayi thi: `jobs-screens.mjs` (applicants area "arrives after job
+posting") aur `screens-3i.mjs` (do disabled action + `/applicants` → 404).
+**Teen, do nahi.** Agli baar shipped-state guard ginte waqt `grep` chala lena,
+yaad se mat likhna.
+
+---
+
+### 2.71 APPLICATION SCREENS — PHASE 5B (PHASE 5 POORA)
+
+Dono taraf ke screens ban gaye: teacher browse/detail/apply/my-applications/
+saved-jobs, school applicants list/detail + status actions, dono dashboard ke
+area, aur **1D ka applicants mockup delete.** Phase 5 ab poora hai.
+
+```
+screens   applications-screens.mjs    86/86   (browser, dono app, negatives sameti)
+swagger   13/13 (floor 89 — 5B ne koi route nahi joda, sirf ek DTO)
+regression: consent 31 · race 21 · lifecycle 75 · jobs-consume 23 ·
+            jobs-lifecycle 34 · jobs-screens 56 · entitlement 34+34 ·
+            dashboards-3i 28 · screens-3i 17 · screens-3h 21 · screens-3f 25 ·
+            screens-25 19 · team 49 · profile-branches 37 · teacher-profile 33
+backend 0/0 · paanchon frontend warnings=0 · run_all ×2 → 0 objects
+```
+
+#### 🔒 Ye screen 2.56 ko DIKHATA hai — sirf maanta nahi
+
+School ka applicant detail hi ek jagah hai jahan teacher ka email/mobile
+dikhta hai, aur wo sirf isliye ki `fn_TeacherContactUnlocked` ne haan kaha.
+
+🔴 **Locked hone par field RESPONSE mein hoti hi nahi.** CSS se chhupaya nahi,
+`*ngIf` se hataaya nahi — server `null` bhejta hai. Devtools, "show hidden
+elements", saved HAR — kisi se kuch nahi milta. Suite raw bytes par assert
+karti hai, `null` par nahi.
+
+⚠️ **Is screen par koi plan check, koi entitlement call, koi "unlock" button
+nahi hai — aur kabhi nahi aayega.** Subscription CAPABILITY khareedti hai,
+contact nahi. Contact teacher ke apne act se khulta hai.
+
+#### 🔴 Status ke buttons SERVER dete hai — component ke paas map hai hi nahi
+
+`USP_GetApplicantById` ab ek teesra result set deta hai: `AllowedTransitions`,
+jo **wahi `fn_ApplicationTransitionAllowed`** chalaa kar banta hai jo illegal
+move refuse karta hai.
+
+⚠️ **Ye 5B mein joda gaya — naya endpoint nahi, ek existing response par ek
+field.** Wajah: doosra raasta TypeScript mein map ki copy rakhna tha. Do copy
+matlab drift, aur drift chup-chaap aata hai — screen ek button dikhata jise
+server refuse karta. Precedent: `StructuralFieldsLocked` (Phase 4).
+
+🔴 **Khaali list ek ASLI jawaab hai.** Rejected terminal hai → server khaali
+bhejta hai → screen koi button nahi banati. "Khaali = pata nahi, sab dikha do"
+padhna mana hai.
+
+#### 🔴 Ek read jo LIKHTI hai — aur ab poori tarah likhti hai
+
+Applicant kholna Applied → Viewed stamp karta hai. 5A us stamp ke baad sirf
+`ApplicationStatusId` badalta tha — `StatusName` "Applied" hi rehta tha,
+`ViewedOn` null, history mein nayi row nahi, aur `AllowedTransitions`
+Applied waale.
+
+⚠️ **Char field ek doosre se jhooth bol rahe the ek hi response mein.** 5B ne
+haath se patch karne ki jagah **dobara padh liya** — ek extra round trip, sirf
+pehli baar kholne par (stamp idempotent hai). Haath se patch karna paanchvi
+field bhoolne ka intezaam hai.
+
+#### 🔴 Har dropdown master se — aur `APPLICATION_STATUS` serve hi nahi hota tha
+
+`m_app_application_status` 5A mein bana, par `USP_GetAppMaster` ki whitelist
+mein nahi tha. School ka stage filter uske bina hardcode hota — 2.7 ka seedha
+ullanghan. **Sirf 6 REACHABLE rows** jaati hain: 7–10 offer chain ke hain, unhe
+filter mein dena matlab ek option jo hamesha khaali list degi, aur wo tooti hui
+screen se alag nahi dikhta.
+
+⚠️ **`st.Name`, kabhi `TeacherFacingName` nahi** — ye key SCHOOL ke liye hai.
+Teacher ko har row apna `TeacherFacingName` saath laati hai, isliye teacher ki
+koi screen ye key padhti hi nahi.
+
+#### 🔴 Teacher ki taraf: "Not selected", kabhi "Rejected" nahi
+
+Teacher ki list/detail/dashboard — teeno par `TeacherFacingName`. School ka
+rejection note teacher ke response ke **bytes mein hi nahi** hota.
+
+⚠️ Isi wajah se teacher ki list par master-driven filter nahi hai: wo key
+school ke naam deti hai, aur "Rejected" likha filter "Not selected" likhi row
+ke upar product ka khud se ulta bolna hota. Tabs rows se bante hain.
+
+#### ⚠️ Design system se liya, usme jodá — copy nahi banayi (2.23 / G27)
+
+Naye screens `.page`, `.page__header`, `.page__toolbar`, `.table-wrap`,
+`.table`, `.table-pager`, `.row--attention`, `.note`, `.badge` — sab
+jp-shared se lete hain.
+
+🔴 **Filter strip ke children ab design system mein hain.** 1D ne unhe mockup
+mein `.filters__*` likha tha; 5B ko wahi strip **teen screen, do app** mein
+chahiye thi. `.page__toolbar` pehle se tha (bina children ke) — baaki wahin
+gaya. Teen nayi private copy banane ka matlab G27 ko teen guna karna tha.
+
+⚠️ **`.tabs` ko design system mein NAHI dala, jaan-boojh kar.** Teeno maujooda
+copy alag-alag hain (`margin-bottom`, `overflow-x`, `background` reset) —
+global banane se kisi ek screen mein property leak karti, aur wo 5B ka risk
+nahi tha. Isliye teacher ki list par tabs ki jagah wahi toolbar idiom hai.
+**G27 badha nahi — par band bhi nahi hua.**
+
+#### 🔴 Ek shipped bug mila: `actionLink` input tha hi nahi
+
+`ui-empty-state` par 4B se `actionLink="/jobs/new"` likha ja raha tha —
+**plain attribute ke roop mein.** Input maujood nahi tha, to Angular ne use host
+element par set karke chhod diya: button banta tha, click `action` emit karta
+tha, koi sun nahi raha tha. **"Post a job" kuch nahi karta tha.**
+
+⚠️ **Type error bhi nahi aata tha.** `[actionLink]="…"` pehle din build todta;
+`actionLink="…"` khushi se compile hota hai. Yahi poora bug hai — isliye ilaaj
+teen call-site badalna nahi, **input banana** tha. Ab link hone par `<a>`
+render hota hai, to middle-click aur "open in new tab" bhi chalte hain.
+
+#### ⚠️ Teen suite ki assertion badli — teeno jaan-boojh kar
+
+| Suite | Pehle | Ab |
+|---|---|---|
+| `dashboards-3i` | `SCHOOL_APPLICANTS` hidden, menu mein `/applicants` nahi | visible, menu mein hai — **aur mockup delete hai** |
+| `jobs-screens` | applicants area "arrives after job posting" | wo promise gaya, koi disabled placeholder nahi |
+| `screens-3i` | 2 disabled action + note, `/applicants` → 404 | 0 disabled, route asli screen deta hai |
+
+🔴 **Yahi rule hai: shipped state badla, to uska guard usi commit mein badlo —
+aur kyun badla wo likho.** Teeno jagah nayi assertion purani wali ko kamzor
+nahi karti: `screens-3i` ab **database se** expectation padhta hai (kitni
+table khaali hain, utne hi empty state), `jobs-screens` promise-copy ka na
+hona maangta hai, aur `dashboards-3i` menu ke saath mockup ka delete hona bhi.
+
+#### ⚠️ Ek purana tootá hua guard bhi mila — 5B ka nahi
+
+`screens-3h` `#section-experience .empty` dhoondta tha. Markup 3H wale commit
+se hi `.card-empty` kehta hai (`.empty` `ui-empty-state` ka andar ka class
+hai, jo wo section use hi nahi karta). Locator kabhi match nahi hua, timeout par
+suite marti thi — **ye assertion ek baar bhi nahi chali.** `git show` se
+confirm kiya ki ye 5B ka regression nahi hai. Fix karke 21/21.
+
+🔴 **Sabak:** jo suite khatam hi nahi hoti wo paas nahi hoti — wo wo hoti hai
+jiska output koi padhta nahi.
+
+#### ⚠️ CHAUTHI baar: fixture ne shared data kharab kiya
+
+`applications-screens.mjs` ne RESUME_REQUIRED sabit karne ke liye TEACHER_B
+(Imran — local-accounts.md mein "ek naam aur ek state, 0%") ko resume upload
+kiya **aur wapas nahi liya.** Agla run sahi tarah fail hua: jo premise wo assert
+karta hai wo sach nahi rahi thi.
+
+⚠️ Pehli koshish mein restore bhi galat tha — snapshot **normalise se pehle**
+liya, to "restore" ne contamination wapas daal di. Ab snapshot normalise ke
+**baad** lete hain, aur restore `finally` mein hai.
+
+🔴 **Ginti: 2.5 ke boundary rows, 4B ka ledger owner, 5A ka unverified teacher,
+ab ye.** Rule: jo suite shared data badalti hai wo usi file mein, `finally`
+mein, wapas karegi — vaada nahi karegi.
+
+#### ⚠️ Applying FREE hai — aur suite ye naapti hai
+
+Exit par ledger row count entry ke barabar hona chahiye. Is run mein paanch job
+publish hui (wahi ek action hai jo kharch kar SAKTA hai; JOB_POST abhi FREE
+hai). Teacher ke kisi bhi action ka is table mein aana **kabhi** allowed nahi.
+
+---
 
 ---
 
@@ -6408,6 +6640,7 @@ naya Code, agla free Id, kuch renumber mat karo.
 | 2026-09-19 | PRE-5 | **`jp_app` masters reachable — G26 opened and closed the same day** — `USP_GetAppMaster` gives the five masters that live in `jp_app` the same whitelist-driven read as `jp_mdm`'s, and `MasterService` falls through on `@Recognised = 0` rather than keeping a routing list in C# (2.68). 🔴 The employment-type dropdown is real: a school can post Part-time, Contract, Visiting and Temporary again, and the options are asserted against the captured network RESPONSE — a screenshot of five `<option>`s proves nothing a hardcoded array would not. 🔴 These are TRUE masters and the 1-hour cache applies; the gating prohibition is about `m_mdm_features`/`m_mdm_plan_features` only, and `entitlement-http`'s two greps still hold. The 4B grant-juggling Viewer fixture is retired for a real seeded `SCHOOL_VIEWER` created through the invite flow — no hash in any `.sql` (2.69). jobs-screens **55/55** (was 37), swagger floor unchanged at 21/76, `run_all` idempotent. ⚠️ `entitlement-engine` 33/34 at the time — a **pre-existing** calendar bomb in the suite, not a regression. **Defused in PRE-5b the same day; it is 34/34 now** | ✅ Done |
 | 2026-08-28 | 4 | **Jobs — backend** — tables, six procedures, the API, and the engine's first real consumer. 🔴 Publish and consume are ONE transaction: a refused consume leaves the job a Draft, and a failure after the consume rolls the ledger row back with it. Two things found by running rather than reading: INSERT ... EXEC made the first design illegal (Msg 3915) and forced the consume into core+wrapper, and a test hook inside the procedure made the atomicity test pass for the wrong reason. Expiry is derived, never stored. jobs-consume 23/23, jobs-lifecycle 34/34, all regressions unchanged. ⚠️ Screens not built — a stated boundary | ✅ Done |
 | 2026-09-19 | 5A | **Applications — backend** — tables, das read procedures upar 016 ke paanch write procedures ke, dono taraf ka API, aur teen nayi verification. 🔴 **2.56 pehli baar ZINDA hua**: `fn_TeacherContactUnlocked` 3D se `RETURN 0` tha, ab ek EXISTS hai — apply karte hi contact **us ek school** ke liye khulta hai, doosre ke liye nahi, aur job SAVE karne se kuch nahi khulta. 🔴 **3C ka guard aakhirkaar chalaya gaya**: ek temporary doosra unique index bana kar 2601 karaya, aur procedure ne ALREADY_APPLIED **nahi** kaha — error apne aap ki tarah upar aaya, log hua, rollback hua. 🔴 Apply **muft** hai — poore feature mein ek bhi consume nahi (2.64). Do asli bug mile: `USP_GetJobList`/`GetJobById` stale `ApplicationCount` column project kar rahe the (ab derived), aur history ka "kisne badla" naam agar email par fallback karta to **teacher ka email** har applicant screen par leak karta — pehli history row teacher hi likhta hai. consent 31/31, race 21/21, lifecycle 70/70, swagger farsh 76 -> 89, saari purani suites unchanged, `run_all` idempotent. ⚠️ Screens nahi bane — 5B, ek likhi hui seema | ✅ Done |
+| 2026-09-19 | 5B | **Applications — screens. PHASE 5 POORA.** Teacher: job browse, job detail + apply, my applications (+ detail), saved jobs. School: applicants list, applicant detail + status actions. Dono dashboard ke area asli count par. 🔴 **1D ka applicants mockup DELETE** — `_design-reference/` poora gaya, uska design asli screen mein hai, aur suite check karti hai ki uska koi fixture naam screen par ya kisi built chunk mein nahi aa sakta. 🔴 **`APPLICATION_STATUS` master serve hi nahi hota tha** — table 5A mein bana, whitelist mein nahi tha, to school ka stage filter hardcode hota (2.7); ab **sirf 6 reachable** rows jaati hain. 🔴 **`AllowedTransitions` server se aata hai** — wahi `fn_ApplicationTransitionAllowed` jo illegal move refuse karta hai; component ke paas map ki koi copy nahi, aur Rejected par khaali list matlab **koi button hi nahi** (absent, disabled nahi). 🔴 Ek shipped bug mila: `ui-empty-state` par `actionLink` **input tha hi nahi** — 4B se plain attribute ki tarah likha ja raha tha, to "Post a job" **kuch nahi karta tha**, aur type error bhi nahi aata tha. Ab input hai aur `<a>` render hota hai. ⚠️ Ek purana tootá guard bhi mila jo 5B ka nahi: `screens-3h` ka `#section-experience .empty` 3H se hi galat tha — wo assertion kabhi chali hi nahi. ⚠️ CHAUTHI fixture contamination (suite ne Imran ka resume chhod diya tha) — ab snapshot normalise ke baad lete hain aur `finally` mein restore. Teen suite ki assertion **jaan-boojh kar** badli (`dashboards-3i`, `jobs-screens`, `screens-3i`) kyunki shipped state badla. screens 86/86, swagger 13/13 (floor 89 waise ka waisa — koi naya route nahi), saari purani suites green, backend 0/0, paanchon frontend warnings=0, `run_all` ×2 → 0 objects | ✅ Done |
 
 ---
 
@@ -6711,6 +6944,46 @@ src/styles/_components.scss  .btn, .card, .job-card, .badge, forms
 src/styles/_theme.scss       Entry point
 app/app.component.{ts,html,scss}  Public shell — header + nav + footer + outlet.
                              Angular ka placeholder page hata diya.
+```
+
+### Phase 5B — applications ke screens (2026-09-19)
+```
+jp-backend/database/jp_app/04_procedures/015_app_masters.sql   APPLICATION_STATUS branch (reachable only)
+jp-backend/database/jp_app/04_procedures/017_application_reads.sql  AllowedTransitions result set
+jp-backend/database/jp_sso/03_seed/005_seed_menus.sql          SCHOOL_APPLICANTS IsMenuVisible 0 -> 1
+jp-backend/JP.Domain/Applications/ApplicationContracts.cs      AllowedTransitionDto
+jp-backend/JP.Infrastructure/Repositories/ApplicationRepository.cs  teesra grid
+jp-backend/JP.Infrastructure/Services/ApplicantService.cs      stamp ke baad dobara padho
+
+jp-shared/src/styles/_layout.scss                              .page__toolbar ke children
+jp-shared/src/ui/ui-empty-state/*                              actionLink ab asli input (G30)
+jp-shared/src/core/interceptors/error.interceptor.ts           RESUME_REQUIRED + JOB_EXPIRED
+jp-shared/src/core/models/lookup.model.ts                      application-status ab serve hota hai
+
+jp-school/src/app/core/applicant.service.ts                    (naya)
+jp-school/src/app/features/school/applicants/list/*            (naya)
+jp-school/src/app/features/school/applicants/detail/*          (naya)
+jp-school/src/app/features/school/dashboard/*                  applicants area asli
+jp-school/src/app/features/school/jobs/list/*                  row se applicants ka link
+jp-school/src/app/app.routes.ts                                /applicants ×2
+🔴 jp-school/src/app/_design-reference/                        DELETED (mockup + README)
+
+jp-teacher/src/app/core/job-search.service.ts                  (naya)
+jp-teacher/src/app/features/teacher/jobs/browse/*              (naya)
+jp-teacher/src/app/features/teacher/jobs/detail/*              (naya)
+jp-teacher/src/app/features/teacher/applications/list/*        (naya)
+jp-teacher/src/app/features/teacher/applications/detail/*      (naya)
+jp-teacher/src/app/features/teacher/saved-jobs/*               (naya)
+jp-teacher/src/app/features/teacher/dashboard/*                dono area asli
+jp-teacher/src/app/app.routes.ts                               paanch route, comingSoon hata
+
+jp-docs/scripts/verify/applications-screens.mjs                (naya — 86 assertions)
+jp-docs/scripts/verify/dashboards-3i.mjs                       menu assertion palti
+jp-docs/scripts/verify/jobs-screens.mjs                        applicants-area assertion palti
+jp-docs/scripts/verify/screens-3i.mjs                          dono 3I assertion palti + sqlcmd helper
+jp-docs/scripts/verify/screens-3h.mjs                          3H se tootá selector theek
+jp-docs/design-screens/                                        13 nayi screenshot + README
+jp-docs/HOW_TO_RUN.md                                          status header + teacher walkthrough
 ```
 
 ---
@@ -7104,25 +7377,78 @@ backend poora aur verified pehle, screens baad mein, kabhi aadha-aadha nahi.
 
 ---
 
-## ▶️ NEXT: PHASE 5B — APPLICATIONS KE SCREENS
+## ✅ PHASE 5B COMPLETE — 2026-09-19 (SCREENS) — **PHASE 5 POORA**
 
-- teacher: job browse + job detail + apply, aur "My applications"
-- school: applicants list + applicant detail (design
-  `jp-school/src/app/_design-reference/applicants/` mein rakha hai)
-- dono dashboard ka applicants area — ab uske peeche asli count hai
-  (`GET /api/applicants/stats`, `GET /api/teacher/applications/stats`)
+Dono taraf ke screens ban gaye aur Phase 5 band hai. Details **2.71**.
 
-🔴 **`SCHOOL_APPLICANTS` menu row abhi `IsMenuVisible = 0` hai** (3I ne
-chhupaya tha, kyunki screen mockup par thi). 5B use wapas dikhayega — **aur usi
-commit mein `dashboards-3i.mjs` ki do assertion badalni hongi**, warna wo suite
-red ho jaayegi. Wo guard theek kaam kar raha hai; use tootne par mat samajhna.
+```
+applications-screens.mjs   86/86   (browser, dono app, saare negatives)
+```
 
-⚠️ **Screen se pehle 2.70 padho**, khaas taur par: list mein contact ke column
-kyun nahi hain, teacher ko `TeacherFacingName` hi kyun jaata hai, aur
-`ApplicationCount` kyun derived hai. Teeno par server pehle se sahi hai — screen
-ko unhe todna aasan hai.
+🔒 **2.56 ab DIKHTA hai.** School ka applicant detail hi ek jagah hai jahan
+teacher ka email/mobile hai, aur wo sirf isliye ki teacher ne apply kiya. Locked
+hone par field response ke **bytes mein hi nahi** hoti — CSS se chhupaya nahi
+gaya, `null` bhi nahi bheja.
+
+🔴 **1D ka applicants mockup DELETE ho gaya.** `_design-reference/` poora gaya.
+Uska design (margin rule, roll as histogram, ruling) asli screen mein hai, aur
+suite sabit karti hai ki uska koi fixture naam na screen par aa sakta hai na
+kisi built chunk mein hai.
+
+🔴 **Do chhed band hue jo 5B ke bina dikhte hi nahi the:**
+`APPLICATION_STATUS` master serve hi nahi hota tha (stage filter hardcode
+hota — 2.7), aur `ui-empty-state` ka `actionLink` **input tha hi nahi** —
+4B se teen "Post a job" button chup-chaap kuch nahi kar rahe the (G30).
+
+⚠️ **Teen suite ki assertion jaan-boojh kar badli** — `dashboards-3i`,
+`jobs-screens`, `screens-3i`. Teeno 3I/4B ka shipped state assert kar rahi
+thin jo 5B ne badla. **Wo guard theek kaam kar rahe the; unhe tootne par mat
+samajhna** — har badli hui assertion ke saath wajah likhi hai, aur nayi wali
+purani se kamzor nahi hai (`screens-3i` ab expectation **database se** padhta
+hai).
+
+⚠️ **Ek purana tootá guard bhi mila, aur wo 5B ka nahi:** `screens-3h` ka
+`#section-experience .empty` 3H wale commit se hi galat tha — locator kabhi
+match hi nahi hua, suite timeout par marti thi, aur wo teen assertion **ek baar
+bhi nahi chali.** `git show` se confirm kiya. Ab 21/21.
+
+⚠️ **CHAUTHI fixture contamination.** Suite ne TEACHER_B ka resume upload karke
+chhod diya tha. Ab snapshot **normalise ke baad** liya jaata hai aur restore
+`finally` mein hai — pehli koshish mein snapshot pehle liya tha, to "restore"
+ne contamination wapas daal di.
 
 ---
+
+## ▶️ NEXT: PHASE 6 — OFFERS, INVITES, NOTIFICATIONS, TEACHER SEARCH
+
+Phase 5 ne jaan-boojh kar chaar cheezein chhodi hain, aur teeno ke liye jagah
+pehle se bani hui hai:
+
+- **Offers** — `m_app_application_status` mein 7–10 (OFFER_SENT,
+  OFFER_ACCEPTED, OFFER_DECLINED, HIRED) **seeded hain** taaki ids kabhi na
+  khiskein, aur `fn_ApplicationTransitionAllowed` unhe aaj refuse karta hai.
+  `t_app_offers` Phase 6 hai. 🔴 Jab wo aayein, `USP_GetAppMaster` ki
+  `APPLICATION_STATUS` branch mein `IsReachable = 1` filter **apne aap**
+  unhe dropdown mein le aayega — master row ka flag badalna hi kaafi hai.
+- **Invites** — 🔒 **consent path 2** (2.56). Aaj `fn_TeacherContactUnlocked`
+  mein **ek hi** EXISTS hai. Invite accept hone par doosra raasta judega —
+  **usi function mein, doosri jagah nahi.**
+- **Notifications** — `t_app_notifications` maujood hai aur 5 mein
+  jaan-boojh kar **kuch nahi likhta.** Status change par teacher ko kuch nahi
+  jaata.
+- **Teacher search** — pehla paid gate (6.5 purchase screens ke saath).
+
+### 🔴 Phase 6 shuru karne se pehle padho
+
+- **2.71** — khaas taur par: buttons server ke `AllowedTransitions` se aate
+  hain (component ke paas map ki copy nahi), aur khaali list ka matlab **koi
+  button nahi** hai, "pata nahi" nahi.
+- **🔒 2.56** — invite wala raasta **usi function** mein judega. Ek doosra
+  EXISTS kisi aur jagah likhna hi wo bug hai jisse 2.56 bacha raha hai.
+- **G28** — withdraw abhi bhi nahi hai. Phase 6 mein invite aane par ye sawaal
+  dobara uthega (invite decline ka kya matlab hai?), to faisla wahan lena.
+- **G27** — `.tabs` teen alag copy. 5B ne badhaya nahi, par band bhi nahi
+  kiya. Chhathi screen banane se pehle theek karna sasta padega.
 
 
 ## Uske baad

@@ -860,17 +860,44 @@ try {
   check('…and the most recent jobs', recent > 0, `${recent} recent rows`);
 
   /*
-    🔴 THE APPLICANTS AREA MUST BE UNCHANGED. Phase 5 owns it; a zero there
-    would still be a number with nothing behind it (2.62).
+    ------------------------------------------------------------------------
+    🔴 THIS ASSERTION WAS REVERSED IN 5B, AND THAT IS THE POINT OF IT.
+    ------------------------------------------------------------------------
+    4B wrote: "the applicants area MUST BE UNCHANGED — Phase 5 owns it; a zero
+    there would still be a number with nothing behind it (2.62)." That was
+    right: t_app_applications did not exist, so "Applications arrive after job
+    posting" was a true statement about the PRODUCT, and it is the one place a
+    disabled control belongs.
+
+    Phase 5 built the table and 5B built the screen, so that sentence stopped
+    being true. The tile now measures: a school with no applications gets a real
+    zero and copy about ITS OWN state.
+
+    ⚠️ WHAT THIS STILL GUARDS. The old assertion existed to catch a placeholder
+    quietly becoming a fake number. The replacement guards the same boundary
+    from the other side: the "arrives after job posting" promise must be GONE,
+    and there must be no disabled action left behind pretending something is
+    coming. A half-migrated tile — new copy, dead button — would pass neither.
   */
   const empties = await dashPage.locator('ui-empty-state').allTextContents();
   const applicants = empties.find((t) => /Applicants/i.test(t)) ?? '';
 
-  check('🔴 the applicants area is STILL the not-yet empty state',
-    /Applications arrive after job posting/i.test(applicants),
-    applicants.replace(/\s+/g, ' ').trim().slice(0, 80));
-  check('🔴 …with no digits in it',
-    !/\d/.test(applicants), /\d/.test(applicants) ? 'A NUMBER APPEARED' : 'no counts');
+  check('🔴 the applicants area no longer promises a coming release (5B)',
+    !/Applications arrive after job posting/i.test(applicants),
+    applicants.replace(/\s+/g, ' ').trim().slice(0, 80) || '(no empty state — it has counts)');
+
+  check('🔴 …and no disabled "Review applicants" placeholder survives',
+    (await dashPage.locator('button[disabled]', { hasText: 'Review applicants' }).count()) === 0,
+    'placeholder gone');
+
+  /*
+    ⚠️ The jobs half is what THIS suite owns, and it must still be untouched by
+    5B — four counts and the recent rows, asserted above. The applicants half is
+    covered end to end by applications-screens.mjs.
+  */
+  check('🔴 …while the JOBS area 4B built is byte-for-byte the same shape',
+    counts.length === 4 && recent > 0,
+    `${counts.length} counts, ${recent} recent rows`);
 
   await shot(dashPage, 'school-dashboard-jobs-1440');
 

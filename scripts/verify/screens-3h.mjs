@@ -213,8 +213,27 @@ check('…with the reason, not just the instruction',
   /find you/i.test((await page.locator('.meter__next-why').textContent()) ?? ''),
   (await page.locator('.meter__next-why').textContent())?.trim());
 
+/*
+  ------------------------------------------------------------------------------
+  ⚠️ THE SELECTOR HERE WAS WRONG FROM THE DAY THIS FILE WAS WRITTEN.
+  ------------------------------------------------------------------------------
+  It asked for `#section-experience .empty`. The markup has said `.card-empty`
+  since the 3H commit that introduced both — `.empty` is the inner class of
+  `ui-empty-state`, which that section does not use — so the locator matched
+  nothing, textContent() hung, and the suite died on a timeout before reaching
+  its last three checks.
+
+  🔴 Found while running the 5B regression pass, and it is NOT a 5B regression:
+  `git show` on the 3H commit has `card-empty` in the same place. This
+  assertion has never once run.
+
+  ⚠️ Which is the real lesson. A suite that cannot finish is not a suite that
+  passes — it is one nobody has read the output of. The copy it was written to
+  protect is correct and always has been; the check protecting it was not there.
+*/
 check('the empty experience section invites rather than reports',
-  /Add where you have taught/i.test((await page.locator('#section-experience .empty').textContent()) ?? ''),
+  /Add where you have taught/i.test(
+    (await page.locator('#section-experience .card-empty').textContent()) ?? ''),
   'not “No experience added yet”');
 
 await shot(page, 'imran-0-percent-1440');

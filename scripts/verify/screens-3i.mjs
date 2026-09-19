@@ -23,6 +23,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
 
+import { execFileSync } from 'node:child_process';
+
 const require = createRequire(import.meta.url);
 const { chromium } = require(
   'C:/Users/bhard/AppData/Local/npm-cache/_npx/e41f203b7505f1fb/node_modules/playwright',
@@ -39,6 +41,25 @@ const TEACHER_FULL = { id: 'rohit.kulkarni.86002@yopmail.com', pw: 'Seeded#Teach
 
 const WIDE = { width: 1440, height: 1000 };
 const PHONE = { width: 375, height: 812 };
+
+/*
+  🔴 ADDED IN 5B, AND THE REASON IS THE POINT OF THE SECTION IT SERVES.
+
+  This file used to assert "two empty states, no digits" as a FIXED shape. That
+  was right while neither table existed — nothing could be there, so nothing
+  could be counted. Both tables exist now, so the screen's shape depends on the
+  DATA, and asserting a fixed shape would start passing for the wrong reason
+  the day a school posts its first job.
+
+  So the expectation is read from the database and compared against what the
+  screen drew. That is the only version of this check that keeps meaning what
+  3I meant by it: no number without a row behind it.
+*/
+const sql = (q) =>
+  execFileSync('sqlcmd', ['-S', 'localhost\\TARUN', '-E', '-I', '-b', '-f', '65001',
+    '-h', '-1', '-W', '-s', '|', '-Q', q], { encoding: 'utf8' })
+    .split(/\r?\n/).map((l) => l.trim())
+    .filter((l) => l && !/^\(\d+ rows affected\)$/.test(l) && !/^Changed database context/.test(l));
 
 const results = [];
 const check = (name, pass, detail) => {
@@ -108,29 +129,73 @@ check('the three tiles are campus, plan and team',
   tiles.length === 3, tiles.map((t) => t.trim()).join(' · '));
 
 /*
-  🔴 THE CHECK THIS PHASE EXISTS FOR.
+  ------------------------------------------------------------------------------
+  🔴 THE CHECK THIS PHASE EXISTED FOR, AND WHAT IT BECAME.
+  ------------------------------------------------------------------------------
+  The screen 3I replaced showed "50 applicants", a funnel and open-job counts,
+  none of which had a table behind them (G6). So 3I asserted the opposite: two
+  areas, NO digits in either — not even a zero — and a disabled action with a
+  line saying when the feature arrives. A zero would have been a measurement of
+  something unmeasurable.
 
-  The old screen showed "50 applicants", a funnel and open-job counts, none of
-  which had a table behind them. If a digit appears in either not-yet area, the
-  mockup has grown back.
+  Both tables exist now: t_app_jobs (Phase 4) and t_app_applications (Phase 5).
+  A zero is a real zero, so the "when it arrives" language is gone and the
+  actions navigate somewhere real.
+
+  ⚠️ WHAT THIS SECTION STILL GUARDS, and it is the same thing. 3I was protecting
+  against NUMBERS WITH NOTHING BEHIND THEM. That danger has not gone away — it
+  has moved. So the assertion now pairs the two: whatever this screen shows must
+  be backed by rows in the database, and the promise-about-a-release copy must
+  be gone. A tile showing "50" with an empty table still fails, exactly as it
+  did in 3I.
 */
 const emptyAreas = page.locator('ui-empty-state');
-check('Jobs and Applicants render as empty states', (await emptyAreas.count()) === 2,
-  `${await emptyAreas.count()} areas`);
-
 const emptyText = await emptyAreas.allTextContents();
-const hasDigits = emptyText.some((text) => /\d/.test(text));
 
-check('🔴 …with NO number in them — not even a zero',
-  !hasDigits, hasDigits ? `found digits: ${emptyText.join(' | ')}` : 'no counts, no zeros');
+const dbJobs = Number(sql(`SET NOCOUNT ON; USE jp_app;
+  SELECT COUNT(*) FROM t_app_jobs j
+    INNER JOIN t_app_school_users su ON su.SchoolId = j.SchoolId
+    INNER JOIN jp_sso.dbo.t_sso_users u ON u.UserUid = su.UserUid
+  WHERE u.Email = '${SCHOOL.id}' AND j.Is_Deleted = 0;`)[0] ?? '0');
 
+const dbApplications = Number(sql(`SET NOCOUNT ON; USE jp_app;
+  SELECT COUNT(*) FROM t_app_applications a
+    INNER JOIN t_app_school_users su ON su.SchoolId = a.SchoolId
+    INNER JOIN jp_sso.dbo.t_sso_users u ON u.UserUid = su.UserUid
+  WHERE u.Email = '${SCHOOL.id}' AND a.Is_Deleted = 0;`)[0] ?? '0');
+
+console.log(`    the database says: ${dbJobs} job(s), ${dbApplications} application(s)`);
+
+/*
+  🔴 THE TILES AND THE TABLES MUST AGREE.
+
+  With nothing in either table both areas are empty states; with rows in one,
+  that area shows counts instead. Asserting the SHAPE against the database is
+  what makes this non-vacuous — a hardcoded "expect 2 empty states" would pass
+  on a fixture-driven screen just as happily as on a real one.
+*/
+const expectedEmpties = (dbJobs === 0 ? 1 : 0) + (dbApplications === 0 ? 1 : 0);
+
+check('🔴 each area is an empty state only when its TABLE is empty',
+  (await emptyAreas.count()) === expectedEmpties,
+  `${await emptyAreas.count()} empty area(s), expected ${expectedEmpties}`);
+
+check('🔴 …and no empty area carries a number — a zero here still has to be absent',
+  !emptyText.some((text) => /\d/.test(text)),
+  emptyText.some((text) => /\d/.test(text)) ? `found digits: ${emptyText.join(' | ')}` : 'no counts, no zeros');
+
+/*
+  🔴 REVERSED IN 5B. 3I required two DISABLED actions, because "not yet" is a
+  fact about the product and that is the one place a disabled control belongs
+  (2.62). Both features exist now, so a disabled control would be a lie.
+*/
 const disabledActions = await page.locator('ui-empty-state button[disabled]').count();
-check('…and their actions are disabled, showing where the feature will be',
-  disabledActions === 2, `${disabledActions} disabled buttons`);
+check('🔴 no disabled placeholder action survives — both features are built (5B)',
+  disabledActions === 0, `${disabledActions} disabled buttons`);
 
 const notes = await page.locator('.empty__note').allTextContents();
-check('…each with one line about when it arrives',
-  notes.length === 2, notes.map((n) => n.trim()).join(' · '));
+check('🔴 …and no "arrives in a coming release" line is left on the screen',
+  notes.length === 0, notes.map((n) => n.trim()).join(' · ') || 'none');
 
 await shot(page, 'school-dashboard-1440');
 await context.close();
@@ -146,35 +211,52 @@ check('🔴 no sideways scroll at 375', schoolOverflow === 0, `${schoolOverflow}
 await shot(page, 'school-dashboard-375');
 
 // ---------------------------------------------------------------------------
-console.log('\n=== 2. 🔴 /applicants NO LONGER RESOLVES ===');
+console.log('\n=== 2. 🔴 /applicants RESOLVES AGAIN — AND THE MOCKUP IS GONE ===');
 
+/*
+  ------------------------------------------------------------------------------
+  🔴 3I ASSERTED THIS ROUTE WAS UNREACHABLE. 5B MADE IT REACHABLE AGAIN.
+  ------------------------------------------------------------------------------
+  The route was removed because the screen behind it was fifty rows of fixture
+  data with no HTTP call — the most finished-looking fiction in the product
+  (G6). 5B built the real screen against t_app_applications and restored both
+  the route and the menu row.
+
+  ⚠️ THE FIXTURE CHECK SURVIVES UNCHANGED, and it is the half that mattered.
+  The names below came from `applicant.data.ts`; that file is DELETED, so if
+  either ever appears on this page again, something has resurrected the mockup.
+  A route that resolves is only good news if what it resolves to is real.
+*/
 await page.setViewportSize(WIDE);
 await page.goto(`${SCHOOL_APP}/applicants`, { waitUntil: 'networkidle' });
-await page.waitForTimeout(1200);
+await page.waitForTimeout(1500);
 
 const bodyText = (await page.locator('body').innerText()).replace(/\s+/g, ' ');
 
-// The old screen's fingerprints: its heading, and any fixture name.
-const showsOldScreen = /Applicants\b.*Everyone who has applied/i.test(bodyText) ||
-  /Aarti Deshpande|Rajesh Kulkarni/.test(bodyText);
+// The old screen's fingerprints: any name out of the deleted fixture file.
+const showsOldScreen = /Aarti Deshpande|Rajesh Kulkarni/.test(bodyText);
 
-check('🔴 the old mockup does NOT render', !showsOldScreen,
-  showsOldScreen ? 'THE MOCKUP IS STILL REACHABLE' : 'no fixture rows, no old heading');
+check('🔴 no fixture row from the deleted mockup appears', !showsOldScreen,
+  showsOldScreen ? 'THE MOCKUP HAS GROWN BACK' : 'no fixture names');
 
 const isNotFound = /not found|404|page you/i.test(bodyText);
-check('…the app shows its not-found page instead', isNotFound,
-  bodyText.slice(0, 120).trim());
+check('🔴 …and the route no longer answers with the not-found page (5B)',
+  !isNotFound, isNotFound ? bodyText.slice(0, 120).trim() : 'the real screen renders');
+
+check('…it is the real screen, titled Applicants',
+  /Applicants/.test(await page.locator('.page__title').textContent() ?? ''),
+  (await page.locator('.page__title').textContent() ?? '').trim());
 
 console.log(`    DOM says: "${bodyText.slice(0, 160).trim()}…"`);
 
 const navPaths = await page.locator('nav a').evaluateAll((links) =>
   links.map((l) => l.getAttribute('href')));
 
-check('…and no sidebar entry points at it',
-  !navPaths.some((p) => p?.includes('applicants')),
+check('🔴 …and the sidebar offers it again — menus are data (2.37)',
+  navPaths.some((p) => p?.includes('applicants')),
   navPaths.filter(Boolean).join(' '));
 
-await shot(page, 'applicants-route-removed-1440');
+await shot(page, 'applicants-route-restored-1440');
 await context.close();
 
 // ---------------------------------------------------------------------------

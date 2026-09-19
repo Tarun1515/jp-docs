@@ -3,8 +3,10 @@
 Everything needed to get this running from a clean machine, and an honest
 statement of what is actually built.
 
-**Status: Phase 3 complete, plus the Phase 2.5 entitlement engine** — three
-databases, both APIs, and the school and teacher portals running on real data.
+**Status: Phase 5 complete** — three databases, both APIs, and all four
+front-ends running on real data. Schools post jobs and process applicants;
+teachers browse, apply and follow what happens next. The Phase 2.5 entitlement
+engine is behind job posting and nothing else.
 
 ⚠️ The engine is built and **nothing is gated by it**. Every feature ships
 "free", no plan includes or excludes anything yet, and no screen asks it a
@@ -541,15 +543,46 @@ not optional now: every dashboard, profile, campus and team screen reads from it
    write real data (3F, 3G). Each profile section saves on its own, and a save
    that clashes with somebody else's shows a reload rather than overwriting them.
 
-   ⚠️ **Applicants is no longer routed.** It was a fixture-driven mockup; the
-   component is kept as the design for Phase 5 under
-   `jp-school/src/app/_design-reference/`, and its menu row is hidden until
-   applications exist.
+   Then open **Jobs** and **Applicants**. Post a vacancy, publish it, and the
+   people who apply appear under Applicants with the stage each of them has
+   reached (4, 5).
+
+   🔒 Open one applicant and you will see their email and mobile. That is
+   decision 2.56 working, not a leak: contact opens because **that teacher
+   applied to you**, it is visible to your school and no other, and no
+   subscription anywhere can buy it. A teacher who has not applied has no
+   contact details on this system as far as you are concerned.
+
+   ⚠️ The applicants screen was a fixture-driven mockup until Phase 5B (G6).
+   The design survived; the fifty invented rows did not, and
+   `_design-reference/` is deleted.
 
 7. **Sign in as a teacher** on **<http://localhost:4400>** and open **Dashboard**
    and **My profile**. The dashboard shows the completeness meter — which names
    the single most valuable missing thing and never prints "0%" at somebody who
    has just started — plus their resume status and plan.
+
+   Then **Find jobs**, open one and apply (5B). Three things are worth trying
+   deliberately:
+
+   - **Apply without a resume.** The refusal appears beside the button, names
+     the missing piece and links straight to the resume section — and the Apply
+     control stays, because that will stop being true the moment they upload
+     one. "Not yet", never "not allowed" (2.62).
+   - **Apply, then replace your resume.** The school still opens the file you
+     sent. `ResumePathSnapshot` is copied at the moment of applying, so
+     changing your profile cannot rewrite what somebody already read.
+   - **Save a job instead of applying.** Nothing is sent to the school. Saving
+     is interest; applying is consent, and only the second one opens your
+     contact details (2.56).
+
+   ⚠️ **An unverified teacher can apply, and that is deliberate.** The verified
+   badge is a signal to schools, never a gate on the teacher (2.9, a locked
+   stance). A product that required verification first would lock people out on
+   the day they joined.
+
+   ⚠️ **There is no withdraw.** A teacher cannot take an application back in
+   this release — recorded as a deliberate deferral, not an oversight (G28).
 8. **Change your password** via Swagger `POST /api/auth/change-password`, then
    try to refresh with an old refresh token: it returns 401 and the entire token
    chain is revoked.
@@ -580,11 +613,14 @@ with no HTTP call** — is now **empty**, and that was the point of Phase 3I.
 
 Two screens were in it, and they were the two that looked the most finished:
 the school dashboard and the applicants list, both computing figures from
-`applicant.data.ts`. The dashboard now fetches real data. The applicants
-component is **no longer routed**: it lives in
-`jp-school/src/app/_design-reference/applicants/` as the design Phase 5 builds
-from, its menu row is hidden, and nothing in the app imports it — verified by
-grep and by the absence of its fixture strings from every built chunk.
+`applicant.data.ts`. The dashboard started fetching real data in 3I.
+
+The applicants list came back in **Phase 5B**, built against
+`t_app_applications`. Its design — the margin rule, the roll as a histogram,
+ruling instead of zebra striping — is the mockup's, and that is the only thing
+that survived: `_design-reference/` and its fixture file are **deleted**, and
+`applications-screens.mjs` checks that no name from it can appear on the screen
+and that its fixture strings are absent from every built chunk.
 
 ⚠️ If you are demonstrating this product, there is no longer a screen you have
 to talk around. There are areas that say "not yet", which is a different thing.
