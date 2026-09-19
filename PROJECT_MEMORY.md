@@ -1,7 +1,7 @@
 # TEACHER RECRUITMENT PORTAL — PROJECT MEMORY
 
 > **Ye file har kaam ke baad update hogi.** Har naye chat/session mein sabse pehle ye file padho.
-> Last updated: **2026-09-19** | Phase **3 COMPLETE** + **2.5 engine** + **4 jobs COMPLETE** + **2.67 swagger fix** + **PRE-5 (G26 band, 2.68/2.69)** | Next: **Phase 5 — Applications**
+> Last updated: **2026-09-19** | Phase **3 COMPLETE** + **2.5 engine** + **4 jobs COMPLETE** + **2.67 swagger fix** + **PRE-5 (G26 band, 2.68/2.69)** + **PRE-5b (baseline green)** | Next: **Phase 5 — Applications**
 >
 > 🔴 **Ye do line har phase ke close-out mein update hongi.** File 3I tak
 > pahunch chuki thi aur ye header **Phase 0** par khada tha — saat phase purana,
@@ -1967,6 +1967,30 @@ against hai, na ki us list ke against jo script khud jaanti ho.
 Paanchon values ab bhi **humari** hain, client ki nahi (2.47). Endpoint hone ka
 matlab hai ki unhe badalna ab **data change** hai, deployment nahi — jo poora
 point tha. `Code` stable, `Name` client ka.
+
+### G27. `.tabs` aur `.banner` teen-teen jagah hand-rolled hain — 🟡 OPEN (PRE-5b, 2026-09-19)
+
+Design system mein dono hain hi **nahi**, aur teen-teen component ne apni copy
+likh li hai:
+
+| Pattern | Kahan-kahan |
+|---|---|
+| `.tabs` / `.tabs__tab` | jp-admin matrix · jp-admin verification queue · jp-school job list |
+| `.banner` | jp-admin matrix · jp-school job form · jp-school job list |
+
+🔴 **2.23 saaf kehta hai:** "No one-off styles; if something is missing, add it
+to the system." Teen copy ka matlab hai ki chauthi screen ek chauthi copy
+likhegi, aur kisi din ek tab doosre se alag dikhne lagega — aur farak kisi
+error se nahi, kisi ke dekhne se pakda jaayega.
+
+⚠️ **Ye PRE-5b ke SCSS budget se mila, par wo uska ilaaj nahi hai.** Budget
+threshold ek alag faisla tha (upar dekho); ye duplication uske theek hone ke
+baad bhi bilkul waisi hi khadi hai. Isliye ise number mila — G26 ki tarah, ek
+comment mein likhi hui baat kisi checklist par nahi aati.
+
+**Band kaise hoga:** dono pattern `jp-shared/src/styles/` mein jaayein, chhe
+copy hatein, teeno app rebuild aur screens dobara verify (screens-25 aur
+jobs-screens). Naapa hua nahi — anumaan ~60 min.
 
 ### 2.45 `jp_mdm` — PHASE 2A BUILD NOTES
 
@@ -6014,7 +6038,8 @@ naya Code, agla free Id, kuch renumber mat karo.
 | 2026-08-28 | 2.5 | **Entitlement engine** — features, gating modes, the append-only ledger, the atomic consume, and the admin plan × feature matrix. 🔴 Every feature ships FREE with no mappings, so nothing a user can see changed. Two bugs found by running the path rather than reading it: the balance formula invented a credit every time a quota consume was refunded, and a retry of an already-paid action was refused with QUOTA_EXHAUSTED once quota ran out. Engine 34/34, HTTP 31/31, browser 19/19; all four SQL suites and three HTTP regressions unchanged | ✅ Done |
 | 2026-08-28 | fix | **swagger.json 500 — duplicate schema id** — `JP.App.Api`'s OpenAPI document had been answering 500 for EVERY endpoint, probably since 2.5: two DTOs named `PlanSummaryDto` collided on Swashbuckle's short-name schema ids, and the generator abandons the whole document on the first collision. Fixed at the generator (namespace-qualified ids, both APIs) rather than by renaming one DTO, which would have left the next collision waiting. 🔴 It survived because no suite fetches swagger.json — they call endpoints directly, which work fine without a document. `verify:swagger` now guards it, and was watched failing at an inflated floor before being set back. 500 → 200, 0 → 76 operations | ✅ Done |
 | 2026-08-28 | 4B | **Job screens** — list, form, publish/close, permission shaping, and the dashboard's jobs area on real counts. 🔴 The full chain proven end to end across BOTH apps in one session: JOB_POST flipped to METERED in the admin screen, jp-school publishes once, is refused with the quota message and keeps the job as a Draft, flipped back to FREE, publishes free. Two endpoint gaps found and reported rather than quietly filled — one approved and added (`GET /api/jobs/stats`), one left open (employment types have no master endpoint, and the five values were NOT hardcoded). browser 37/37, every earlier suite unchanged | ✅ Done |
-| 2026-09-19 | PRE-5 | **`jp_app` masters reachable — G26 opened and closed the same day** — `USP_GetAppMaster` gives the five masters that live in `jp_app` the same whitelist-driven read as `jp_mdm`'s, and `MasterService` falls through on `@Recognised = 0` rather than keeping a routing list in C# (2.68). 🔴 The employment-type dropdown is real: a school can post Part-time, Contract, Visiting and Temporary again, and the options are asserted against the captured network RESPONSE — a screenshot of five `<option>`s proves nothing a hardcoded array would not. 🔴 These are TRUE masters and the 1-hour cache applies; the gating prohibition is about `m_mdm_features`/`m_mdm_plan_features` only, and `entitlement-http`'s two greps still hold. The 4B grant-juggling Viewer fixture is retired for a real seeded `SCHOOL_VIEWER` created through the invite flow — no hash in any `.sql` (2.69). jobs-screens **55/55** (was 37), swagger floor unchanged at 21/76, `run_all` idempotent. ⚠️ `entitlement-engine` 33/34 — a **pre-existing** calendar bomb in the suite, not a regression; see the close-out | ✅ Done |
+| 2026-09-19 | PRE-5b | **Baseline green** — the calendar bomb in `entitlement-engine` defused exactly as the PRE-5 close-out suggested: the two boundary rows get their own `OwnerUid`, and the assertion got STRONGER (`=== 1` on both sides, not the `>= 1` that had been swallowing the contamination). 🔴 It was green for a month and then deterministically red, with nothing about the engine having changed — the third time this project has caught a test passing for the wrong reason. Both stale build warnings cleared: the unused import removed, and the SCSS budget re-thresholded with its reasoning written down rather than silently raised — which also surfaced **G27**, `.tabs` and `.banner` hand-rolled in three components each with neither in the design system (2.23). 34/34, every suite unchanged, builds warning-free | ✅ Done |
+| 2026-09-19 | PRE-5 | **`jp_app` masters reachable — G26 opened and closed the same day** — `USP_GetAppMaster` gives the five masters that live in `jp_app` the same whitelist-driven read as `jp_mdm`'s, and `MasterService` falls through on `@Recognised = 0` rather than keeping a routing list in C# (2.68). 🔴 The employment-type dropdown is real: a school can post Part-time, Contract, Visiting and Temporary again, and the options are asserted against the captured network RESPONSE — a screenshot of five `<option>`s proves nothing a hardcoded array would not. 🔴 These are TRUE masters and the 1-hour cache applies; the gating prohibition is about `m_mdm_features`/`m_mdm_plan_features` only, and `entitlement-http`'s two greps still hold. The 4B grant-juggling Viewer fixture is retired for a real seeded `SCHOOL_VIEWER` created through the invite flow — no hash in any `.sql` (2.69). jobs-screens **55/55** (was 37), swagger floor unchanged at 21/76, `run_all` idempotent. ⚠️ `entitlement-engine` 33/34 at the time — a **pre-existing** calendar bomb in the suite, not a regression. **Defused in PRE-5b the same day; it is 34/34 now** | ✅ Done |
 | 2026-08-28 | 4 | **Jobs — backend** — tables, six procedures, the API, and the engine's first real consumer. 🔴 Publish and consume are ONE transaction: a refused consume leaves the job a Draft, and a failure after the consume rolls the ledger row back with it. Two things found by running rather than reading: INSERT ... EXEC made the first design illegal (Msg 3915) and forced the consume into core+wrapper, and a test hook inside the procedure made the atomicity test pass for the wrong reason. Expiry is derived, never stored. jobs-consume 23/23, jobs-lifecycle 34/34, all regressions unchanged. ⚠️ Screens not built — a stated boundary | ✅ Done |
 
 ---
@@ -6611,7 +6636,7 @@ browser  jobs-screens 55/55   (tha 37 — G26 ke 9 naye proof, Viewer asli accou
 regression  swagger 10/10 · jobs-consume 23/23 · jobs-lifecycle 34/34
             entitlement-http 34/34 · dashboards 27/27 · team 49/49
             profile-branches 37/37
-            ⚠️ entitlement-engine 33/34 — neeche padho
+            entitlement-engine 34/34 — PRE-5b ke baad; neeche padho
 build    paanchon frontend prod · backend 0/0 · run_all do baar, zero naye object
 swagger  SSO 21 (floor 21) · App 76 (floor 76) — farsh nahi badla, naya
          operation bana hi nahi
@@ -6630,9 +6655,9 @@ master hain aur unpar wahi 1 ghante ka cache lagta hai (2.48). `m_mdm_features`
 / `m_mdm_plan_features` aaj bhi `IEntitlementRepository` se seedha, bina cache
 padhe jaate hain — `entitlement-http.mjs` ki dono grep green hain.
 
-#### ⚠️ Ek suite red hai, aur wo PRE-5 ki wajah se nahi
+#### ✅ Wo ek red suite — PRE-5b mein theek hui
 
-`entitlement-engine.mjs` **33/34**. Toota hua assertion:
+Us waqt `entitlement-engine.mjs` **33/34** thi (ab 34/34 — neeche). Toota hua assertion:
 
 ```
 FAIL  …and the balance counts them in DIFFERENT months
@@ -6652,22 +6677,48 @@ Ye **test ka calendar bomb** hai, product ka bug nahi:
 - Window math wali dono assertion **pass** hain (`18:29:59Z -> 2026-08-01`,
   `18:30:00Z -> 2026-09-01`) — yaani jis cheez ka ye test hai wo sahi hai.
 
-🔴 **Jaan-boojh kar theek nahi kiya.** Kisi aur ki suite ki assertion ko pass
-karaane ke liye badalna theek wahi aadat hai jo suite ko bekaar banati hai, aur
-ye PRE-5 ke scope mein tha hi nahi. **Sujhaya hua fix:** section 6 ki do
-boundary row ko apna alag `OwnerUid` do — tab ginti mein koi aur row aati hi
-nahi aur assertion `=== 1` rehte hue calendar se azaad ho jaati hai (`>= 1`
-kar dena use kamzor kar dega: phir wo sabit nahi karega ki 18:30:00Z wali row
-September mein giri, August mein nahi).
+🔴 **PRE-5 ne jaan-boojh kar nahi chheda** — doosre ki suite ki assertion ko
+pass karaane ke liye badalna wahi aadat hai jo suite ko bekaar banati hai.
 
-#### ⚠️ Do build warning, dono purani
+✅ **PRE-5b ne theek kar diya, aur theek usi tarah jo yahan sujhaya tha:**
+section 6 ki do boundary row ko apna `OwnerUid` mila
+(`…2500BEEF2504`), aur assertion **kamzor nahi** hui — ulta **strong** ho gayi:
 
-Dono PRE-5 se pehle ki hain — jin file mein hain unhe is kaam ne chhua hi nahi:
+```
+pehle : augUsed >= 1 && sepUsed === 1     (>= 1 upar ke consumes ko maaf karta tha)
+ab    : augUsed === 1 && sepUsed === 1     — dono taraf theek EK row
+```
 
-| Kahan | Warning |
-|---|---|
-| `jp-school` `job-list.component.ts` | NG8113 — `UiButtonComponent` import hai, template use nahi karta |
-| `jp-admin` `entitlement-matrix.component.scss` | budget 4.00 kB, actual 4.92 kB |
+⚠️ **Assertion ko `>= 1` karke chup karana aasan tha aur galat hota.** Wo
+phir sabit nahi karta ki 18:30:00Z wali row September mein giri — jo is poore
+test ka maqsad hai. Fixture ko **alag kiya**, assertion ko nahi.
+
+🔴 Aur ye wahi sabak hai jo 3G aur 4B mein mila tha, teesri baar: **jo test
+galat wajah se pass ho, wo fail hone wale test se bura hai.** Ye ek mahine
+green raha — August mein — aur September aate hi pakka red ho gaya, bina engine
+mein kuch badle.
+
+#### ✅ Do build warning — PRE-5b mein saaf, par do alag tareeke se
+
+| Kahan | Warning | Kya hua |
+|---|---|---|
+| `jp-school` `job-list.component.ts` | NG8113 — `UiButtonComponent` import tha, template use nahi karta | **Hata diya.** Meri hi galti thi, 4B se |
+| `jp-admin` `entitlement-matrix.component.scss` | budget 4.00 kB, actual 4.92 kB | **Threshold badla** — neeche wajah |
+
+🔴 **SCSS wali ko "teen-line fix" maan lena do cheezon ko ek maan lena hota.**
+Naapne par:
+
+- `anyComponentStyle: 4kB` **Angular CLI ka generic default** hai. Matrix is
+  app ki sabse ghani screen hai — sticky header wali grid, custom toggle, tabs,
+  banner, legend, responsive. 4.92 kB **bloat nahi** hai. Warning 6 kB hui;
+  **error ki chhat 8 kB par waise ki waisi** hai, to asli bloat aaj bhi girega.
+- Par usi naap ne asli bimari dikhayi: `.tabs` **teen** component mein
+  haath se likhi hai aur `.banner` bhi **teen** mein, aur design system mein
+  dono hain hi nahi — seedha **2.23 ka ullanghan**. Wo **G27** hai.
+
+⚠️ Sirf budget badha kar chhod dena G27 ko chhupa deta — isliye dono alag
+likhe hain. Aur extraction akela budget clear karta bhi nahi: teeno block
+milakar ~800 byte source hain (~500 minified), overshoot 923 byte ka tha.
 
 ---
 
