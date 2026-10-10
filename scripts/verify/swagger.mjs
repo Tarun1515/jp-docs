@@ -59,8 +59,14 @@ const APIS = [
       ⚠️ Raising the floor is the whole value of this guard. Leaving it at 76
       would mean all thirteen could silently disappear again and this suite
       would still be green.
+
+      🔴 RAISED TO 95 ON 2026-09-19 (PHASE 6A — Offer Lite), again in the same
+      change that added the routes. The six are four school-side
+      (`/api/applicants/{id}/offers` GET and POST, `/api/offers/{id}/withdraw`,
+      `/api/applicants/{id}/hire`) and two teacher-side (`/api/teacher/offers`,
+      `/api/teacher/offers/{id}/respond`).
     */
-    minOperations: 89,
+    minOperations: 95,
   },
 ];
 
@@ -156,6 +162,24 @@ try {
 
   check('the applicant detail operation is documented (Phase 5A)',
     !!applicant, applicant ? 'present' : 'MISSING');
+
+  /*
+    🔴 Phase 6A's two sides, named for the same reason as 5A's.
+
+    A count alone would pass if the whole teacher-facing half vanished and six
+    school routes appeared. These two are what the phase is: a school making an
+    offer, and the teacher answering it.
+  */
+  const sendOffer = doc?.paths?.['/api/applicants/{applicationId}/offers']?.post;
+  const respond = doc?.paths?.['/api/teacher/offers/{offerId}/respond']?.post;
+  const hire = doc?.paths?.['/api/applicants/{applicationId}/hire']?.post;
+
+  check('the send-offer operation is documented (Phase 6A)',
+    !!sendOffer, sendOffer ? 'present' : 'MISSING');
+  check('…and the teacher\'s response — the other half of the machine',
+    !!respond, respond ? 'present' : 'MISSING');
+  check('…and confirm-hire, which OFFER.APPROVE gates separately from sending',
+    !!hire, hire ? 'present' : 'MISSING');
   check('…and the apply operation — consent path 1 (2.56)',
     !!apply, apply ? 'present' : 'MISSING');
   check('…and the resume snapshot fetch, which RESUME.DOWNLOAD gates',

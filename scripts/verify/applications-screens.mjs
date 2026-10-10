@@ -9,7 +9,9 @@
     2. THE MASTER                the Stage dropdown's options matched against
                                  the actual /api/masters/application-status
                                  RESPONSE off the wire — not a list this file
-                                 knows. The offer chain must NOT be offered.
+                                 knows. ⚠️ 6A: the offer chain IS offered now
+                                 — 023's IsReachable flipped when t_app_offers
+                                 shipped, and the assertion moved with it.
     3. THE SNAPSHOT              apply -> replace the resume -> the school
                                  still opens the ORIGINAL bytes while the
                                  teacher's own profile serves the new ones.
@@ -343,12 +345,29 @@ try {
   check('/api/masters/application-status answers 200',
     masterResponse.http === 200, `HTTP ${masterResponse.http}`);
 
-  check('🔴 …with the SIX REACHABLE statuses and no more',
-    masterRows.length === 6, masterRows.map((r) => r.code).join(', '));
+  /*
+    ⚠️ 🔴 REVERSED IN 6A, AND THE REASON IS THE WHOLE POINT OF THE FLAG.
 
-  check('🔴 …and the offer chain is NOT offered — it is unreachable until Phase 6',
-    !masterRows.some((r) => ['OFFER_SENT', 'OFFER_ACCEPTED', 'OFFER_DECLINED', 'HIRED'].includes(r.code)),
-    'no 7..10');
+    5B asserted SIX reachable statuses and no offer chain, because
+    t_app_offers did not exist and a filter offering "Offer sent" could only
+    ever have returned an empty list — indistinguishable from a broken screen.
+
+    Phase 6A built the table, so 023's IsReachable flipped for 7..10 and the
+    same query now answers TEN. That is the flag doing exactly what it was
+    added for: the dropdown follows what the product can actually do, and
+    nobody had to edit a list of ids.
+
+    🔴 The property being guarded has not moved: every option the filter offers
+    must be a state an application can genuinely be in. It was six; it is ten;
+    it is never "whatever is in the table".
+  */
+  check('🔴 …with the TEN reachable statuses — the offer chain became reachable in 6A',
+    masterRows.length === 10, masterRows.map((r) => r.code).join(', '));
+
+  check('🔴 …and the offer chain IS offered now, because an application can be in it',
+    ['OFFER_SENT', 'OFFER_ACCEPTED', 'OFFER_DECLINED', 'HIRED']
+      .every((c) => masterRows.some((r) => r.code === c)),
+    '7..10 present');
 
   const masterInDb = sql(`SET NOCOUNT ON; USE jp_app;
     SELECT CAST(COUNT(*) AS varchar(5)) FROM m_app_application_status
@@ -624,8 +643,20 @@ try {
     offerAttempts.push(`${id}:${r.http}/${r.body?.code ?? '-'}`);
   }
 
-  check('🔴 every one of statuses 7..10 is refused — the offer chain is Phase 6',
+  /*
+    ⚠️ STILL REFUSED, AND STILL FOR A GOOD REASON — only a different one.
+
+    6A put 7..10 in the transition map. It did NOT put them within reach of
+    this endpoint: they are produced by the offer actions, which write the
+    offer row alongside. The assertion therefore keeps its shape and tightens
+    its claim — every attempt must be refused, AND with the code that says why.
+  */
+  check('🔴 every one of statuses 7..10 is still refused here — offers drive them (6A)',
     offerAttempts.every((a) => !a.includes(':200')),
+    offerAttempts.join('  '));
+
+  check('🔴 …with OFFER_ACTION_REQUIRED, not the retired "arrives in a later release" code',
+    offerAttempts.every((a) => a.includes('OFFER_ACTION_REQUIRED')),
     offerAttempts.join('  '));
 
   // ---- rejection, and what the teacher is told -----------------------------

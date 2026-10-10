@@ -1,7 +1,7 @@
 # TEACHER RECRUITMENT PORTAL — PROJECT MEMORY
 
 > **Ye file har kaam ke baad update hogi.** Har naye chat/session mein sabse pehle ye file padho.
-> Last updated: **2026-09-19** | Phase **3 COMPLETE** + **2.5 engine** + **4 jobs COMPLETE** + **2.67 swagger fix** + **PRE-5 (G26 band, 2.68/2.69)** + **PRE-5b (baseline green)** + **5A applications BACKEND (2.70, G28)** + **5B applications SCREENS COMPLETE — PHASE 5 POORA (2.71, G30)** + **6A-0 approval engine above level 1 (2.72, G14 BAND, G31)** | Next: **Phase 6A — Offer Lite**
+> Last updated: **2026-09-19** | Phase **3 COMPLETE** + **2.5 engine** + **4 jobs COMPLETE** + **2.67 swagger fix** + **PRE-5 (G26 band, 2.68/2.69)** + **PRE-5b (baseline green)** + **5A applications BACKEND (2.70, G28)** + **5B applications SCREENS COMPLETE — PHASE 5 POORA (2.71, G30)** + **6A-0 approval engine above level 1 (2.72, G14 BAND, G31)** + **6A Offer Lite BACKEND COMPLETE (2.73, G32)** | Next: **Phase 6B — Teacher search + invites (consent path 2)**
 >
 > 🔴 **Ye do line har phase ke close-out mein update hongi.** File 3I tak
 > pahunch chuki thi aur ye header **Phase 0** par khada tha — saat phase purana,
@@ -2160,6 +2160,36 @@ hain.
 faisla** hai, G14 ka bakaya nahi: kisi ko ye bhi chahiye ho sakta hai ki har
 conflict dikhe. 6A-0 ne isliye behaviour nahi badla, sirf number diya, aur
 `approval-levels.mjs` ab exactly ek row expect karti hai aur kehti hai kyun.
+
+### G32. OFFER_APPROVAL ka level config seeded hai, par koi request banti nahi — 🟡 OPEN (6A, 2026-09-19)
+
+6A ne `t_mdm_request_levels` mein OFFER_APPROVAL ka level 1 **SCHOOL_OWNER**
+(RoleId 4) par theek kar diya — 2C ne use galti se `@ROLE_ADMIN` par seed kiya
+tha, jo ek platform admin hai aur school ke andar ke sign-off mein uska koi kaam
+nahi.
+
+⚠️ **Par aaj koi OFFER_APPROVAL request banti hi nahi.** Offer bhejna seedha
+`USP_SendOffer` hai, aur permission `OFFER.CREATE` / `OFFER.APPROVE` se tay
+hoti hai (service layer). `t_mdm_approval_requests` mein RequestTypeId 4 ki ek
+bhi row nahi aati.
+
+🔴 **Isliye ye ek jaal hai, aur usi wajah se number mila:** koi school
+LevelNumber 2 ki row daal kar Senior-HR→Owner configure kar sakta hai, aur
+**kuch nahi hoga** — na dusra approval maanga jaayega, na pehla. Config
+maujood, consumer nahi. Bina likhe ye theek wahi cheez hai jo 6A-0 ne engine
+mein pakdi: ek raasta jiska koi test nahi, kyunki uspar koi chalta hi nahi.
+
+**6A ne jaan-boojh kar yahin roka**, aur brief ne bhi yahi kaha: "Seed ONE level
+(OFFER.APPROVE) … say so in the build notes." Ek level ke saath approval
+workflow banana matlab ek aisa flow likhna jisme approver aur sender wahi aadmi
+hai.
+
+**Band kaise hoga:** `USP_SendOffer` do hisson mein bante — offer DRAFT banta,
+ek OFFER_APPROVAL request submit hoti, aur offer teacher ko **tab** dikhta jab
+request complete ho jaaye. Trigger: client ka point 7 ka jawaab (jo abhi tak
+nahi aaya), ya koi school do-level sign-off maange. 6A-0 ne sabit kar diya ki
+engine do level chal leta hai, to kaam sirf do procedure jodne ka hai — engine
+ka nahi.
 
 ### 2.45 `jp_mdm` — PHASE 2A BUILD NOTES
 
@@ -6583,6 +6613,135 @@ dono par platform config byte-identical assert hoti hai.
 
 ---
 
+### 2.73 OFFER LITE — PHASE 6A (BACKEND)
+
+`t_app_offers`, `m_app_offer_status`, chaar write procedures, do read, API aur
+verification. Teacher ko offer dikhta hai aur wo jawaab de sakta hai.
+
+```
+offers.mjs            57/57   (machine · decisions · race · 3C negative · HTTP)
+swagger               16/16   (floor 89 -> 95, chhe naye route)
+regression: approval-levels 31 · consent 31 · race 28 · lifecycle 75 ·
+            screens 87 · jobs-consume 23 · jobs-lifecycle 34 · jobs-screens 56 ·
+            entitlement 34+34 · dashboards 28 · screens-3i 17 · team 49 ·
+            profile-branches 37 · teacher-profile 33 · SQL approval 30
+backend 0/0 · paanchon frontend warnings=0 · run_all ×2 → 0 objects
+```
+
+#### 🔴 DO MACHINE HAIN, EK NAHI — aur unhe mila dena hi galti hoti
+
+```
+OFFER        Sent -> Accepted / Declined / Withdrawn          (m_app_offer_status)
+APPLICATION  … -> 5 Selected -> 7 OfferSent -> 8 OfferAccepted -> 10 Hired
+```
+
+Offer **dastavez** hai; application **candidate kahan khada hai**. Dono ek hi
+transaction mein chalte hain, par sawaal alag poochte hain — "Declined" dekh kar
+school ko ye pata hona chahiye ki ye *is offer* ka hai ya *is candidate* ka.
+
+#### 🔴 Map ne 7..10 le liye, aur har edge ek FAISLA hai
+
+```
+5 Selected      -> 6 Rejected · 7 OfferSent
+7 OfferSent     -> 8 OfferAccepted · 9 OfferDeclined · 5 Selected
+8 OfferAccepted -> 10 Hired
+9 OfferDeclined -> 6 Rejected · 7 OfferSent
+10 Hired        -> (kuch nahi)
+```
+
+- **5 -> 7 hi, 3 ya 4 se nahi.** Offer faisle ke BAAD aata hai. Shortlisted se
+  seedha offer dene par application history wo step chhod deti jo school ne
+  asal mein liya tha.
+- **🔴 Decline ke baad DUSRA offer allowed hai.** Filtered index sirf LIVE row
+  par hai, to declined offer naya nahi rokta — sawaal ye tha ki product ko
+  rokna *chahiye* ya nahi. Nahi: ₹40,000 mana karke ₹45,000 maan lena aam
+  mol-bhaav hai, aur mana karne se wo baat-cheet product ke BAHAR chali jaati
+  hai jahan kuch record nahi hota. ⚠️ Poora trail rehta hai —
+  OfferSent → OfferDeclined → OfferSent — to "kitni baar is aadmi ke paas
+  gaye" ka jawaab maujood hai.
+- **Withdraw ka jawaab wahi hai, raasta alag.** Withdrawal application ko
+  **5 Selected** par wapas laata hai, to re-offer special case hi nahi —
+  pehla case dobara hai. Alternative tha ek "withdrawn" application status
+  banana, jo OFFER ka haal APPLICATION ki machine mein ghusa deta.
+- **8 -> 10 alag step hai.** Accept karna aa jaana nahi hai. Dono ko mila dena
+  matlab unhe hired likhna jo kabhi aaye hi nahi — aur wahi number ek din
+  school ko defend karna padega.
+
+#### 🔴 Generic status endpoint ab BHI 7..10 refuse karta hai
+
+Map kehta hai kya **legal** hai; `USP_SetApplicationStatus` usse **narrow** hai.
+Wo chaar sirf OFFER actions se bante hain, jo offer row aur application ko ek
+saath hilaate hain. Endpoint unhe maan leta to school application ko OfferSent
+par set kar sakta tha **bina koi offer hone ke**, ya Hired par **bina kisi ke
+accept kiye** — do table aapas mein jhooth bolte, aur kuch error na hota.
+
+⚠️ **`OFFER_STAGE_UNAVAILABLE` retire ho gaya.** Us code ka matlab tha "product
+mein offer abhi nahi hai" — 2.62 ka not-yet — aur `t_app_offers` ship hone ke
+din wo jhooth ho gaya. Rakhna matlab school ko ek aise release ka intezaar
+karwana jo aa chuka hai. Naya code: **`OFFER_ACTION_REQUIRED`**.
+
+#### 🔴 ALREADY_OFFERED sirf RACE se milta hai — aur suite use banati hai
+
+Aam dusre click se ye **kabhi nahi** aa sakta: offer jaane ke baad application
+7 par baith jaati hai, aur map `7 -> 7` ko INSERT se bahut pehle refuse kar
+deta hai. Matlab filtered index tak pahunch hi nahi hoti, aur CATCH chalta hi
+nahi.
+
+⚠️ **Yahi 3C wala aakaar hai:** ek guard jo maujood hai, theek dikhta hai, aur
+kabhi chala hi nahi. `offers.mjs` section 3 do session ek hi wall-clock instant
+par arm karke use chalata hai (**gate instants: gap 0–2 ms**), aur section 4 ek
+**doosra** unique index bana kar sabit karta hai ki CATCH *kaun sa* index collide
+hua ye dekhta hai — doosra 2601 apne aap ki tarah upar aata hai, log hota hai,
+rollback hota hai.
+
+#### 🔴 Do permission, ek dastavez
+
+`OFFER.CREATE` bhejta aur withdraw karta hai; `OFFER.APPROVE` **hire confirm**
+karta hai. jp_sso ka seed SENIOR_HR ko sirf pehla deta hai aur SCHOOL_OWNER ko
+dono — bilkul wahi aakaar jo ek subsystem peeche `JOB.CREATE` / `JOB.PUBLISH`
+ka hai.
+
+⚠️ Offer **padhna** `APPLICANT.VIEW` par hai, `OFFER.CREATE` par nahi. Jo
+applicant dekh sakta hai wo ye bhi dekh sakta hai ki usse kya offer hua — isko
+"banane" ki permission se baandhna grouping ka haadsa hota, faisla nahi.
+
+#### ⚠️ Teacher ki taraf: alag shabd, aur school ka note bilkul nahi
+
+`TeacherFacingName` — "Offer received", "You declined". School ka
+`WithdrawalReason` `USP_GetMyOffers` ki projection mein **hai hi nahi** (suite
+`OBJECT_DEFINITION` par check karti hai, aur response ke bytes par bhi) — wahi
+line jo 017 rejection reason ke liye kheenchti hai.
+
+#### 🔴 Ek offer accept karne se teacher ki BAAKI applications ko kuch nahi hota
+
+Lalach ye hai ki accept hote hi sab band kar do. Teen tarah se galat:
+
+1. **Teacher ne wo nahi kaha.** Usne EK offer maana; baaki chhodne ko kisi ne
+   nahi kaha, aur acceptance kisi ke join karne se pehle bhi gir sakti hai.
+2. **Product mein withdraw hai hi nahi (G28)**, to yahi ek jagah hoti jahan
+   application chup-chaap gayab ho jaati — ek aise case ke liye side se banayi
+   gayi jise kisi ne design nahi kiya.
+3. **🔒 Ye CONSENT wholesale cheen leta.** Har doosre school ka contact access
+   ek live application par tika hai (2.56); sab band karne se un schools ke
+   neeche se contact nikal jaata — baat-cheet ke beech, ek aise raaste se jo
+   kahin likha nahi.
+
+⚠️ Jis din withdraw design hoga (G28), ye uske jawaab dene wale cases mein se
+ek hai.
+
+#### ⚠️ OFFER_APPROVAL ka level theek hua, par uska koi consumer nahi — G32
+
+2C ne RequestTypeId 4 ko `@ROLE_ADMIN` par seed kiya tha. Offer school ka
+**apna** sign-off hai; koi platform admin us loop mein nahi hona chahiye. Ab wo
+row **SCHOOL_OWNER (4)** par hai, kyunki jp_sso ka seed yahi kehta hai ki
+`OFFER.APPROVE` kiske paas hai.
+
+🔴 Aur do level ek **ROW** hai, release nahi — 6A-0 ne engine ko level 2 par
+chala kar dikha diya (reject, resubmit, role scoping, concurrency). Par aaj
+OFFER_APPROVAL ki koi request banti nahi, to config inert hai: **G32**.
+
+---
+
 ## 3. SCOPE (Client spec ke against)
 
 ### IN SCOPE — MVP
@@ -6796,6 +6955,7 @@ naya Code, agla free Id, kuch renumber mat karo.
 | 2026-09-19 | 5A | **Applications — backend** — tables, das read procedures upar 016 ke paanch write procedures ke, dono taraf ka API, aur teen nayi verification. 🔴 **2.56 pehli baar ZINDA hua**: `fn_TeacherContactUnlocked` 3D se `RETURN 0` tha, ab ek EXISTS hai — apply karte hi contact **us ek school** ke liye khulta hai, doosre ke liye nahi, aur job SAVE karne se kuch nahi khulta. 🔴 **3C ka guard aakhirkaar chalaya gaya**: ek temporary doosra unique index bana kar 2601 karaya, aur procedure ne ALREADY_APPLIED **nahi** kaha — error apne aap ki tarah upar aaya, log hua, rollback hua. 🔴 Apply **muft** hai — poore feature mein ek bhi consume nahi (2.64). Do asli bug mile: `USP_GetJobList`/`GetJobById` stale `ApplicationCount` column project kar rahe the (ab derived), aur history ka "kisne badla" naam agar email par fallback karta to **teacher ka email** har applicant screen par leak karta — pehli history row teacher hi likhta hai. consent 31/31, race 21/21, lifecycle 70/70, swagger farsh 76 -> 89, saari purani suites unchanged, `run_all` idempotent. ⚠️ Screens nahi bane — 5B, ek likhi hui seema | ✅ Done |
 | 2026-09-19 | 5B | **Applications — screens. PHASE 5 POORA.** Teacher: job browse, job detail + apply, my applications (+ detail), saved jobs. School: applicants list, applicant detail + status actions. Dono dashboard ke area asli count par. 🔴 **1D ka applicants mockup DELETE** — `_design-reference/` poora gaya, uska design asli screen mein hai, aur suite check karti hai ki uska koi fixture naam screen par ya kisi built chunk mein nahi aa sakta. 🔴 **`APPLICATION_STATUS` master serve hi nahi hota tha** — table 5A mein bana, whitelist mein nahi tha, to school ka stage filter hardcode hota (2.7); ab **sirf 6 reachable** rows jaati hain. 🔴 **`AllowedTransitions` server se aata hai** — wahi `fn_ApplicationTransitionAllowed` jo illegal move refuse karta hai; component ke paas map ki koi copy nahi, aur Rejected par khaali list matlab **koi button hi nahi** (absent, disabled nahi). 🔴 Ek shipped bug mila: `ui-empty-state` par `actionLink` **input tha hi nahi** — 4B se plain attribute ki tarah likha ja raha tha, to "Post a job" **kuch nahi karta tha**, aur type error bhi nahi aata tha. Ab input hai aur `<a>` render hota hai. ⚠️ Ek purana tootá guard bhi mila jo 5B ka nahi: `screens-3h` ka `#section-experience .empty` 3H se hi galat tha — wo assertion kabhi chali hi nahi. ⚠️ CHAUTHI fixture contamination (suite ne Imran ka resume chhod diya tha) — ab snapshot normalise ke baad lete hain aur `finally` mein restore. Teen suite ki assertion **jaan-boojh kar** badli (`dashboards-3i`, `jobs-screens`, `screens-3i`) kyunki shipped state badla. screens 86/86, swagger 13/13 (floor 89 waise ka waisa — koi naya route nahi), saari purani suites green, backend 0/0, paanchon frontend warnings=0, `run_all` ×2 → 0 objects | ✅ Done |
 | 2026-09-19 | 6A-0 | **G14 ka bakaya chukaya — offer ka ek bhi line likhne se pehle.** `approval-levels.mjs` 31/31: level-2 reject (poori request rejected, level 2 par rukta hai), level-2 resubmit (ResubmitRequired level 2 par, par applicant ke resubmit par **level 1 reset** — dono level dobara), per-level role scoping (dono taraf FORBIDDEN), aur level-2 concurrency (gate instants, gap 0 ms, ek jeeta ek CONCURRENCY_CONFLICT). 🔴 **Ek asli defect mila:** procedure `t_mdm_request_levels` ko **do baar** padhta tha aur dono read "org override" ka matlab alag samajhte the — `IsFinal` org row ko preference deta tha, permission check dono rows par ek saath chalta tha, to override ne role **joda** banisbat badle ke. Jis organisation ne apni approval narrow ki, wahi ek case chup-chaap kaam nahi karta tha — aur dikhta nahi tha kyunki koi override hai hi nahi. Ab effective row **ek baar** resolve hota hai aur dono faisle usse padhte hain. ⚠️ Mere do test galat the (trail submission se shuru hota hai; override wala test galat level par pooch raha tha) — dono theek. **G14 CLOSED**, **G31 open** (engine normal concurrency conflict ko error-log karta hai — 5A ke ulta). Purani SQL suite 30/30 unchanged, `run_all` ×2 → 0 objects | ✅ Done |
+| 2026-09-19 | 6A | **Offer Lite — backend.** `t_app_offers`, `m_app_offer_status`, chaar write + do read procedure, chhe route, API. 🔴 **Do machine, ek nahi:** offer (Sent/Accepted/Declined/Withdrawn) aur application (5 → 7 → 8 → 10) — ek transaction, alag sawaal. 🔴 **Map ne 7..10 le liye aur har edge faisla hai:** 5→7 hi (offer faisle ke baad aata hai), 7→5 withdrawal ka landing (re-offer special case nahi, pehla case dobara), **9→7 decline ke baad dusra offer ALLOWED** (mol-bhaav product ke andar rahe; poora trail bachta hai), 8→10 alag step (accept karna aa jaana nahi). 🔴 **Generic status endpoint ab bhi 7..10 refuse karta hai** — wo stages sirf offer actions se bante hain, warna school application ko OfferSent par set kar deta bina offer ke. `OFFER_STAGE_UNAVAILABLE` **retire**, naya `OFFER_ACTION_REQUIRED`. 🔴 **`ALREADY_OFFERED` sirf race se milta hai** (map `7→7` ko INSERT se pehle rok deta hai) — 3C wala aakaar, to suite do session ek hi instant par arm karti hai (**gap 0–2 ms**) aur ek doosra index bana kar sabit karti hai ki CATCH *kaun sa* index dekhta hai. 🔴 **Do permission:** OFFER.CREATE bhejta, OFFER.APPROVE hire confirm karta (SENIOR_HR ke paas pehla hi hai). 🔴 **Ek offer accept karne se baaki applications ko kuch nahi hota** — faisla, teen wajah ke saath, aur teesri 2.56 hai. OFFER_APPROVAL ka level ADMIN se **SCHOOL_OWNER** par theek hua (2C ki galti), par uska koi consumer nahi: **G32**. ⚠️ Mere do test galat the (3C negative ka premise khud banana pada — chhathi fixture contamination; aur scope negative ke liye aisa actor chahiye tha jiske paas permission HO). ⚠️ `applications-race` ki overlap assertion flake hui — proof se evidence par utari. offers 57/57, swagger floor 89→95, Phase 5 ki do suite usi commit mein update, saari purani suites green, `run_all` ×2 → 0 objects | ✅ Done |
 
 ---
 
@@ -7583,36 +7743,89 @@ vivaran 2.70 ke RACE section ke follow-up mein.
 
 ---
 
-## ▶️ NEXT: PHASE 6 — OFFERS, INVITES, NOTIFICATIONS, TEACHER SEARCH
+## ✅ PHASE 6A COMPLETE — 2026-09-19 (OFFER LITE, BACKEND)
 
-Phase 5 ne jaan-boojh kar chaar cheezein chhodi hain, aur teeno ke liye jagah
-pehle se bani hui hai:
+6A-0 (G14 ka bakaya) aur 6A (Offer Lite) dono band. Details **2.72** aur
+**2.73**.
 
-- **Offers** — `m_app_application_status` mein 7–10 (OFFER_SENT,
-  OFFER_ACCEPTED, OFFER_DECLINED, HIRED) **seeded hain** taaki ids kabhi na
-  khiskein, aur `fn_ApplicationTransitionAllowed` unhe aaj refuse karta hai.
-  `t_app_offers` Phase 6 hai. 🔴 Jab wo aayein, `USP_GetAppMaster` ki
-  `APPLICATION_STATUS` branch mein `IsReachable = 1` filter **apne aap**
-  unhe dropdown mein le aayega — master row ka flag badalna hi kaafi hai.
-- **Invites** — 🔒 **consent path 2** (2.56). Aaj `fn_TeacherContactUnlocked`
-  mein **ek hi** EXISTS hai. Invite accept hone par doosra raasta judega —
-  **usi function mein, doosri jagah nahi.**
-- **Notifications** — `t_app_notifications` maujood hai aur 5 mein
-  jaan-boojh kar **kuch nahi likhta.** Status change par teacher ko kuch nahi
-  jaata.
-- **Teacher search** — pehla paid gate (6.5 purchase screens ke saath).
+```
+approval-levels.mjs   31/31      offers.mjs   57/57      swagger 16/16 (floor 95)
+```
 
-### 🔴 Phase 6 shuru karne se pehle padho
+🔴 **Do machine, aur unhe mila dena hi galti hoti:** offer ek dastavez hai
+(Sent/Accepted/Declined/Withdrawn), application candidate ki jagah hai
+(5 → 7 → 8 → 10). Ek transaction mein chalte hain, alag sawaal poochte hain.
 
-- **2.71** — khaas taur par: buttons server ke `AllowedTransitions` se aate
-  hain (component ke paas map ki copy nahi), aur khaali list ka matlab **koi
-  button nahi** hai, "pata nahi" nahi.
-- **🔒 2.56** — invite wala raasta **usi function** mein judega. Ek doosra
-  EXISTS kisi aur jagah likhna hi wo bug hai jisse 2.56 bacha raha hai.
-- **G28** — withdraw abhi bhi nahi hai. Phase 6 mein invite aane par ye sawaal
-  dobara uthega (invite decline ka kya matlab hai?), to faisla wahan lena.
-- **G27** — `.tabs` teen alag copy. 5B ne badhaya nahi, par band bhi nahi
-  kiya. Chhathi screen banane se pehle theek karna sasta padega.
+🔴 **Decline ke baad dusra offer ALLOWED** — mol-bhaav product ke andar rahe,
+aur poora trail bachta hai. Withdraw application ko 5 par wapas laata hai, to
+re-offer special case hi nahi.
+
+🔴 **Generic status endpoint ab bhi 7..10 refuse karta hai**, aur ye sabse
+aasaani se chhoot sakta tha: map unhe maanta hai, par wo stages sirf offer
+actions se bante hain. Warna school application ko Hired par set kar sakta tha
+bina kisi ke accept kiye.
+
+🔴 **`ALREADY_OFFERED` sirf race se milta hai** — aam dusra click map par hi ruk
+jaata hai. 3C wala aakaar: guard maujood, kabhi chala nahi. Suite use chalati
+hai (gate instants, gap 0–2 ms) aur ek doosra index bana kar sabit karti hai ki
+CATCH *kaun sa* index dekhta hai.
+
+⚠️ **6A-0 ne engine mein ek asli defect pakda:** org override override karta hi
+nahi tha — permission check aur `IsFinal` read ek hi table ko do alag tareeke se
+padhte the. Ab effective row ek baar resolve hota hai.
+
+⚠️ **Mere teen test galat the, teeno theek:** 6A-0 ka trail (submission se shuru
+hota hai) aur org-override wala level; 6A ka 3C negative (premise khud banana
+pada — **chhathi** fixture contamination) aur scope negative (actor ke paas
+permission HONI chahiye thi). Aur `applications-race` ki overlap assertion flake
+hui — proof se evidence par utari gayi, kyunki ~16 ms tick use tez call par
+hamesha fail karwa deta.
+
+⚠️ **Phase 5 ki do suite usi commit mein update** — `applications-lifecycle` aur
+`applications-screens` 7..10 ko unreachable assert karti thin. Shipped state
+badla, guard ke saath wajah likhi gayi (5B ka rule).
+
+---
+
+## ▶️ NEXT: PHASE 6B — TEACHER SEARCH + INVITES (🔒 CONSENT PATH 2)
+
+6A ke baad agla boundary. Brief ne teen workstream fixed order mein diye the —
+6A (engine debt + Offer Lite), **6B** (search + invites), 6C (notifications +
+saare screens) — aur kabhi aadha nahi.
+
+- **Search (jp-school)** — subject, city/state, experience range
+  (`m_mdm_experience_range` — whitelist mein daalna hoga), qualification,
+  class level. 🔴 **SERVER-side paging aur filtering, pehle din se** (G29 ka
+  sabak, aur yahan volume asli hogi). Suspended teachers bahar.
+  🔒 **Contact search results mein KABHI nahi** — kisi plan, kisi flag, kisi
+  role ke liye nahi. 2.56 ka grep search procs tak badhega.
+- **Gating** — `TEACHER_SEARCH` engine ka **pehla Boolean consumer**;
+  `TEACHER_INVITE` Metered (reference = InviteUid). Dono FREE seed hongi.
+  🔴 Boolean ledger mein **kuch nahi likhta** (2.64) — 2.5 ka design assertion,
+  ab ek asli consumer ke against. Saare entitlement read
+  `IEntitlementRepository` se (direct), **kabhi `IMasterService` se nahi** —
+  isolation grep badhega.
+- **Invites** — 🔒 **consent path 2, doosra aur AAKHIRI.**
+  `fn_TeacherContactUnlocked` ko apna doosra EXISTS milega — **usi function
+  mein, doosri jagah nahi.**
+  ⚠️ **Schema mein `InviteStatus` ka koi ACCEPTED value HI NAHI hai**
+  (Sent/Viewed/Applied/Ignored). Locked 2.56 note theek yahi kehta hai: **add
+  karo, warna consent path 2 chup-chaap path 1 mein dhal jaayega.**
+  Invite dekhna kuch nahi kholta; ignore karna kuch nahi kholta; school ka
+  payment status kuch nahi kholta — kabhi.
+- **Path 1 ka REGRESSION** — function badlega, to apply-unlocks **dobara sabit**
+  karna hoga, maan kar nahi chhodna. Consent suite dono path ek hi run mein.
+
+### 🔴 6B shuru karne se pehle padho
+
+- **🔒 2.56** — doosra EXISTS **usi function** mein. Kisi aur jagah likhna hi wo
+  bug hai jisse 2.56 bacha raha hai.
+- **2.64** — Boolean ledger mein kuch nahi likhta. Suite ko ledger count entry
+  aur exit par barabar maangna hoga.
+- **2.68 / G26** — naya jp_app master whitelist mein **usi commit** mein
+  (APPLICATION_STATUS ka sabak: 5A mein table bani, 5B tak serve nahi hui).
+- **G29** — search par paging server-side, pehle din se.
+- **2.73** — offer ki do-machine wali seema, taaki invite usse na uljhe.
 
 
 ## Uske baad

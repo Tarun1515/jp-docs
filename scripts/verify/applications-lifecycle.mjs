@@ -331,21 +331,42 @@ try {
   check('🔴 REJECTED IS TERMINAL — Rejected -> Shortlisted refused, by decision not oversight',
     rejToShort.status === 0 && rejToShort.code === 'INVALID_TRANSITION', rejToShort.raw);
 
-  // ---- 7..10, the offer chain --------------------------------------------
+  /*
+    ---- 7..10, the offer chain ---------------------------------------------
+
+    ⚠️ 🔴 THIS ASSERTION WAS REVERSED IN 6A, AND THE REFUSAL SURVIVED IT.
+
+    Phase 5 asserted OFFER_STAGE_UNAVAILABLE here — "offers arrive in a later
+    release", 2.62's not-yet. That code was TRUE then and became FALSE the day
+    t_app_offers shipped: leaving it would have told a school to wait for
+    something that had already happened.
+
+    🔴 What did NOT change is that this endpoint refuses all four. The
+    transition map permits 5 -> 7, 7 -> 8 and the rest now, but every one of
+    those is produced by an OFFER action that writes the offer row and moves the
+    application in ONE transaction. If this endpoint accepted them, a school
+    could set an application to OfferSent with no offer behind it, or to Hired
+    with nobody having accepted anything — two tables disagreeing, nothing
+    erroring.
+
+    So the refusal stayed and only its REASON changed, which is why the code
+    changed with it (OFFER_ACTION_REQUIRED). The guard was working; it is not
+    being weakened, it is being told the truth about why it fires.
+  */
   console.log('');
   for (const to of [7, 8, 9, 10]) {
     const r = setStatus(3, to);
     console.log(`    3 Shortlisted -> ${to} : ${r.raw}`);
-    check(`🔴 status ${to} (the Phase 6 offer chain) refuses with OFFER_STAGE_UNAVAILABLE`,
-      r.status === 0 && r.code === 'OFFER_STAGE_UNAVAILABLE', r.raw);
+    check(`🔴 status ${to} is refused with OFFER_ACTION_REQUIRED — offers drive it, not this endpoint (6A)`,
+      r.status === 0 && r.code === 'OFFER_ACTION_REQUIRED', r.raw);
   }
 
   const noChange = setStatus(3, 3);
   check('…and asking for the state it is already in is a SUCCESS with NO_CHANGE (2.48)',
     noChange.status === 1 && noChange.code === 'NO_CHANGE', noChange.raw);
 
-  const codes = new Set(['INVALID_TRANSITION', 'OFFER_STAGE_UNAVAILABLE', 'NO_CHANGE']);
-  check('🔴 three distinct codes — a client can tell "not from here" from "not yet" from "already there"',
+  const codes = new Set(['INVALID_TRANSITION', 'OFFER_ACTION_REQUIRED', 'NO_CHANGE']);
+  check('🔴 three distinct codes — "not from here", "not through this door", "already there"',
     codes.size === 3, [...codes].join(' · '));
 
   // ---- the same chain, over HTTP -----------------------------------------

@@ -304,8 +304,27 @@ try {
   check('…on two different SQL sessions, not one connection reused',
     ma.spid !== mb.spid && !!ma.spid && !!mb.spid, `spids ${ma.spid} and ${mb.spid}`);
 
-  check('…and their execution windows overlapped — one was inside the procedure while the other was',
-    overlapMs > 0, `${overlapMs} ms of overlap`);
+  /*
+    ------------------------------------------------------------------------
+    ⚠️ THE OVERLAP IS REPORTED, NOT ASSERTED — AND IT USED TO BE ASSERTED.
+    ------------------------------------------------------------------------
+    `overlapMs > 0` was added alongside the gate instants and it FLAKED: a run
+    came back with an entry gap of 0 ms and an overlap of 0 ms, and failed.
+
+    That is not evidence against concurrency; it is the same ~16 ms Windows
+    timer tick that makes the entry gap 0 in the first place. Overlap is
+    min(t1) - max(t0), so a call that starts and finishes inside ONE tick reads
+    t1 == t0 and the arithmetic gives zero. The faster the procedure, the more
+    likely the assertion fails — which is precisely backwards.
+
+    🔴 The ENTRY INSTANTS are the proof, and they are asserted. Both sessions
+    were released by the same WAITFOR on the same tick; that is what "they
+    raced" means and it does not depend on how long the work took. The overlap
+    and the lock waits are printed as supporting detail, for the same reason
+    and with the same status.
+  */
+  check('…and neither session finished before the other started',
+    overlapMs >= 0, `${overlapMs} ms of overlap (0 means one call fitted inside a single clock tick)`);
 
   const rows = Number(scalar(`SET NOCOUNT ON; USE jp_app;
     SELECT COUNT(*) FROM t_app_applications WHERE TeacherId=${teacherId} AND JobId=${jobA} AND Is_Deleted=0;`));
