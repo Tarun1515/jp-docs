@@ -81,8 +81,31 @@ const APIS = [
       so a teacher, an owner and a viewer all read their own through the same
       four routes. There is no `?userUid=`, and 030 removed the column that
       would make a cross-user query expressible at all.
+
+      🔴 RAISED TO 113 ON 2026-10-11 (PHASE 6.5A — billing, manual first), in
+      the same change that added the routes. Eight, split by who may call them:
+
+        the account's own    /api/billing/plans
+                             /api/billing/my-plan
+                             /api/billing/my-history
+                             POST /api/billing/plan-change
+
+        PAYMENT.VERIFY only  /api/billing/payments/pending
+                             /api/billing/payments/{id}
+                             POST /api/billing/payments/{id}/verify
+                             /api/billing/owners/{ownerUid}/history
+
+      ⚠️ The account-facing four take NO owner parameter — the owner comes from
+      the token (2.39, 2.51), so there is nothing to tamper with. The admin four
+      take one explicitly and are gated on a permission SUPER_ADMIN alone holds.
+
+      🔴 THERE IS NO PAYMENT-GATEWAY ROUTE, and its absence is the design. Money
+      arrives by NEFT, cheque or cash and an admin confirms it; the verify route
+      IS the seam a gateway callback will later enter through
+      (MONETIZATION_DESIGN 6.5-A). A stub "pay now" endpoint would be the
+      mockup-era failure this project exists to avoid.
     */
-    minOperations: 105,
+    minOperations: 113,
   },
 ];
 

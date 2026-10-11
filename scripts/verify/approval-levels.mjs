@@ -189,8 +189,28 @@ try {
     entryLevels.split(' · ').every((l) => l.includes(':L1:final1')),
     entryLevels);
 
-  check('🔴 …which is exactly why G14 exists: one path, four times over',
-    entryLevels.split(' · ').length === 4, `${entryLevels.split(' · ').length} request types`);
+  /*
+    🔴 FIVE SINCE 6.5A, AND THE NUMBER MOVED FOR A REASON WORTH READING.
+
+    Phase 6.5A seeded PLAN_CHANGE (RequestTypeId 5) — a plan-change request,
+    whose single final level is SUPER_ADMIN. The point of this assertion is
+    unchanged: EVERY shipped type is configured single-level, so the platform
+    walks the same one path N times over, which is what G14 records and what
+    6A-0 proved the engine can walk beyond.
+
+    ⚠️ It is a COUNT rather than a list on purpose: the failure it exists to
+    catch is a type arriving with no level configuration at all, which would
+    make it unsubmittable. 6.5A's seed guards that from its own side too
+    (011_seed_plan_change_request.sql raises if level 1 is missing), and the
+    two checks are independent — this one would also catch a type added
+    without touching that file.
+
+    🔴 CHANGED IN THE SAME COMMIT AS THE SEED ROW, with the reason written
+    down. A guard quietly relaxed to match new behaviour is worse than no
+    guard, and this project has the rule because it has made that mistake.
+  */
+  check('🔴 …which is exactly why G14 exists: one path, five times over',
+    entryLevels.split(' · ').length === 5, `${entryLevels.split(' · ').length} request types`);
 
   check('entry: no fixture level rows left over from a previous run',
     scalar(`SET NOCOUNT ON; USE jp_mdm;

@@ -967,14 +967,453 @@ written against.
 
 | 6.5 brings | How it lands |
 |---|---|
-| Payment gateway | A successful payment writes **Grant** rows, with the payment reference in `Notes` / a `RefEntityTypeId = PAYMENT` |
-| Purchase / upgrade screens | New rows in `t_app_subscriptions` (the one-active-per-owner index already governs this) |
-| Invoices | A new table keyed to payments; the ledger is untouched |
+| Payment gateway | ⬜ **Not in 6.5** — money arrives manually and an admin confirms it. The gateway becomes one more caller of the same activation procedure (**6.5-A**). A credit *top-up* is the other purchase shape and still writes **Grant** rows with the payment reference in `Notes` / a `RefEntityTypeId = PAYMENT` |
+| Purchase / upgrade screens | New rows in `t_app_subscriptions` — and the one-active-per-owner index is why activation is necessarily *close the old, open the new* in one transaction (**6.5-A**) |
+| Invoices | A **receipt** in 6.5 — numbered per IST year from a counter row (2.46), recording what was received. Not an invoice and not claiming to be; GST stays out (**6.5-E**) |
 | Refunds | **Reversal** rows — the entry type already exists |
 | Credit expiry | **Expiry** rows — the entry type already exists, plus the retention decision deferred in Decision 4 |
 | Real pricing | Data in `m_mdm_plans.Price` and mappings in `m_mdm_plan_features` — no deployment (2.7) |
 | Turning gating on | Change `GatingModeId` per feature — data, not code |
-| Proration | 🔴 An open decision, tied to the first-period rule in Decision 6 |
+| Proration | ✅ **DECIDED — out** (**6.5-D**). Decision 6 flagged this to be revisited "when money is attached"; money is attached now and the answer is no, for the reason recorded there. The bounded cost is stated in full: an upgrade late in a month grants that month's full new quota |
+
+---
+
+## 🔴 Phase 6.5 addendum — BILLING, MANUAL FIRST
+
+> Written **before** any 6.5 code, which is the 2.5-PRE lesson: the design
+> document that arrives after the build documents the build, and a decision
+> written down after it was made is a description rather than a choice.
+>
+> **The engine above this line is unchanged by this addendum** — not one table,
+> procedure or formula moves to accommodate billing, which was the test 2.5-PRE
+> was written against, and it held.
+>
+> ⚠️ The forecast table in "What Phase 6.5 adds" **did** move, in four rows: a
+> forecast left standing beside the decision that replaced it is the exact rot
+> this project keeps finding, so those rows now point here. The gateway row in
+> particular said a payment writes **Grant** rows — true of a credit top-up,
+> **not** of the subscription purchase this phase actually builds.
+
+**The gateway is not in this phase.** Money arrives by NEFT, cheque or cash, an
+admin confirms it, and the subscription activates. `m_mdm_payment_modes` has had
+`ONLINE / NEFT / CHEQUE / CASH` seeded since 2A and
+`t_mdm_request_payments` has carried `VerifiedByUserId` since 2A under a
+"build, don't use" note. This phase uses them. The gateway becomes **one more
+caller** of the same procedure later.
+
+---
+
+### 6.5-A — The seam: one service method, two callers, two databases
+
+**One method owns the whole transition: payment reaches SUCCESS → subscription
+activated.** `IBillingService.VerifyAndActivateAsync`. The manual caller is an
+admin endpoint; the gateway caller, later, is a callback endpoint. Same method,
+new caller, no redesign.
+
+This is the `IEmailService` / `IFileStorageService` pattern this codebase
+already runs on: one contract, a swappable implementation behind it, and the
+business rule written once.
+
+#### 🔴 Corrected while writing this, before any code existed
+
+The first draft of this section said **one procedure**, `USP_VerifyPaymentAndActivate`,
+in `jp_app`. That is not buildable, and the reason is two decisions this
+project already made:
+
+- the payment row lives in **`jp_mdm`** (`t_mdm_request_payments`) and the
+  subscription lives in **`jp_app`** (`t_app_subscriptions`) — and **no query
+  may cross** (2.2);
+- so the two halves cannot share a transaction, and there is **no distributed
+  transaction** (2.48).
+
+⚠️ This is exactly what writing the addendum first is for. Had the sentence
+survived into code, the shape would have been discovered at the point where the
+procedure needed a table it cannot see — and the pressure then is to reach
+across the database boundary "just this once", which is how 2.2 dies.
+
+**The seam is therefore at the SERVICE, not the procedure**, and the codebase
+already runs this exact pattern — 2.48's cross-database orchestration, the one
+`ApprovalService` uses to drive school approval and teacher verification:
+
+```
+IBillingService.VerifyAndActivateAsync          <- THE SEAM. Both callers enter here.
+  |
+  |-- jp_mdm   USP_VerifyPayment        commits.  PaymentStatusId -> SUCCESS,
+  |                                     verifier stamped, receipt number allocated
+  |
+  '-- jp_app   USP_ActivateSubscription separate transaction. Old row closed,
+                                        new row opened, both kept
+```
+
+🔴 **The first half is committed before the second one starts, and the method
+reports that truthfully** rather than smoothing it over — `activationCompleted`,
+the same shape `orchestrationCompleted` already has. The payment is **not**
+rolled back if activation fails. It cannot be: it is committed in another
+database, and the money really did arrive. Pretending otherwise would be worse
+than saying so.
+
+#### 🔴 Which makes idempotency structural rather than a nicety
+
+A partial failure — payment verified, activation not — is a state the system
+**will** reach, so recovery is simply *calling the method again*:
+
+- `USP_VerifyPayment` is idempotent on the payment reaching SUCCESS; a second
+  call changes nothing and reports `Status 1`.
+- `USP_ActivateSubscription` is idempotent on **`PaymentUid`**; it activates
+  for a payment that has not yet been activated, and reports `Status 1` for one
+  that has.
+
+So the retry of a half-completed verification **completes** it, and the retry of
+a complete one does nothing. That is the same requirement as 6.5A's
+"verifying twice = one activation" and the same requirement as the gateway
+delivering its callback three times — one mechanism, three reasons to want it.
+
+⚠️ **`PaymentUid` is a new column** on `t_mdm_request_payments`, and it is the
+cross-database handle. `jp_app` may legitimately *store* a `jp_mdm` id — it
+already stores `PlanId` with no FK — but a `uniqueidentifier` is the house
+shape for a reference that crosses, and the ledger's `RefEntityUid` is already
+a `uniqueidentifier` expecting exactly this (the `RefEntityTypeId = PAYMENT`
+row of the forecast table above).
+
+#### Why the activation half must not be duplicated
+
+Activation is where money becomes capability, and it carries an invariant the
+database enforces structurally:
+
+```
+UQ_t_app_subscriptions_OneActivePerOwner   UNIQUE (OwnerUid)
+                                           WHERE StatusId = 1 AND Is_Deleted = 0
+```
+
+Only one row per owner may sit at `StatusId = 1`. So activation is necessarily
+*close the old, open the new*, in one transaction — and two copies of that is two
+places for the invariant to be got wrong, where the second one is found by a
+school holding two active plans.
+
+**Rejected — a path per payment source.** It reads simpler on day one: a manual
+flow that trusts an admin, a gateway flow that trusts a signature. It was
+rejected because the part that **differs** is *authentication*, which belongs in
+the API layer and nowhere near a procedure, and the part that is **identical** is
+*activation*, which is the part carrying the invariant. Splitting on the wrong
+axis is how the invariant ends up twice — and the second copy is found by a
+school holding two active plans.
+
+⚠️ Note what this means for where the two halves live: they are two procedures
+because they are in two databases, **not** because there are two callers. One
+caller or ten, the split is the same, and neither procedure knows which caller
+it is serving.
+
+#### 🔴 What the gateway caller will need that the admin caller does not
+
+Stated now, so the seam is real rather than a hope. Each of these shapes the
+**signature built today**, not later:
+
+| The gateway needs | Why the admin path does not | What it costs now |
+|---|---|---|
+| `@VerifiedByUserId` **optional** | A callback has no JWT and no user. There is no person to record | The column is already `NULL`-able (2A). The procedure must not require it — and must therefore record *how* it was verified, not only *who*: `@VerifiedVia` (`ADMIN` / `GATEWAY`) |
+| Idempotency on the **payment row**, not the HTTP call | An admin clicks once; a gateway retries its callback on any timeout, and may deliver the same event three times | Already required by this phase (6.5A, idempotent verify). The gateway gets it free |
+| To set `PaymentStatusId` to **FAILED** | An admin only records money that arrived. A gateway reports failures too | Activation keys on *"the payment reached SUCCESS"*, never on *"an admin said so"*. One branch, both callers |
+| **No remark requirement** | A machine cannot be asked to explain a mismatch | The mismatch rule lives in the API/screen layer, not in the procedure — see 6.5-B below. This is the load-bearing consequence of the seam |
+
+The last row is the one worth noticing: **the amount-mismatch rule cannot be a
+procedure constraint**, because the gateway caller would trip over it with
+nobody to type a remark. Putting it in the procedure would make the seam a hope.
+It goes in the layer that has a human in front of it.
+
+⚠️ What the gateway will *also* need and this phase does **not** build: signature
+verification, a replay window, and a raw-payload audit row. Those are
+authentication concerns, they land entirely in the API layer, and none of them
+reach this procedure. That is the test of whether the seam is real.
+
+---
+
+### 6.5-B — Recorded ≠ expected: the ledger never lies about money
+
+The payment row stores **what was received**, not what was owed:
+
+```
+Amount          what actually arrived
+PaymentModeId   NEFT / cheque / cash / online
+GatewayRefNo    the UTR, the cheque number, the receipt book number
+Remarks         NEW COLUMN — why the amount differs, when it does
+PaymentUid      NEW COLUMN — the cross-database handle (6.5-A), unique
+```
+
+Those two columns are the whole ALTER this phase makes to a table built in 2A.
+
+`Amount ≠ m_mdm_plans.Price` is **recorded, never refused**. When they differ the
+admin screen requires a remark and shows the difference; the procedure stores
+both numbers and says nothing about the gap.
+
+**Why there is no price-enforcement logic.** A school that transferred ₹4,900
+against a ₹5,000 plan has paid ₹4,900 — the money is in the bank. A system that
+refuses to record it has not prevented an underpayment; it has made the real
+state of the world unrepresentable, and the first support call gets answered by
+somebody editing rows by hand. The product's obligation here is narrow and
+absolute: **never lie about what was received.** Whether ₹100 is chased is a
+commercial conversation, and the remark is where it starts.
+
+**Rejected — a CHECK constraint, or a refusal when `Amount <> Price`.** It
+sounds like rigour. It makes the common real case (a short transfer, a bank
+charge deducted in transit, a rounded cheque) impossible to enter, and the
+pressure to enter it anyway does not disappear — it moves to SSMS, where there
+is no trail at all. The weaker-looking rule produces the stronger audit.
+
+⚠️ **The plan's price is copied onto the payment row at request time**
+(`t_mdm_request_payments.PlanId` already exists; the expected amount is read
+through it). Prices are data and will change (2.7); a receipt that re-derives
+its expected amount from today's `m_mdm_plans.Price` would silently restate last
+year's invoice. The row records the price that was quoted.
+
+---
+
+### 6.5-C — Expiry is derived, never swept
+
+**Agreed, with the direction as stated**, and the reasoning is the 2.5-PRE reset
+decision applied to a second thing: a quota reset writes no rows, and an expiry
+should write none either. There is no sweeper today — **zero** SQL Agent jobs on
+this instance, verified — and this phase adds none.
+
+> A paid subscription past `EndsOn` is read as *not in force* by one predicate,
+> everywhere. The account falls back to the **default plan for its UserTypeId**
+> (`m_mdm_plans.IsDefault = 1`), derived at read time. Every account keeps
+> working at the free baseline. `SUBSCRIPTION_INACTIVE` stays reserved for
+> **cancelled or suspended** — a decision somebody made — and is never the answer
+> to "the paid period ran out".
+
+#### The model this rests on
+
+| Column | What it records |
+|---|---|
+| `StatusId` | A **decision**: `ACTIVE` (in force) · `EXPIRED` (closed, superseded by a later row) · `CANCELLED` (deliberately stopped) |
+| `EndsOn` | A **fact about time**. `NULL` on every free subscription — provisioning has set it so since 2F |
+| `Is_Active` | The soft-delete-adjacent flag the house pattern already uses |
+
+"In force at `@Now`" = `Is_Active = 1 AND StatusId = 1 AND (EndsOn IS NULL OR
+EndsOn > @Now)`. That is the whole predicate, and it already exists —
+**once** — at `013_entitlement.sql:413`. It stays once.
+
+**Rejected — a nightly job that stamps `StatusId = EXPIRED`.** It is the obvious
+design and it is wrong for the same reason the quota reset writes no rows: the
+truth is a function of the clock, and a job that writes it down introduces a
+window in which the database disagrees with reality. The window is not
+theoretical — it is "between midnight and whenever the job ran", which is
+exactly when a customer whose plan lapsed at midnight tries to post a job. A
+derived read has no window. It also means the system behaves correctly on a
+machine where nothing is scheduled, which is every developer's machine and, on
+the day it matters, production.
+
+**Rejected — letting it refuse, and telling the customer to renew.** This is
+today's shipped behaviour, and it is the one thing in this addendum that
+*changes* existing code rather than extending it. Current behaviour: a lapsed
+paid subscription returns `SUBSCRIPTION_INACTIVE` and the account can do
+nothing. That is a cliff: an account that paid once is worse off than an account
+that never paid, because the never-paid account is on the free plan and still
+works. Falling back to the free baseline makes lapsing a **reduction in
+capability** rather than a loss of the product.
+
+#### 🔴 The hazard this creates, which only reading the consume path reveals
+
+The fallback cannot simply be bolted onto the refusal branch, because the
+consume path reads the plan **twice** and compares the two reads:
+
+```
+C#   ConsumeOnceAsync:  subscription = GetCurrentAsync(ownerUid)      -> PlanId
+                        resolution   = ResolveAsync(feature, PlanId)  -> QuotaPerPeriod
+SQL  USP_ConsumeFeatureCore, under the per-owner lock:
+                        @ExpectedPlanId  vs  the row's PlanId  ->  PLAN_CHANGED
+```
+
+`@ExpectedPlanId` is compared against the **raw `PlanId` column**. So if the C#
+layer falls back to the free plan while the row still carries the paid
+`PlanId`, every consume on a lapsed subscription answers `PLAN_CHANGED` — and
+keeps answering it, because 2.64's retry is bounded at one and the second
+resolve reaches the same disagreement. A correct-looking change in one layer
+produces a permanent refusal with an irrelevant code.
+
+**Therefore the fallback is computed in the one place that answers "which plan
+is in force" — inside the lock — and the caller hands down BOTH candidate
+mappings rather than choosing between them.** Concretely:
+
+- `fn_SubscriptionInForce(@IsActive, @StatusId, @EndsOn, @Now)` → `bit`. One
+  definition in `jp_app`, called by the read path and by the locked path. It
+  takes scalars, not an `OwnerUid`, so it is cheap inside the lock and has no
+  table dependency to schemabind (the `fn_QuotaPeriodForUtc` lesson, 2.64).
+- `USP_ConsumeFeatureCore` gains `@FallbackPlanId` **and that plan's own
+  mapping** — `@FallbackHasMapping`, `@FallbackIsIncluded`,
+  `@FallbackQuotaPerPeriod`. The quota must travel with the plan: a draft that
+  passed only the id would have dropped a lapsed account to the free plan while
+  leaving it the PAID plan's allowance, silently.
+- `USP_ResolveEntitlement` returns both mappings **in one query**, so none of
+  this costs a round trip on a path that must stay a direct read (2.64).
+- ⚠️ **The fallback id is a parameter, not a lookup.** `m_mdm_plans` lives in
+  `jp_mdm` and no query may cross (2.2). Caching it in `jp_app` was rejected:
+  that is master data on the gating path, which 2.64 forbids outright.
+
+#### 🔴 `@ExpectedPlanId` KEEPS COMPARING THE COLUMN — this section said the opposite first
+
+The paragraph above originally ended "…and `@ExpectedPlanId` is compared
+against the *effective* plan, not the column." **That was wrong, it was built
+that way, and the verification caught it:** every consume on a lapsed
+subscription answered `409 PLAN_CHANGED` instead of running on the free quota.
+
+The inversion is worth keeping on the page, because the wrong version sounds
+more principled than the right one:
+
+| | |
+|---|---|
+| **What the guard is for** | The caller read the subscription, looked up *that* plan's mapping, and passed it down. Between those two reads the **row** could have changed — an activation, a cancellation — leaving the caller's quota describing a plan the owner has already left. The thing that may have moved is the **column**. |
+| **Why there is nothing stale in the fallback case** | The caller does not pick a plan. It supplies the plan's mapping *and* the default plan's mapping, so whichever the procedure decides is in force, the matching quota is already in hand. |
+| **What comparing the effective plan did** | In the fallback case the row says the paid plan (what the caller passed) while the effective plan is the free one — so the guard fired on its own correct behaviour. Forever: 2.64's retry is bounded at one, and the second resolve reaches the same disagreement. |
+
+⚠️ A green suite would not have shown this. The refusal is a plausible 409
+carrying a code that reads like a race, on a subscription that genuinely had
+changed plan earlier in the same test. It took asserting *which* code came back.
+
+⚠️ This is a **behaviour change to a shipped predicate**, so it ships with the
+verification that shows both sides: a subscription with `EndsOn` yesterday
+(on the IST boundary, 2.28), the DB row and the API response side by side, and a
+consume that now runs on the free quota where it previously returned
+`SUBSCRIPTION_INACTIVE`. No job has run; nothing was written.
+
+---
+
+### 6.5-D — Plan change mid-period, and the derived quota
+
+`@QuotaPerPeriod` is read from the **current** plan on every single consume —
+this is already true and needs no change:
+
+```
+resolution = ResolveAsync(featureCode, subscription.PlanId)   // per consume
+```
+
+And the period is the **IST calendar month** (Decision 6), anchored to the
+calendar rather than the subscription. Those two facts together settle plan
+changes without any new mechanism, because the ledger is keyed on
+`owner + feature + period` and **never on plan**:
+
+| Mid-period change | `allowed` | `used` | Effect |
+|---|---|---|---|
+| **Upgrade** (quota 5 → 20) | rises immediately | **stays counted** | More headroom at once. No proration, no credit for the unused part of the old plan |
+| **Downgrade** (quota 5 → 2), used 3 | falls immediately | **stays counted** | `used (3) > allowed (2)` → the **next consume is refused** with the quota refusal code. The balance is reported as **0, never negative** |
+
+**`used` survives the change deliberately.** Resetting it would let an account
+upgrade, spend the larger quota, downgrade, and spend again inside one calendar
+month. Because `used` is per owner-feature-period, re-upgrading in the same
+month grants no fresh allowance either — which is what makes "no proration" safe
+rather than exploitable.
+
+**A negative balance is never reported.** `allowed − used` is clamped at zero on
+the way out. A customer being told they have "−1 posts" is a bug report; being
+told they have none and their plan allows 2 is a statement they can act on.
+
+**No proration, and this closes Decision 6's open flag.** That flag said to
+revisit pro-rating "when money is attached" — it is attached now, and the answer
+is no, for the reason already recorded there: a customer who joins on the 20th
+and receives 6 posts instead of 10 asks why, and "we divided by the days
+remaining" is arithmetic nobody expects of a monthly allowance. The cost is
+bounded and now fully stated: **an upgrade late in a month grants that month's
+full new quota.** At most one part-month of generosity per change, and the
+exploit path is closed by `used` surviving. Proration, refunds, credit notes and
+GST computation remain **OUT** (2.63).
+
+`PLAN_CHANGED`'s bounded retry already exists and is unchanged (2.64) — the only
+amendment is *what it is compared against*, in 6.5-C above.
+
+---
+
+### 6.5-E — Receipts: numbered, and recording what was received
+
+A receipt number is allocated **per year, from a counter row**, using the 2.46
+pattern exactly as `USP_SubmitApprovalRequest` does it:
+
+```
+UPDATE s SET LastNumber = s.LastNumber + 1
+OUTPUT inserted.LastNumber INTO @Seq
+FROM <series> AS s WITH (UPDLOCK, ROWLOCK)
+WHERE <series key> AND SeriesYear = @Year;        -- @Year = YEAR(fn_IstToday())
+```
+
+**Never `MAX(...) + 1`**, for the reason 2.46 already records: two sessions read
+the same maximum before either inserts, both get the same number, **nothing
+errors**, and the duplicate simply exists until two schools quote the same
+receipt number to support. The `UPDATE … OUTPUT` takes an exclusive row lock for
+the rest of the transaction, so concurrent verifications serialise on that one
+row and everything else stays parallel. The first allocation of a year races on
+the `INSERT`; that specific collision (2601/2627) is swallowed and both sessions
+continue to the `UPDATE`, which is what both actually needed.
+
+⚠️ **The IST year, not the UTC one** (2.28). A verification at 01:00 IST on
+1 January is still 31 December in UTC, and numbering it into the old year would
+show up on the first receipt of every year.
+
+A receipt records **what was received** — amount, mode, reference, the plan it
+was for, the price quoted at request time, and the period it activated. It is
+not an invoice and does not claim to be.
+
+**Where the excluded things would land, when they are no longer excluded (2.63):**
+
+| Deferred | Where it lands | What it does not touch |
+|---|---|---|
+| **GST computation** | Tax columns on the receipt row + a rate master in `jp_mdm`. A receipt is already immutable, which is the hard part | The ledger. Tax is a property of the money, not of capability |
+| **Credit notes** | A row type on the receipt table, pointing at the receipt it corrects. Never an `UPDATE` of the original | The original receipt, ever |
+| **Refunds** | **Reversal** ledger rows — the entry type exists, and 2.64 established that reversals work by **exclusion** (`ReversedOn` stamped on the target, every balance query filtering `ReversedOn IS NULL`), never by summing | The balance formula. This is why refunds were cheap to defer |
+| **Proration** | The quota lookup, as a multiplier on `@QuotaPerPeriod` — and 6.5-D's "no proration" is a product decision, not a missing mechanism. If adopted, the rule must be **visible on the purchase screen before the customer pays** |  |
+
+---
+
+### 🔒 What this phase does not touch
+
+The prohibition at the head of this document is unchanged and extends to every
+object 6.5 adds: **the entitlement engine and contact unlock never reference
+each other, in either direction.** A payment buys capability — whether a school
+may search at all, how many invitations it may send. It never buys a teacher's
+phone number or email, and `fn_TeacherContactUnlocked` still returns true on
+exactly two paths: the teacher applied, or the teacher accepted an invitation
+(🔒 2.56, **LOCKED**).
+
+A verified payment is therefore **not** a third path, and the phrase "the school
+has paid" appears nowhere in the contact-unlock dependency set. The two 2.56
+greps extend to every new procedure, service and repository in this phase, the
+closed-set dependency guard enforces it structurally, and the verification
+prints the output rather than asserting it passed.
+
+Entitlement reads stay on `IEntitlementRepository` — direct, per consume, never
+through `IMasterService` and never from a cache (2.64).
+
+### 🔴 This phase seeds NO paid plan, and that was nearly got wrong
+
+The first draft of this addendum said 6.5 would seed "development fixtures with
+placeholder prices". `03_seed/008_seed_plans.sql` already forbids exactly that,
+in writing, and its argument is better than mine was:
+
+> *"Pricing is not finalised. The public site's FAQ says so. **Anything seeded
+> here with a price on it becomes a number the client read in software we
+> delivered, and it will be quoted back at us.** So: one free plan per user
+> type, both at zero, both perpetual. Paid tiers are a decision made with the
+> client, not a placeholder invented here."*
+
+Its premise was checked rather than assumed, and still holds: the public FAQ
+says *"Pricing is not finalised — if you are registering now, talk to us
+first"*, the Terms say the pricing section cannot be completed until it is, and
+**no price appears anywhere on the public site**.
+
+So the seed is unchanged by this phase. What that means concretely:
+
+| | |
+|---|---|
+| **The catalog endpoint** | Ships and works. It returns the public plans for the caller's `UserTypeId` — which today is one free plan each. A catalog is a *mechanism*; its contents are the client's data (2.7) |
+| **The paid plan the verification needs** | Created by the suite as a **fixture**: shipped state asserted on ENTRY, plan created, scenario run, plan removed in `finally`, shipped state asserted again on EXIT |
+| **Going live** | An `INSERT` of real plans and their `m_mdm_plan_features` mappings. No deployment, no code change (2.7) |
+
+⚠️ So a school on the day this ships sees a plan catalog containing only "Free",
+and the request-change flow has nothing to request. **That is the correct
+shipped state**, it is the same shape as 2.64 shipping an engine where nothing
+is gated, and it is what makes the written client confirmation (§4 Q4) a
+*commercial* gate rather than a code one.
+
+⚠️ **The real prices remain the client's to give.** This addendum defines the
+mechanism and takes no position on what anything costs.
 
 ---
 

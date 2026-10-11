@@ -432,11 +432,55 @@ try {
 
   const files = walk(root);
 
-  // ---- 2.56, direction A: does the engine mention contact? ----------------
+  /*
+    ---- 2.56, direction A: does the engine mention contact? ----------------
+
+    🔴 EXTENDED IN 6.5A TO EVERY BILLING OBJECT.
+
+    The brief's words were "the 2.56 greps extend to every new object", and
+    billing is where the temptation is sharpest: a verified payment is the one
+    new thing in the product that somebody could plausibly argue should unlock
+    a teacher's details. It must not, and 2.56 is LOCKED at exactly two paths —
+    the teacher applied, or the teacher accepted an invitation.
+
+    ⚠️ The pattern below names the FILES, not the directories, so a new billing
+    object has to be added here deliberately. A directory glob would quietly
+    cover new files and quietly stop covering renamed ones, and this grep's
+    whole value is that its scope is reviewable in a diff.
+  */
   const enginePaths = files.filter((f) =>
-    /Entitlement|013_entitlement|020_entitlement_ledger|036_entitlement_catalog|009_entitlement_catalog/i.test(f));
+    /Entitlement|013_entitlement|020_entitlement_ledger|036_entitlement_catalog|009_entitlement_catalog/i.test(f)
+    // 6.5A — billing: the seam, its two halves, and the activation side.
+    || /Billing|010_billing|023_billing_activation|012_subscription|SubscriptionRepository|PlanRepository/i.test(f));
+
+  /*
+    🔴 A FILE WHOSE OWN 2.56 GUARD NAMES THE FUNCTION IS NOT A BREACH.
+
+    010_billing.sql and 023_billing_activation.sql each end with a build guard
+    that asserts they do NOT depend on the unlock function — and that guard, by
+    necessity, contains the function's name as a string. Stripping comments is
+    not enough: a RAISERROR check naming what it bans is executable code naming
+    it, which is the same trap that caught the receipt-allocator guard earlier
+    in this phase.
+
+    ⚠️ So those two are covered a STRONGER way instead, and excluded here:
+    sys.sql_expression_dependencies records what a module actually REFERENCES,
+    resolved by the engine rather than by a LIKE. It cannot be fooled by a
+    comment, and it catches an indirect reference through a view that a text
+    search would miss. Proven to discriminate: that view currently reports
+    USP_GetTeacherContactForSchool and USP_GetApplicantById as the function's
+    real consumers.
+
+    🔴 AND THE EXCLUSION ASSERTS ITS OWN REPLACEMENT EXISTS (below). An
+    exclusion that outlives the guard it defers to is how a prohibition
+    quietly stops being enforced.
+  */
+  const guardedBySqlDependency = (f) =>
+    /010_billing\.sql|023_billing_activation\.sql/i.test(f);
 
   const engineTouchingContact = enginePaths.filter((f) => {
+    if (guardedBySqlDependency(f)) return false;
+
     const body = readFileSync(f, 'utf8');
     // Ignore the prohibition headers themselves — they NAME the thing they ban.
     const code = body.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*(\/\/\/?|--).*$/gm, '');
@@ -444,12 +488,41 @@ try {
     return /fn_TeacherContactUnlocked|ContactUnlocked|MobileNumber|ContactEmail/i.test(code);
   });
 
+  /*
+    The replacement, asserted. Both deferred files must still carry a
+    dependency guard — if somebody deletes one, this fails rather than the
+    exclusion silently covering for it.
+  */
+  const deferred = enginePaths.filter(guardedBySqlDependency);
+
+  const missingDependencyGuard = deferred.filter((f) =>
+    !/sys\.sql_expression_dependencies/i.test(readFileSync(f, 'utf8')));
+
+  check('🔒 2.56 A′ — the two SQL files excluded above still carry their dependency guard',
+    deferred.length === 2 && missingDependencyGuard.length === 0,
+    missingDependencyGuard.length
+      ? `missing in: ${missingDependencyGuard.join(', ')}`
+      : `${deferred.length} file(s), each asserting no dependency on the unlock function`);
+
   console.log(`    engine files scanned: ${enginePaths.length}`);
   enginePaths.forEach((f) => console.log(`      ${f.replace(root + '\\', '')}`));
 
   check('🔴 2.56 A — no engine file references contact unlock in its CODE',
     engineTouchingContact.length === 0,
-    engineTouchingContact.length ? engineTouchingContact.join(', ') : 'zero hits outside the prohibition headers');
+    engineTouchingContact.length
+      ? engineTouchingContact.join(', ')
+      : `zero hits across ${enginePaths.length} files, outside the prohibition headers`);
+
+  /*
+    🔴 AND THE SCOPE ITSELF IS ASSERTED.
+
+    A grep that silently stops matching is a grep that passes forever. 6.5A
+    added six billing objects to the pattern above; if a rename or a deletion
+    drops the file count, this fails and names the number — which is the same
+    lesson the suite-count manifest exists for.
+  */
+  check('🔴 …and the grep still has something to scan (a shrinking scope is a silent pass)',
+    enginePaths.length >= 14, `${enginePaths.length} files in scope`);
 
   // ---- 2.56, direction B: does contact unlock mention the engine? ---------
   const contactPaths = files.filter((f) => /teacher_public_profile|TeacherDirectory/i.test(f));

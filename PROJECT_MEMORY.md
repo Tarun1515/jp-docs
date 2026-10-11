@@ -1,7 +1,7 @@
 # TEACHER RECRUITMENT PORTAL — PROJECT MEMORY
 
 > **Ye file har kaam ke baad update hogi.** Har naye chat/session mein sabse pehle ye file padho.
-> Last updated: **2026-10-11** | Phase **3 COMPLETE** + **2.5 engine** + **4 jobs COMPLETE** + **2.67 swagger fix** + **PRE-5 (G26 band, 2.68/2.69)** + **PRE-5b (baseline green)** + **5A applications BACKEND (2.70, G28)** + **5B applications SCREENS COMPLETE — PHASE 5 POORA (2.71, G30)** + **6A-0 approval engine above level 1 (2.72, G14 BAND, G31)** + **6A Offer Lite BACKEND COMPLETE (2.73, G32)** + **6B TEACHER SEARCH + INVITES BACKEND COMPLETE — 🔒 CONSENT PATH 2 (2.74, G33, G34)** + **6C-0 verification ka bakaya: G33 aur G34 BAND (2.75, G35, G36)** + **6C-1 NOTIFICATIONS BACKEND + G27 BAND (2.76, G37)** + **6C-2-0 G37 BAND — badge asli hua, aur shared suite runner (2.77, G35 BAND)** + **6C-2 SCREENS COMPLETE — 🔒 consent path 2 screen se, devtools-forced negatives dono taraf (2.78)** | Next: **6C-3 / Phase 6 ka bacha hua — Point 7 (interview/offer scope) par client ka likha jawab abhi bhi pending hai**
+> Last updated: **2026-10-11** | Phase **3 COMPLETE** + **2.5 engine** + **4 jobs COMPLETE** + **2.67 swagger fix** + **PRE-5 (G26 band, 2.68/2.69)** + **PRE-5b (baseline green)** + **5A applications BACKEND (2.70, G28)** + **5B applications SCREENS COMPLETE — PHASE 5 POORA (2.71, G30)** + **6A-0 approval engine above level 1 (2.72, G14 BAND, G31)** + **6A Offer Lite BACKEND COMPLETE (2.73, G32)** + **6B TEACHER SEARCH + INVITES BACKEND COMPLETE — 🔒 CONSENT PATH 2 (2.74, G33, G34)** + **6C-0 verification ka bakaya: G33 aur G34 BAND (2.75, G35, G36)** + **6C-1 NOTIFICATIONS BACKEND + G27 BAND (2.76, G37)** + **6C-2-0 G37 BAND — badge asli hua, aur shared suite runner (2.77, G35 BAND)** + **6C-2 SCREENS COMPLETE — 🔒 consent path 2 screen se, devtools-forced negatives dono taraf (2.78)** + **6.5A BILLING BACKEND COMPLETE — manual first, seam service par, expiry derived (2.79, G38)** | Next: **6.5B billing screens** — ⚠️ Point 7 (interview/offer scope) par client ka likha jawab abhi bhi pending hai
 >
 > 🔴 **Ye do line har phase ke close-out mein update hongi.** File 3I tak
 > pahunch chuki thi aur ye header **Phase 0** par khada tha — saat phase purana,
@@ -2080,6 +2080,37 @@ expire ho gaya.** Us comment mein likha tha ".tabs system mein nahi hai (G27)" �
 ab hai. Baaki wajah apne paon par khadi hai: har option apna **count** carry
 karti hai, jiske liye tab strip mein jagah nahi. Comment theek kar diya — toota
 hua reason likha chhod dena usi class ki galti hai jo G27 thi.
+
+### G38. `@FallbackPlanId` NULL default se lapsed account ka cliff wapas aa sakta hai — 🟡 OPEN (6.5A, 2026-10-11)
+
+`USP_ConsumeFeatureCore` ka `@FallbackPlanId` **NULL default** hai, aur NULL ka
+matlab pre-6.5 behaviour hai: lapsed subscription `SUBSCRIPTION_INACTIVE`.
+
+Wajah jaan-boojh kar hai — SQL-level caller (`entitlement-engine.mjs` is
+procedure ko seedha chalati hai) bina is parameter ke chalte rehne chahiye, aur
+unke liye purana behaviour sahi hai. **Par risk asli hai:** koi naya procedure
+ya service jo `USP_ConsumeFeature` call kare aur fallback bhejna bhool jaaye,
+wo us cliff ko **chup-chaap** wapas le aata hai — lapsed account ke liye 403,
+bina kuch fail hone ke.
+
+**Aaj ka mitigation:**
+
+- API ka **har** path fallback bhejta hai, kyunki wo `EntitlementService` ke ek
+  hi `ConsumeOnceAsync` se jaata hai, aur `USP_ResolveEntitlement` fallback
+  ko **usi query** mein deta hai — bhoolne ke liye alag se kuch karna padega.
+- `billing.mjs` assert karti hai ki **API path** free baseline deta hai, refusal
+  nahi.
+
+**Jo band karega:** ya parameter ko required banana (har SQL-level caller
+badlega, including ek purani suite), ya ek guard jo assert kare ki koi
+C# caller `ConsumeAsync` ko fallback ke bina na bulaye. Dono 6.5B se bade hain
+aur isi liye ye likha hua OPEN hai, na ki chup-chaap accept.
+
+⚠️ **Jo is gap ko ek `@QuotaPerPeriod` wali galti se alag karta hai:** quota wala
+bug *chup* tha (galat allowance, kuch fail nahi), ye *loud* hai (403). Ek lapsed
+account turant complain karega. Is liye severity medium hai, high nahi.
+
+---
 
 ### G37. Teacher verification product se di hi nahi ja sakti — ✅ CLOSED (6C-2-0, 2026-10-11)
 
@@ -7681,6 +7712,172 @@ hain, aur pehla dikhana wo tareeka hai jisse koi offer miss karta hai.
 
 ---
 
+### 🔒 2.79 BILLING — MANUAL FIRST, PHASE 6.5A
+
+Paisa NEFT/cheque/cash se aata hai, admin confirm karta hai, plan activate hota
+hai. **Gateway is phase mein nahi hai** — wo baad mein usi seam ka ek naya
+caller banega.
+
+```
+billing.mjs                47/47   seam, mismatch, idempotent, race, expiry,
+                                   downgrade, negatives, bypass
+regression: 30/30 suite clean, 1154 assertion, 554 s
+SQL: branch 48 · teacher 45 · team 52 · approval 30 · sso 73 · error-log 17 · menus 31
+backend 0/0 (--no-incremental) · run_all ×2 content-identical · swagger farsh 105 -> 113
+```
+
+#### 🔴 ADDENDUM PEHLE LIKHA (2.5-PRE ka sabaq) — AUR USMEIN TEEN GALTIYAN MILIN
+
+`MONETIZATION_DESIGN.md` ka 6.5 addendum **ek line code se pehle** likha gaya.
+Teen cheezein us likhne mein hi pakdi gayin, jo code mein pakdi jaatin to mehengi
+hoti:
+
+**1. "Ek procedure" bana hi nahi sakta tha.** Pehla draft kehta tha
+`USP_VerifyPaymentAndActivate`, `jp_app` mein. Par payment `jp_mdm` mein hai
+aur subscription `jp_app` mein, **koi query cross nahi kar sakti (2.2)**, aur
+distributed transaction nahi hai (2.48). To seam **SERVICE** par hai —
+`IBillingService.VerifyAndActivateAsync` — do procedure, do transaction, aur
+handoff ka sach `activationCompleted` se **bataya** jaata hai, chhupaya nahi
+(wahi shape `ApprovalService` ka). ⚠️ Agar ye line code tak pahunch jaati, to
+discovery us jagah hoti jahan procedure ko ek table chahiye hoti jo use dikhti
+hi nahi — aur dabaav "bas ek baar" cross karne ka hota, jisse 2.2 marta hai.
+
+**2. Paid plan seed karna mana hai, aur maine wahi likh diya tha.**
+`008_seed_plans.sql` pehle se likhit mein forbid karta hai: *"pricing finalised
+nahi hai, aur jo number hum ship karte hain wo humein wapas quote kiya jaata
+hai."* Uski premise **check ki gayi, maani nahi** — public FAQ aaj bhi kehta hai
+pricing final nahi, Terms kehta hai wo section poora nahi ho sakta, aur site par
+ek bhi price nahi hai. To seed **nahi badla**: catalog endpoint ship hua, usmein
+sirf free plan hai, aur **011 ka build guard** priced public plan par build gira
+deta hai (chala kar dekha: exit 1, plan ka naam ke saath). Paid plan **suite ka
+fixture** hai, `finally` mein hatta hai.
+
+**3. `@ExpectedPlanId` ka comparison 6.5-C ne ULTA likha tha.** Addendum kehta
+tha "effective plan se compare karo, column se nahi". Build hua, aur
+**verification ne pakda**: lapsed subscription par har consume `409
+PLAN_CHANGED` deta tha. Wajah: guard ka kaam **row badalne** ka pata lagana hai,
+aur fallback case mein row paid plan kehti hai (jo caller ne bheja) jabki
+effective plan free hai — to guard apne hi sahi behaviour par fire karta tha,
+**hamesha**, kyunki 2.64 ka retry ek par bounded hai. Caller plan **chunta hi
+nahi**: `USP_ResolveEntitlement` dono mapping ek hi query mein deta hai. Doc
+theek kiya gaya aur ulta-pan page par likha hai.
+
+#### 🔴 QUOTA PLAN KE SAATH CHALTA HAI — ye poochh kar mila, test se nahi
+
+6.5-C ka pehla build sirf `@FallbackPlanId` bhejta tha aur `@QuotaPerPeriod`
+chhod deta tha. Matlab: 100-post wale plan ka lapsed account free plan par
+girta aur **100 post rakhta**. Kuch fail nahi hota — account ko bas wo plan mil
+jaata jispar wo nahi tha. Ab `USP_ResolveEntitlement` **dono mapping ek hi
+query** mein deta hai (gating read direct rehna chahiye — 2.64) aur procedure
+lock ke andar chunta hai. Naapa gaya: paid quota 100, fallback 2 → pehla consume
+ke baad **remaining 1**, 99 nahi.
+
+#### 🔒 EXPIRY DERIVED HAI — koi job nahi, kuch likha nahi jaata
+
+`fn_SubscriptionInForce(@IsActive, @StatusId, @EndsOn, @Now)` — **ek** definition,
+scalars leta hai (lock ke andar sasta, aur SCHEMABIND karne ko koi table nahi —
+2.64 ka `fn_QuotaPeriodForUtc` wala sabaq). Us par build-time truth table hai,
+aur wo **discriminate karti hai** (predicate jaan-boojh kar toda → exit 1).
+
+🔴 **Jo badla:** pehle lapsed paid subscription `SUBSCRIPTION_INACTIVE` deta tha
+aur account kuch nahi kar sakta tha — **jo kabhi paid tha wo us se BURA tha jo
+kabhi paid nahi tha**, kyunki free account chalta rehta hai. Ab wo default plan
+ke entitlement par girta hai, read time par derive hota hai. Is instance par
+**zero** SQL Agent job hain (naapa gaya) aur ye phase ek bhi nahi jodta.
+`SUBSCRIPTION_INACTIVE` sirf **faisle** ke liye bacha hai — cancelled ya
+deactivated — waqt beetne ke liye nahi.
+
+⚠️ Naapa gaya IST boundary par: `EndsOn` = 00:00 IST aaj, abhi 15:16 IST. DB row
+`status 1, isActive 1, inForce 0` — kuch sweep nahi hua; response `plan 1,
+onFreeBaseline true`; consume `QUOTA_EXHAUSTED` (free quota), **not**
+`SUBSCRIPTION_INACTIVE`.
+
+#### 🔴 RECORDED ≠ EXPECTED — ledger kabhi jhooth nahi bolta
+
+Payment row **jo aaya** wo rakhti hai: `Amount`, mode, reference, `Remarks`
+(naya column), aur `PriceQuoted` (naya) — jo plan ka daam **request ke waqt** tha,
+kyunki daam data hai aur badlega (2.7). `Amount ≠ Price` **record hota hai,
+refuse nahi**: 4,900 bheja hua school ne 4,900 diya hai, aur use record na karna
+underpayment nahi rokta — wo asli duniya ko **likh hi nahi sakne** layak bana
+deta hai, aur correction SSMS mein hota hai, bina trail.
+
+🔴 **Mismatch par remark ZAROORI hai, aur wo rule API layer mein hai** — kyunki
+baad mein aane wala **gateway caller kisi se remark maang hi nahi sakta** (6.5-A).
+Use procedure mein daalna seam ko ummeed bana deta.
+
+#### 🔴 IDEMPOTENT DONO TARAF, AUR DO SACH MEIN SAMANANTAR SESSION
+
+Dono aadhe idempotent hain — verify payment ke SUCCESS par, activation
+`SourcePaymentUid` par — to **aadhe-poore verification ki recovery "phir call
+karo" hai**, jo 6.5-A ka poora vaada hai.
+
+```
+dono session ek hi wall-clock instant par armed (WAITFOR TIME — 2C ka pattern)
+verify A  : Status 1 "The payment is verified."        RCP-2026-00003  already 0
+verify B  : Status 1 "This payment was already verified." RCP-2026-00003  already 1
+activate A: Status 1 "The subscription is active."        sub 982  already 0
+activate B: Status 1 "This payment had already been activated." sub 982  already 1
+receipts: 1 · subscriptions: 1 · ACTIVE per owner: 1
+```
+
+⚠️ **Pehle draft mein chaaron session ke liye EK instant tha**, aur batch do the —
+doosra batch tab shuru hua jab wo waqt nikal chuka tha, aur `WAITFOR TIME` **kal
+tak** intezaar karta hai. Suite बिना output, बिना error, das minute latki rahi.
+`sys.dm_exec_requests` ne bataya. Ab har batch apna instant arm karta hai.
+
+#### 🔴 PLAN CHANGE APPROVE NAHI HOTA, PAY HOTA HAI — ek bypass jo lagbhag ship ho gaya
+
+Plan change ka ek request row hai (RequestNo + trail usi se aata hai, 2.46). To
+admin use **generic approvals endpoint** se approve kar sakta tha — jo payment ke
+baare mein kuch nahi jaanta. Natija: request APPROVED, orchestration ke switch
+mein type 5 ka koi arm nahi (to failure report hoti), payment **PENDING** hi
+rehta, aur kuch activate nahi hota. Entitlement hole nahi — par *"ek owner, ek
+khula request"* `PENDING` par key karta hai, to school **doosra** request bana
+leta aur ek plan ke do payment queue mein hote.
+
+⚠️ **Ye poochh kar mila ki generic endpoint naye request type ke saath kya karta
+hai — kisi test ke fail hone se nahi.** Saari suite green thi, kyunki kisi ke paas
+ek aise type par action karne ki wajah hi nahi thi jo wo likhe jaane ke waqt
+maujood nahi tha. Ab `ProcessActionAsync` type 5 ko **mana** karta hai (redirect
+nahi — Approve dabaane wale admin ko pata chalna chahiye ki paisa confirm nahi
+hua), aur suite wo assert karti hai.
+
+#### 🔒 2.56 — GUARD TEXT SE NAHI, DEPENDENCY SE
+
+Pehle guard `sys.sql_modules` mein function ka **naam** dhoondta tha. Wo do
+tarah se galat tha: (1) usse ye file project ke **apne** 2.56 grep mein fail
+hoti thi — grep comment hata kar executable code mein naam dhoondta hai, aur
+*jo guard naam leta hai wo bhi executable code hai jo naam le raha hai* (yehi
+trap isi phase mein receipt-allocator guard ne khaya); (2) text search us cheez
+se **kamzor** hai jiska wo approximation hai — view ke zariye indirect reference
+miss karta aur harmless string literal par fire karta.
+
+Ab `sys.sql_expression_dependencies` hai: engine khud batata hai module **kya
+reference karta hai**. Wo discriminate karta hai — naap kar dekha, wo
+`USP_GetTeacherContactForSchool` aur `USP_GetApplicantById` ko function ke asli
+consumer bataata hai. Grep ka scope 18 file hua (saare billing C# object usmein
+hain) **aur scope khud assert hota hai** — ghatta scope ek chup-chaap pass hai.
+
+#### ⚠️ COUNT GUARD JO ISI COMMIT MEIN HILE, WAJAH KE SAATH
+
+| Guard | Pehle | Ab | Kyun |
+|---|---|---|---|
+| `approval-levels.mjs` request types | 4 | **5** | `PLAN_CHANGE` seeded (RequestTypeId 5) |
+| `001_test_sso_procedures` permission catalogue | 23 | **24** | `PAYMENT.VERIFY` |
+| …aur SUPER_ADMIN ke granted | 23 | **24** | wahi, aur ye assertion wo pakadti hai jo catalogue mein aaya par kisi ko granted nahi — ek screen jo hai par kholne wala koi nahi |
+| `swagger.mjs` operations | 105 | **113** | aath billing route |
+
+🔴 **Naya permission banaya, jabki 2.5 ne jaan-boojh kar reuse kiya tha.** Plan
+mein kya shaamil hai — wo **system setting** hai, to 2.5 ne `SETTINGS.MANAGE`
+reuse kiya. Paisa aaya ki nahi — wo **operational act** hai jiska money trail
+hai, aur dono **alag logon** ko diye jaayenge: koi finance wala jo payment
+confirm kare par plan ka daam na badal sake. Permission hi wo cheez hai jo is
+system mein ye farq keh sakti hai. 🔒 Seed sirf SUPER_ADMIN ko deta hai aur
+**006 ka guard holders ka CLOSED SET assert karta hai** — chala kar dekha:
+SCHOOL_OWNER ko grant karte hi build exit 1, role ke naam ke saath.
+
+---
+
 ## 3. SCOPE (Client spec ke against)
 
 ### IN SCOPE — MVP
@@ -7900,6 +8097,7 @@ naya Code, agla free Id, kuch renumber mat karo.
 | 2026-10-11 | 6C-1 | **Notifications backend + G27 band.** `m_app_notification_type` (12 type, har ek ke liye **build-time guard** jo uska procedure naam se maangta hai — G32 ka sabak structural), `t_app_notifications`, gyaarah procedure, chaar route, email worker. 🔒 **Scope `RecipientUserUid` hai aur doosra raasta hai hi nahi** — table mein SchoolId/OrganizationUid **nahi** hai, aur wahi absence design hai: filter karne ko column na ho to "ek school ki saari notification" wali query likhi hi nahi ja sakti. School ka event fan out hota hai, har recipient ki apni read state. 🔴 **Creators event ki apni transaction mein** — ek hi DB, to atomic guarantee muft (2.48 cross-DB ke baare mein hai, ye nahi). 🔴 **Ek jaal jo chup-chaap kaam karta dikhta:** `EXEC` se bulaayi procedure apna result set **client** ko bhejti hai pehle, to creator ka Status/Code/Message/Id SELECT Dapper ko **notification ki row** de deta — apply "Notifications created." return karta, Id mein recipient count, aur **koi error nahi** (2.21 ne shape ek jaisa banaya hai). Isliye dono creator **OUTPUT-only** hain. 🔴 **Chuppiyan faisla hain:** 1 Applied, 4 Interviewed aur **5 Selected** par teacher ko kuch nahi — Selected school ka andar ka faisla hai, teacher tak **OFFER** jaata hai (2.73); suite Selected par count pehle=baad naapti hai. 🔴 **Do raaste ek move banate hain** — stage 2 dropdown se bhi aata hai aur application **kholne** se bhi, to faisla `USP_NotifyApplicationStatus` mein ek jagah hai aur dono usse call karti hain. 🔒 **Kisi notification mein contact ya private note nahi** — rejection ka Remarks, decline ka TeacherRemarks, withdraw ka Reason, salary, email/mobile/resume: paanchon bahar, chaaron caller ka list raw text mein checked. 🔒 Aur INVITE_ACCEPTED ki notification **delete karke** dikhaya ki unlock `IsConsent` row se aata hai, sentence se nahi. 🔴 **Fan-out ka negative positive se ahem:** `hr.lead` **usi organisation** ka hai par doosre school ka owner — OrganizationUid par likha fan-out use pakad leta aur baaki sab phir bhi pass hota. ⚠️ Email **poller** hai (worker 30 s), kyunki notification SQL likhta hai aur us waqt koi C# call stack mein nahi; type `SendEmail` tay karta hai, caller nahi. ⚠️ **Verification type 13/14 jaan-boojh kar seed NAHI** — unka consumer nahi hai, aur seeding G32 ka aakaar de deti. Us talash se **G37** nikla: `RunTeacherVerification` ab bhi "requires t_app_teachers, which is Phase 3" kehti hai aur **koi cheez `IsVerified` set nahi karti** — chaar verified teacher seed row hain. ✅ **G27 band:** `.tabs` + `.banner` system mein, **chhe copy se zero**, paanch ek-line margin opt-in bache (wajah ke saath); farak drift nahi tha (button vs link reset), aur margin par **minority sahi thi** (`.page` gap deta hai, `.note` par `margin: 0` likha hai). `--alert`/`--locked` → `--danger`/`--warning`, do suite locator usi commit mein. ⚠️ Mere chaar test galat the (`applicationStatusId` vs `toStatusId` — har call 200 aur kuch na badle, atharah assertion us ek chup no-op ke neeche; `branchId` chhoot gaya; "HR is one of them" jabki HR us school ka member hi nahi; aur email-stamp test **background worker se race** kar raha tha). `notifications.mjs` **74/74** · swagger floor 101 → **105** | ✅ Done |
 | 2026-10-11 | 6C-2-0 | **G37 band — badge asli hua — 6C-2 ki ek bhi screen se pehle.** Screens badge teen jagah dikhati hain; aaj tak koi asli teacher use kama hi nahi sakta tha, to har dikhta badge seed-data ka jhooth hota. `031` (`VerifiedByUserId` — school ke paas 2F se hai, teacher ke paas do hi the kyunki badge kabhi set hi nahi hota tha), `022 USP_SetTeacherVerified` (badge + stamp + notification, **ek transaction**, idempotent), stub ki jagah asli call, type 13/14 seed **apne consumer ke saath** (029 ka guard har type ke liye procedure ka naam maangta hai), aur decline ka notification `ApprovalService` ki rejection branch se. 🔴 **Jo stub chaar phase chala:** "setting IsVerified requires t_app_teachers, which is Phase 3" — Phase 3 chaar phase pehle ship hua tha; admin approve kar sakta tha, trail likha jaata tha, badge kabhi nahi lagta, aur **koi error nahi** kyunki wo branch pehle se failure report karti thi. Bacha isliye ki **badge ke raaste par koi test kabhi chala hi nahi** — chaar badge wale teacher seed row hain, to badge ki har assertion aise data par pass hoti thi jo kisi ne kamaya nahi. 🔴 **Test wahi raasta chalta hai jo aadmi:** teacher submit (HTTP) → admin ka **queue** → action endpoint se approve → `orchestrationCompleted` **true** (yahi false aata tha) → badge + stamp + verifier **admin (40), teacher (147) nahi** → **`/teacher-search` ke asli result mein `isVerified true`** → `verifiedOnly` 4 se 5 → notification teacher tak, admin ka note us mein nahi par **trail par hai**. 🔴 **Decline badge chheenta nahi** — `@Approved` faisla hai, store karne wali value nahi (ek character chhota raasta pehle se verified teacher ka badge chup-chaap le leta). 🔴 **Decline ka notification gate ke peeche nahi** — orchestration approval par gated hai (Phase 2E ka bug) aur wo gate hilaya nahi gaya; batana provisioning nahi hai, aur peeche daalne ka matlab hota ki reject hua teacher hamesha intezaar kare. ⚠️ **Mera pehla build guard galat tha, pehle hi run mein pakda gaya** — usne maana ki seeded verified teacher ke paas `VerifiedOn` nahi hai; chaaron ke paas hai. Backfill karna ek na-hui approval gadhna hota, date se scope karna date check hota — to guard wahi assert karta hai jo har row par sach hai, aur "teenon column saath" wali baat suite mein gayi. ✅ **G35 band mechanism se:** `scripts/verify/run.mjs` — har run ka poora output file mein (G35), aur assertion count committed manifest se compare, **ghatna = failure** (6C-0 ka `team-contract`). Us 56/57 ka kaaran ab bhi pata nahi aur likha hua hai; band risk hua hai. 🔴 **Runner ne pehle hi pass par `team-contract` 48/48 pakdi** — uska fixture doosri suite ke leftover par conditional tha; ab apna campus naam, har baar banta hai (49 → 50). `teacher-verification.mjs` **33/33** · `notifications` 12 → 14 type (teen assertion wajah ke saath badli) · **25/25 suite clean, 334 s, bina kisi API restart** | ✅ Done |
 | 2026-10-11 | 6C-2 | **Search, invite, invitations inbox, offer ke dono taraf, notification centre — 6C-2 POORA.** `search-invite-screens` 31/31 · `invitation-screens` **31/31 (nayi)** · `offer-screens` 34/34 · `notification-screens` 21 → 33. 🔒 **Consent path 2 ab screen se saabit hai** — dialog email/phone/resume teeno naam leta hai, "no other school" kehta hai, aur accept par `fn_TeacherContactUnlocked` 0 → 1; **dekhna aur decline dono 0 par chhodte hain**. Accept hone par koi inaam nahi (na "unlocked", na 🎉 — warna consent transaction ban jaata). 🔴 **Devtools-forced negative dono jagah:** kisi doosre ka offer/invitation `fetch` se answer → **404, 403 nahi** (2.6), refusal mein kisi ka naam nahi, row chhui nahi gayi, aur **kisi ka contact nahi khula**. 🔴 **Jo sirf asli raasta chala kar mila (koi suite green hone se nahi):** Selected application par "Offer sent" button jo 400 `OFFER_ACTION_REQUIRED` deta tha (6A se live) · `<input type="time">` "09:00" deta hai par `TimeSpan` binder "09:00:00" maangta hai, to reporting time wala **har** offer refuse ho raha tha · viewer ko 403 par screen "No teacher matches those filters" keh rahi thi · `FullName` teeno layer mein khaali tha. ⚠️ **Teen test galat wajah se pass ho rahe the:** 375 ka check accept ke baad **answered** row (bina button) naap raha tha — ab accept se pehle, aur live row + uske button assert hote hain · "newest first" ek row par trivially sach tha — doosri application add ki, ab **title se** order assert hota hai kyunki din ek hi hai · **positional locator (`.first()`) mere hi chhode hue probe row par ACCEPT dabaa sakta tha** — suite ab sirf apni banayi row ko address karti hai. 🔴 **`run.mjs` manifest mein na hone wali suite skip kar deta tha** — is phase likhi suite bilkul na chalti aur `--update` uska count seekh hi nahi sakta tha; ab chalti hai, `NEW` dikhti hai, pin hone tak NOT CLEAN. 🔴 **`TEACHER_OFFERS` seed row (2.37), `PermissionCode` NULL, route usi commit mein** — teacher sidebar 8 → 9, aur `HOW_TO_RUN`/`local-accounts`/ye file **isi commit** mein; ⚠️ stale 32 par +1 kiya tha, asli 34 hai — **stale number par arithmetic rot confirm karta hai**. ⚠️ **/notifications ek hi shared component, dono portal usi par route** (G27), aur **fail hua read khaali inbox nahi** — request abort kar ke naapa gaya. **29/29 suite clean, 1105 assertion, 454 s · SQL 296 · backend 0/0 · paanchon frontend 0 warning · run_all ×2 byte-identical** | ✅ Done |
+| 2026-10-11 | 6.5A | **Billing — manual first. Design addendum PEHLE, phir backend.** `billing.mjs` **47/47**. 🔴 **Addendum ne code se pehle teen galtiyan pakdin:** (1) "ek procedure" **bana hi nahi sakta tha** — payment `jp_mdm`, subscription `jp_app`, cross query mana (2.2), distributed transaction nahi (2.48); seam **service** par hai aur handoff ka sach `activationCompleted` se bataya jaata hai. (2) **paid plan seed karna likhit mein mana hai** (`008_seed_plans.sql`: "jo number hum ship karte hain wo wapas quote kiya jaata hai") — premise check ki, aaj bhi sach hai (FAQ, Terms, site par ek bhi price nahi); to seed nahi badla, paid plan **suite ka fixture** hai aur **011 ka guard** priced public plan par build gira deta hai (chala kar dekha). (3) **`@ExpectedPlanId` ka comparison ULTA likha tha** — "effective plan se compare karo" build hua aur **verification ne pakda**: lapsed subscription par har consume `409 PLAN_CHANGED`, **hamesha** (2.64 ka retry ek par bounded). Guard ka kaam row badalne ka pata lagana hai; caller plan chunta hi nahi, `USP_ResolveEntitlement` **dono mapping ek query** mein deta hai. 🔴 **Quota plan ke saath chalta hai** — pehla build sirf fallback ka **id** bhejta tha, to 100-post plan ka lapsed account free par girta aur 100 post rakhta; kuch fail nahi hota. Naapa: paid 100, fallback 2 → remaining **1**, 99 nahi. 🔒 **Expiry DERIVED** — `fn_SubscriptionInForce` ek definition, build-time truth table (predicate toda → exit 1), **zero** SQL Agent job; lapsed account ab **marta nahi**, free baseline par chalta hai (pehle `SUBSCRIPTION_INACTIVE` — jo kabhi paid tha wo us se bura tha jo kabhi nahi tha). IST boundary par naapa: DB `status 1, inForce 0`, response `onFreeBaseline true`, consume `QUOTA_EXHAUSTED`. 🔴 **Recorded ≠ expected** — 4900 vs 5000 **record** hota hai, refuse nahi; mismatch par remark zaroori, **par wo rule API layer mein** kyunki gateway caller kisi se remark maang hi nahi sakta. 🔴 **Idempotent dono taraf**, do sach mein samanantar session (WAITFOR TIME): 1 receipt, 1 subscription, 1 ACTIVE per owner; ⚠️ pehle draft mein chaaron ke liye EK instant tha aur batch do — doosra batch **kal** ka intezaar karne laga, suite bina output das minute latki (`sys.dm_exec_requests` ne bataya). 🔴 **Ek bypass lagbhag ship ho gaya:** plan change ka request row hai, to admin use **generic approvals endpoint** se approve kar sakta tha — request APPROVED, payment PENDING, kuch activate nahi, aur "ek owner ek khula request" `PENDING` par key karta hai to school **doosra** request bana leta. Poochh kar mila, test se nahi. 🔒 **2.56 ka guard text se nahi, `sys.sql_expression_dependencies` se** — purana guard function ka naam dhoondta tha aur isi liye project ke apne grep mein **fail** hota tha (jo guard naam leta hai wo bhi naam lene wala code hai); grep scope 18 file, aur **scope khud assert hota hai**. ⚠️ **Count guard isi commit mein hile:** request types 4 → 5, permissions 23 → 24 (dono jagah), swagger 105 → **113**. 🔴 **Naya permission** (`PAYMENT.VERIFY`) jabki 2.5 ne reuse kiya tha — paisa confirm karna system setting nahi, operational act hai, aur dono alag logon ko milenge; 006 holders ka **closed set** assert karta hai (SCHOOL_OWNER ko grant → build exit 1). **30/30 suite clean, 1154 assertion · SQL 296 · backend 0/0 · run_all ×2 content-identical** | ✅ Done |
 
 ---
 
@@ -8928,6 +9126,62 @@ thin; ab severity se naam hain.
 ⚠️ **Mere chaar test galat the**, aur pehla sabse mehnga: `applicationStatusId`
 bheja jabki DTO `toStatusId` maangta hai — **har call 200 deta aur kuch
 badalta nahi**, aur us ek chup no-op ke neeche atharah assertion fail hui.
+
+---
+
+## ✅ 6.5A COMPLETE — 2026-10-11 (BILLING BACKEND, MANUAL FIRST)
+
+Details **2.79**. Addendum **ek line code se pehle** likha gaya, aur usi likhne
+mein teen galtiyan mili.
+
+```
+billing.mjs 47/47 · 30/30 suite clean, 1154 assertion, 554 s
+SQL 296 · backend 0/0 · run_all ×2 content-identical · swagger 105 -> 113
+```
+
+🔴 **Seam SERVICE par hai, procedure par nahi** — aur wo majboori hai, pasand
+nahi: payment `jp_mdm`, subscription `jp_app`, cross query mana (2.2),
+distributed transaction nahi (2.48). Pehla aadha commit hone ke baad doosra
+chalta hai aur method **sach bataata hai** (`activationCompleted`), smooth nahi
+karta. Payment rollback **nahi** hota — ho hi nahi sakta, aur paisa sach mein
+aaya tha.
+
+🔴 **Teen galtiyan addendum likhte waqt mili**, code mein nahi: "ek procedure"
+bana hi nahi sakta tha; paid plan seed karna **likhit mein mana** hai aur maine
+wahi likh diya tha; aur `@ExpectedPlanId` ka comparison **ulta** tha — wo build
+hua aur **verification ne pakda** (har lapsed consume 409, hamesha).
+
+🔴 **Quota plan ke saath chalta hai.** Pehla build sirf fallback ka id bhejta tha
+— 100-post plan ka lapsed account free par girta aur 100 post rakhta, aur **kuch
+fail nahi hota**. Ye poochh kar mila ki quota kya hoga, test se nahi.
+
+🔒 **Expiry derived hai, sweep nahi hoti.** Ek predicate, build-time truth table
+jo discriminate karti hai, zero scheduled job. Lapsed account ab **free baseline
+par chalta hai** — pehle wo us account se bura tha jo kabhi paid nahi tha.
+`SUBSCRIPTION_INACTIVE` sirf faisle ke liye bacha hai.
+
+🔴 **Ek bypass lagbhag ship ho gaya:** generic approvals endpoint se plan-change
+request approve ho sakti thi — request APPROVED, payment PENDING, kuch activate
+nahi, aur school doosra request bana leta. **Poochh kar mila ki generic endpoint
+naye type ke saath kya karta hai**, kisi test ke fail hone se nahi.
+
+🔒 **2.56 ka guard ab dependency se hai, text se nahi** — purana guard function ka
+naam leta tha aur isi liye project ke apne grep mein fail hota tha.
+
+⚠️ **Gateway is phase mein NAHI hai**, aur uska na hona design hai. Koi "pay now"
+button nahi, koi stub endpoint nahi (2.62). Jab aayega, uska callback **usi**
+`VerifyAndActivateAsync` ko bulaayega; signature verification, replay window aur
+raw-payload audit **API layer** mein rahenge aur procedure tak nahi pahunchenge
+— yehi seam ke asli hone ki jaanch hai.
+
+⚠️ **G38 khula hai:** `@FallbackPlanId` ka NULL default pre-6.5 behaviour hai, to
+koi naya caller jo use bhejna bhool jaaye wo cliff wapas le aata hai. Mitigation
+likha hua hai.
+
+⚠️ **Point 7 (interview/offer scope) par client ka likha jawab abhi bhi pending
+hai**, aur ⚠️ **§4 Q4 — billing MVP mein hai, iska likhit confirmation bhi.**
+Mechanism ship ho gaya; daam client ka hai aur unka INSERT hai, deployment nahi
+(2.7).
 
 ---
 

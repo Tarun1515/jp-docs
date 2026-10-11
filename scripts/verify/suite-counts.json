@@ -19,7 +19,7 @@
     "jobs-consume": 23,
     "jobs-lifecycle": 34,
     "entitlement-engine": 34,
-    "entitlement-http": 35,
+    "entitlement-http": 37,
     "team-contract": 50,
     "profile-branches": 37,
     "browse-contract": 31,
@@ -32,6 +32,7 @@
     "jobs-screens": 56,
     "applications-screens": 87,
     "offer-screens": 34,
-    "invitation-screens": 31
+    "invitation-screens": 31,
+    "billing": 47
   }
 }
