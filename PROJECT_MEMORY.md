@@ -1,7 +1,7 @@
 # TEACHER RECRUITMENT PORTAL — PROJECT MEMORY
 
 > **Ye file har kaam ke baad update hogi.** Har naye chat/session mein sabse pehle ye file padho.
-> Last updated: **2026-10-11** | Phase **3 COMPLETE** + **2.5 engine** + **4 jobs COMPLETE** + **2.67 swagger fix** + **PRE-5 (G26 band, 2.68/2.69)** + **PRE-5b (baseline green)** + **5A applications BACKEND (2.70, G28)** + **5B applications SCREENS COMPLETE — PHASE 5 POORA (2.71, G30)** + **6A-0 approval engine above level 1 (2.72, G14 BAND, G31)** + **6A Offer Lite BACKEND COMPLETE (2.73, G32)** + **6B TEACHER SEARCH + INVITES BACKEND COMPLETE — 🔒 CONSENT PATH 2 (2.74, G33, G34)** + **6C-0 verification ka bakaya: G33 aur G34 BAND (2.75, G35, G36)** + **6C-1 NOTIFICATIONS BACKEND + G27 BAND (2.76, G37)** + **6C-2-0 G37 BAND — badge asli hua, aur shared suite runner (2.77, G35 BAND)** | Next: **6C-2 jaari — notification centre HO GAYA; bacha: search+invite, invitations inbox, offer ke dono taraf**
+> Last updated: **2026-10-11** | Phase **3 COMPLETE** + **2.5 engine** + **4 jobs COMPLETE** + **2.67 swagger fix** + **PRE-5 (G26 band, 2.68/2.69)** + **PRE-5b (baseline green)** + **5A applications BACKEND (2.70, G28)** + **5B applications SCREENS COMPLETE — PHASE 5 POORA (2.71, G30)** + **6A-0 approval engine above level 1 (2.72, G14 BAND, G31)** + **6A Offer Lite BACKEND COMPLETE (2.73, G32)** + **6B TEACHER SEARCH + INVITES BACKEND COMPLETE — 🔒 CONSENT PATH 2 (2.74, G33, G34)** + **6C-0 verification ka bakaya: G33 aur G34 BAND (2.75, G35, G36)** + **6C-1 NOTIFICATIONS BACKEND + G27 BAND (2.76, G37)** + **6C-2-0 G37 BAND — badge asli hua, aur shared suite runner (2.77, G35 BAND)** | Next: **6C-2 jaari — notification centre + search/invite HO GAYE; bacha: invitations inbox, offer ke dono taraf, /notifications page**
 >
 > 🔴 **Ye do line har phase ke close-out mein update hongi.** File 3I tak
 > pahunch chuki thi aur ye header **Phase 0** par khada tha — saat phase purana,
@@ -8858,16 +8858,80 @@ alag-alag baat kehne lagtin.
 - 🔒 Sign-out par count **gira** diya jaata hai — shared machine par agla aadmi
   warna kisi aur ki ginti wala badge inherit karta.
 
+### ✅ Search + invite (jp-school) — HO GAYA (2026-10-11)
+
+```
+search-invite-screens.mjs  31/31   2.62 ka poora matrix · 🔒 contact · forced negatives
+27/27 suite clean (374 s) · paanchon frontend warnings=0
+```
+
+🔒 **Contact ka column kisi plan ya role ke liye nahi**, aur suite use **render
+hui bytes** ke against check karti hai — baaki teen layer (019 ki projection,
+sealed DTO, ContactLeakGuard) kahin aur assert hoti hain; ye ek hi jagah hai jo
+dekh sakti hai ki **aadmi ko kya dikha**.
+
+🔴 **2.62 ke teen case, teeno asli seeded role par:**
+
+| Account | Permissions | Screen |
+|---|---|---|
+| owner | VIEW + INVITE | form, results, har row par Invite |
+| HR | VIEW only | wahi results, Invite **nahi**, ek line "kaun kar sakta hai" |
+| viewer | kuch nahi | form hi nahi, request hi nahi, ek explanation |
+
+🔴 **Viewer wala case ek BUG tha jo dekhne se mila.** Pehla version unke liye
+poora form render karta tha, search firing karta tha, 403 khaata tha, aur
+likhta tha **"No teacher matches those filters"** — kisi ko ye batana ki teacher
+base khaali hai, jabki sach ye hai ki wo dekh nahi sakte. Jo summary "kisi se
+match nahi hua" aur "hum pooch nahi paaye" mein farak na kar sake, usko hona hi
+nahi chahiye. Ab wo **null** return karti hai jab kehne ko sach kuch na ho, aur
+`TEACHER_SEARCH.VIEW` na rakhne wale ko form ki jagah explanation milta hai.
+**2.62 control ke baare mein hai, aur screen sabse bada control hai.**
+
+🔴 **"Abhi nahi" doosra aadha:** invitation khuli ho to Invite control **rehta
+hai, disabled**, aur wajah uske saath — khuli invitation, pehle se application,
+aur khatam quota teen alag intezaar hain.
+
+⚠️ **Quota plan se predict nahi hota** (2.64) — flag server ke apne
+QUOTA_EXHAUSTED se set hota hai aur server ka hi jumla carry karta hai.
+
+🔴 **Forced negatives suite ka maqsad hain — aur unka pehla version galat wajah
+se pass hua.** Usne `disabled` hata kar click kiya; modal khula hi nahi, to
+"doosri invitation nahi bani" trivially sach tha aur server ke baare mein kuch
+sabit nahi karta tha. Wajah test se behtar nikli: blocked row ek **alag
+element** render karta hai jiska `(click)` hi nahi hai. Ab wo apni assertion
+hai, aur server **seedha** test hota hai:
+
+```
+owner, pehle se invited teacher  -> 200 ALREADY_INVITED, doosri row nahi,
+                                    ledger 0 -> 0 (index ne meter se pehle roka)
+HR seedha /invites par           -> 403
+viewer seedha /search par        -> 403, aur us refusal mein teacher ka data nahi
+```
+
+⚠️ **Aur ek stale comment theek hua:** `MASTER_KEYS` kehta tha
+`application-status` "SIX REACHABLE statuses only … refused until Phase 6". 6A
+ne chaaron offer status reachable kar diye aur flag flip kiya, to endpoint
+**das** return karta hai offers ke din se — comment do phase tak chhe ka vaada
+karta raha. 6A/6B/6C ke teen master (`offer-status`, `invite-status`,
+`notification-type`) ab `MASTER_KEYS` mein hain.
+
 ### ⏳ 6C-2 mein jo bacha hai
 
-1. **Search + invite screens (jp-school)** — 2.62 ke dono case ek screen par
-   (quota khatam = abhi nahi; permission nahi = allowed nahi). 🔒 Result mein
-   contact ka koi column nahi.
-2. **Invitations inbox (jp-teacher)** — accept/ignore, aur accept ke baad
+1. **Invitations inbox (jp-teacher)** — accept/ignore, aur accept ke baad
    "unlocked" jaisa kuch dikhana nahi.
-3. **Offer screens dono taraf** — school ka send/withdraw/hire, teacher ka
+2. **Offer screens dono taraf** — school ka send/withdraw/hire, teacher ka
    accept/decline. 2.73 ki do machine screen par bhi do rehni chahiye.
+   ⚠️ `TEACHER_OFFERS` menu row **hai hi nahi** — route ke saath usi commit
+   mein seed karna hoga (route file ka apna rule).
+3. **`/notifications` full page** dono app mein (bell ho gaya; menu row us
+   page par point karti hai).
 4. Screenshots + README pass.
+
+⚠️ **Aur ek cheez jo maine aaj TEEN baar ki:** `npm run build` chalte dev
+server ke saath — har baar `ngDevMode is not defined` aur browser kaam ruka.
+`tsc --noEmit` yahan chalta nahi (federation ka rootDir), to compile check
+**dev server khud** hai: edit karo, browser probe se padho, aur poora build
+**aakhir mein** dev server band karke.
 
 - **Search + invite (jp-school)** — 2.62 ke dono case ek hi screen par: quota
   khatam ("abhi nahi" — disabled + kab) aur permission nahi ("allowed nahi" —
