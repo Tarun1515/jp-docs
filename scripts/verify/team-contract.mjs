@@ -28,6 +28,7 @@
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
+import { session as loginSession, token as loginToken } from './lib/login.mjs';
 
 const SSO = 'http://localhost:5199/api';
 const APP = 'http://localhost:5299/api';
@@ -61,26 +62,22 @@ const j = async (url, opts) => {
  * 🔴 The wait is bounded. A 429 that never clears is a real problem and has to
  * surface as one.
  */
-const loginFull = async (loginId, password, attempt = 1) => {
-  const r = await j(`${SSO}/auth/login`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ loginId, password }),
-  });
+/*
+  🔴 SIGN-IN COMES FROM THE SHARED HELPER NOW — G34.
 
-  if (r.http === 429 && attempt <= 3) {
-    console.log(`  … rate limited signing in as ${loginId}; waiting 25s (attempt ${attempt} of 3)`);
-    await new Promise((resolve) => setTimeout(resolve, 25_000));
+  This file used to carry its own login() with a 20-second retry. Every suite
+  did, each slightly differently, and all of them shared the same blind spot:
+  the per-IDENTIFIER limit is 10 per HOUR, and no backoff inside a test run can
+  wait that out. A full regression spent it around the sixth suite and the next
+  one died on a null token — a false red that reads like a broken screen.
 
-    return loginFull(loginId, password, attempt + 1);
-  }
+  `lib/login.mjs` adds a token cache on top of the backoff, which is the part
+  that actually closes that window. See its header for the trade it makes and
+  the one call site that must bypass it.
+*/
+const loginFull = loginSession;
 
-  if (!r.body?.data?.accessToken) throw new Error(`${loginId}: ${r.http} ${r.body?.message ?? r.text}`);
-
-  return r.body.data;
-};
-
-const login = async (loginId, password) => (await loginFull(loginId, password)).accessToken;
+const login = loginToken;
 
 const auth = (t) => ({ 'content-type': 'application/json', authorization: `Bearer ${t}` });
 const head = (t) => ({ authorization: `Bearer ${t}` });
@@ -437,7 +434,15 @@ if (colleagueToken) {
 
 // 🔴 The message. 3E's lesson: the right refusal with the wrong reason is a
 // support call nobody can reproduce.
-const backIn = await login(COLLEAGUE, COLLEAGUE_PW);
+/*
+  🔴 { fresh: true } — NOT NEGOTIABLE HERE.
+
+  The colleague was just removed from the school, and roles travel inside the
+  token. A cached one would still carry the access they had a moment ago, and
+  this assertion would pass while proving nothing. This is the only call site
+  in scripts/verify/ that needs it; the audit is in PROJECT_MEMORY under G34.
+*/
+const backIn = await login(COLLEAGUE, COLLEAGUE_PW, { fresh: true });
 const afterRemovalProfile = await j(`${APP}/school/profile`, { headers: head(backIn) });
 check('they can still SIGN IN — the account is theirs, the access was the school\'s',
   true, 'login 200');

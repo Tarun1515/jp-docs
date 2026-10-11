@@ -20,6 +20,7 @@
   Run: node scripts/verify/profile-branches.mjs   (both APIs up)
 */
 import { execFileSync } from 'node:child_process';
+import { token as loginToken } from './lib/login.mjs';
 
 const SSO = 'http://localhost:5199/api';
 const APP = 'http://localhost:5299/api';
@@ -39,15 +40,20 @@ const j = async (url, opts) => {
   return { http: r.status, body, text };
 };
 
-const login = async (loginId, password) => {
-  const r = await j(`${SSO}/auth/login`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ loginId, password }),
-  });
-  if (!r.body?.data?.accessToken) throw new Error(`${loginId}: ${r.http} ${r.body?.message ?? r.text}`);
-  return r.body.data.accessToken;
-};
+/*
+  🔴 SIGN-IN COMES FROM THE SHARED HELPER NOW — G34.
+
+  This file used to carry its own login() with a 20-second retry. Every suite
+  did, each slightly differently, and all of them shared the same blind spot:
+  the per-IDENTIFIER limit is 10 per HOUR, and no backoff inside a test run can
+  wait that out. A full regression spent it around the sixth suite and the next
+  one died on a null token — a false red that reads like a broken screen.
+
+  `lib/login.mjs` adds a token cache on top of the backoff, which is the part
+  that actually closes that window. See its header for the trade it makes and
+  the one call site that must bypass it.
+*/
+const login = loginToken;
 
 const auth = (t) => ({ 'content-type': 'application/json', authorization: `Bearer ${t}` });
 const head = (t) => ({ authorization: `Bearer ${t}` });

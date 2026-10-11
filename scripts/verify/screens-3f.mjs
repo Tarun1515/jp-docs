@@ -21,6 +21,7 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
+import { session as loginSession } from './lib/login.mjs';
 
 // Playwright is installed for the CLI rather than as a dependency of this repo,
 // so it is resolved from the npx cache instead of being added to package.json —
@@ -54,11 +55,21 @@ const j = async (url, opts) => {
   try { return { http: r.status, body: JSON.parse(text) }; } catch { return { http: r.status, body: null }; }
 };
 
-const token = (await j(`${SSO}/auth/login`, {
-  method: 'POST',
-  headers: { 'content-type': 'application/json' },
-  body: JSON.stringify({ loginId: OWNER.id, password: OWNER.pw }),
-})).body.data;
+/*
+  🔴 THIS IS THE SUITE THAT GAVE THE FALSE RED — G34.
+
+  It signed in inline, with no retry at all, and read `.body.data` straight off
+  the response. During 6B's regression the limiter was full by the time it ran,
+  `data` was null, and the file died on
+  `TypeError: Cannot read properties of null (reading 'accessToken')` — which
+  looks exactly like a broken screen and was nothing of the kind. 25/25 the
+  moment the limiter was clear.
+
+  `lib/login.mjs` now owns the backoff AND a token cache, so the suite no
+  longer competes with the seventeen before it for the same account's hourly
+  allowance.
+*/
+const token = await loginSession(OWNER);
 
 const api = (t) => ({ 'content-type': 'application/json', authorization: `Bearer ${t.accessToken}` });
 
@@ -100,19 +111,96 @@ const uploadPhoto = async (name, caption) => {
 // ---------------------------------------------------------------------------
 // FIXTURE — a school worth photographing, put back at the end.
 // ---------------------------------------------------------------------------
+
+/*
+  ⚠️ THE FIXTURE CLEANS UP BEFORE IT BUILDS — the SEVENTH contamination.
+
+  The teardown at the bottom of this file only runs if the file reaches the
+  bottom. Four crashed runs during 6C-0 — a dev server poisoned by a production
+  build, nothing to do with this suite — each uploaded three photos and left
+  them, and the next run found TWELVE tiles where section 2 asserts three. The
+  failure then pointed at the gallery, which was blameless.
+
+  🔴 These captions are the suite's SIGNATURE, so anything already wearing one
+  came from a run that died. Removing them on entry is what makes this file safe
+  to crash; the alternative is a human remembering to clean a table by hand,
+  which is how six earlier contaminations survived.
+
+  ⚠️ Deliberately narrow: only photos carrying these exact captions go, so a
+  real photo somebody uploaded is never touched. And it is done through the
+  product's own DELETE, not SQL — the same path the teardown uses.
+*/
+const FIXTURE_PHOTOS = [
+  ['front-gate.png', 'The gate on Kalyan Road'],
+  ['library.png', 'The library, rebuilt in 2023'],
+  ['lab.png', 'Physics lab'],
+];
+
+const FIXTURE_CAPTIONS = FIXTURE_PHOTOS.map(([, caption]) => caption);
+
+const strays = ((await profileNow()).photos ?? []).filter((p) => FIXTURE_CAPTIONS.includes(p.caption));
+
+if (strays.length) {
+  console.log(`\n  ⚠️ ${strays.length} fixture photo(s) left by an earlier run — removing them first`);
+
+  for (const stray of strays) {
+    await j(`${APP}/school/photos/${stray.photoId}`, {
+      method: 'DELETE', headers: { authorization: `Bearer ${token.accessToken}` },
+    });
+  }
+}
+
+/*
+  ⚠️ AND THE CAMPUS HALF, WHICH WAS WORSE THAN THE PHOTOS.
+
+  The same four crashed runs each left a live 'North Wing / NW-01' campus. That
+  is not a cosmetic leftover:
+
+    🔴 team-contract.mjs SKIPS creating its own campus when one named "North
+       Wing" already exists, so its final cleanup assertion stopped running
+       altogether — 48 checks where there should be 49. A silently SMALLER
+       suite is worse than a failing one; nothing was red.
+    🔴 browse-contract.mjs read "5 branch(es)" for a school that has one
+       campus and a head office.
+
+  ⚠️ 'NW-01' is this suite's signature and team-contract's campus has no code
+  at all, so this cannot reach across and delete the other suite's fixture.
+  Head offices are excluded outright — the product refuses that anyway (2.50),
+  and a cleanup that leans on the product refusing is a cleanup waiting to be
+  wrong.
+*/
+const FIXTURE_BRANCH_CODE = 'NW-01';
+
+const branchesAtEntry = (await j(`${APP}/branches?includeInactive=true`, { headers: api(token) })).body?.data ?? [];
+const strayBranches = branchesAtEntry.filter((b) => b.branchCode === FIXTURE_BRANCH_CODE && !b.isHeadOffice);
+
+if (strayBranches.length) {
+  console.log(`  ⚠️ ${strayBranches.length} fixture campus(es) left by an earlier run — removing them first`);
+
+  for (const stray of strayBranches) {
+    await j(`${APP}/branches/${stray.branchId}`, {
+      method: 'DELETE', headers: api(token), body: JSON.stringify({ rowVersion: stray.rowVersion }),
+    });
+  }
+}
+
 const original = await profileNow();
 const originalBranches = (await j(`${APP}/branches?includeInactive=true`, { headers: api(token) })).body.data;
 
 console.log('\n=== FIXTURE ===');
 
+check('🔴 entry: no fixture campus of ours survives a previous run',
+  !originalBranches.some((b) => b.branchCode === FIXTURE_BRANCH_CODE && !b.isHeadOffice),
+  `${originalBranches.length} campus(es), head office included`);
+
+check('🔴 entry: no fixture photo of ours survives a previous run',
+  (original.photos ?? []).every((p) => !FIXTURE_CAPTIONS.includes(p.caption)),
+  `${(original.photos ?? []).length} genuine photo(s) on the school`);
+
 await setGroupType(2);
 
 const photoIds = [];
-for (const [name, caption] of [
-  ['front-gate.png', 'The gate on Kalyan Road'],
-  ['library.png', 'The library, rebuilt in 2023'],
-  ['lab.png', 'Physics lab'],
-]) {
+for (const [name, caption] of FIXTURE_PHOTOS) {
   photoIds.push(await uploadPhoto(name, caption));
 }
 

@@ -18,6 +18,7 @@
   Run: node scripts/verify/teacher-profile.mjs   (both APIs up)
 */
 import { execFileSync } from 'node:child_process';
+import { token as loginToken } from './lib/login.mjs';
 
 const SSO = 'http://localhost:5199/api';
 const APP = 'http://localhost:5299/api';
@@ -36,24 +37,20 @@ const j = async (url, opts) => {
 };
 
 /** Waits out the login limiter rather than failing on it (5/minute per IP). */
-const login = async (loginId, password, attempt = 1) => {
-  const r = await j(`${SSO}/auth/login`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ loginId, password }),
-  });
+/*
+  🔴 SIGN-IN COMES FROM THE SHARED HELPER NOW — G34.
 
-  if (r.http === 429 && attempt <= 3) {
-    console.log(`  … rate limited; waiting 25s (attempt ${attempt} of 3)`);
-    await new Promise((resolve) => setTimeout(resolve, 25_000));
+  This file used to carry its own login() with a 20-second retry. Every suite
+  did, each slightly differently, and all of them shared the same blind spot:
+  the per-IDENTIFIER limit is 10 per HOUR, and no backoff inside a test run can
+  wait that out. A full regression spent it around the sixth suite and the next
+  one died on a null token — a false red that reads like a broken screen.
 
-    return login(loginId, password, attempt + 1);
-  }
-
-  if (!r.body?.data?.accessToken) throw new Error(`${loginId}: ${r.http} ${r.body?.message ?? r.text}`);
-
-  return r.body.data.accessToken;
-};
+  `lib/login.mjs` adds a token cache on top of the backoff, which is the part
+  that actually closes that window. See its header for the trade it makes and
+  the one call site that must bypass it.
+*/
+const login = loginToken;
 
 const auth = (t) => ({ 'content-type': 'application/json', authorization: `Bearer ${t}` });
 const head = (t) => ({ authorization: `Bearer ${t}` });

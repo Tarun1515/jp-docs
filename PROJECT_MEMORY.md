@@ -1,7 +1,7 @@
 # TEACHER RECRUITMENT PORTAL — PROJECT MEMORY
 
 > **Ye file har kaam ke baad update hogi.** Har naye chat/session mein sabse pehle ye file padho.
-> Last updated: **2026-10-11** | Phase **3 COMPLETE** + **2.5 engine** + **4 jobs COMPLETE** + **2.67 swagger fix** + **PRE-5 (G26 band, 2.68/2.69)** + **PRE-5b (baseline green)** + **5A applications BACKEND (2.70, G28)** + **5B applications SCREENS COMPLETE — PHASE 5 POORA (2.71, G30)** + **6A-0 approval engine above level 1 (2.72, G14 BAND, G31)** + **6A Offer Lite BACKEND COMPLETE (2.73, G32)** + **6B TEACHER SEARCH + INVITES BACKEND COMPLETE — 🔒 CONSENT PATH 2 (2.74, G33, G34)** | Next: **Phase 6C — Notifications + saare screens**
+> Last updated: **2026-10-11** | Phase **3 COMPLETE** + **2.5 engine** + **4 jobs COMPLETE** + **2.67 swagger fix** + **PRE-5 (G26 band, 2.68/2.69)** + **PRE-5b (baseline green)** + **5A applications BACKEND (2.70, G28)** + **5B applications SCREENS COMPLETE — PHASE 5 POORA (2.71, G30)** + **6A-0 approval engine above level 1 (2.72, G14 BAND, G31)** + **6A Offer Lite BACKEND COMPLETE (2.73, G32)** + **6B TEACHER SEARCH + INVITES BACKEND COMPLETE — 🔒 CONSENT PATH 2 (2.74, G33, G34)** + **6C-0 verification ka bakaya: G33 aur G34 BAND (2.75, G35, G36)** | Next: **Phase 6C — Notifications + saare screens**
 >
 > 🔴 **Ye do line har phase ke close-out mein update hongi.** File 3I tak
 > pahunch chuki thi aur ye header **Phase 0** par khada tha — saat phase purana,
@@ -2191,7 +2191,7 @@ nahi aaya), ya koi school do-level sign-off maange. 6A-0 ne sabit kar diya ki
 engine do level chal leta hai, to kaam sirf do procedure jodne ka hai — engine
 ka nahi.
 
-### G33. `browse-contract.mjs` 3E se chal hi nahi rahi — 🟡 OPEN (6B, 2026-10-11)
+### G33. `browse-contract.mjs` 3E se chal hi nahi rahi — ✅ CLOSED (6C-0, 2026-10-11)
 
 Suite `head.711429@brightfield.edu.in` se login karti hai aur us account ka
 password sirf us waqt ke `JP_PW` env var mein tha. `local-accounts.md` mein wo
@@ -2215,7 +2215,27 @@ Section 7 ka full-set sync ek aise teacher par chahiye jiske subject pehle se
 hon. ⚠️ Fixture overlap dhyaan se — aath doosri suite inhi accounts par khadi
 hain.
 
-### G34. Purani verification suites mein 429 retry nahi hai — 🟡 OPEN (6B, 2026-10-11)
+#### ✅ Band kaise hua — 6C-0, **31/31**
+
+Poori file rebase hui, wahi plan:
+
+- `principal@greenwood.edu.in` + `rohit.kulkarni.86002@yopmail.com` +
+  `imran.qureshi.86007@yopmail.com` — teenon `local-accounts.md` se.
+  `JP_PW` ka raasta hata diya.
+- **SchoolId caller ke uid se** nikalta hai, naam se nahi. 🔴 Purana code
+  `SchoolName = 'Brightfield Academy'` dhoondta tha aur us id ko *jo bhi* signed
+  in ho uske uid ke saath use karta tha — doosre owner par rebase karne par wo
+  ek school suspend karke doosre ko query karta: **PASS jo kuch sabit na kare**,
+  jo fail hone se bura hai.
+- 🔒 **Wo assertion jiske liye G33 bana tha ab maujood hai** — locked contact ka
+  403 message dono consent path naam leta hai (`appl` aur `invit`), aur **paisa
+  teesra raasta nahi** offer karta (plan/upgrade/pay/billing — ek bhi nahi).
+  6B ne ye haath se check kiya tha; ab assertion hai.
+- Fixture overlap: section 1 school ko suspend/unverify karta hai aur section 6
+  teacher ka subject set badalta hai — **dono snapshot hote hain, `finally` mein
+  restore hote hain, aur exit par assert hote hain** (`[42] -> [1,2] -> [42]`).
+
+### G34. Purani verification suites mein 429 retry nahi hai — ✅ CLOSED (6C-0, 2026-10-11)
 
 Login rate limit 5/min per IP aur 10/hr per identifier hai. Nayi suites
 (`invites`, `teacher-search`, `applications-*`) 429 par wait-and-retry karti
@@ -2231,6 +2251,105 @@ chalaate hain, unke liye ye "6B ne screens-3f tod di" jaisa dikhta hai.
 **Band kaise hoga:** `login()` helper ek shared module mein nikaalo (retry +
 backoff andar), aur saari suites usse login karein. Tab tak: regression ke
 beech-beech `JP.Sso.Api` restart kar do — limiter in-memory hai.
+
+#### ✅ Band kaise hua — 6C-0
+
+`scripts/verify/lib/login.mjs`, aur **18 suite** us par. Par backoff akela kaafi
+nahi tha, aur ye seekhne wali baat hai:
+
+| Limit | Wait kar sakte? |
+|---|---|
+| `LoginPerIp` 5 / 60 s | ✅ haan — 20 s ruk kar phir koshish |
+| `LoginPerIdentifier` 10 / 3600 s | ❌ **nahi** — ek test run ke andar ye kabhi nahi khulta |
+
+Isliye module do kaam karta hai: **backoff** (5s·10s·20s·30s·30s) per-IP ke
+liye, aur **disk par token cache** per-identifier ke liye. Aatharah suite ka ek
+hi owner se login ab **ek** login hai, baaki cache hit.
+
+🔴 **Cache ka trade likh kar rakha hai:** warm cache ka matlab suite
+`/auth/login` ko chhue bina pass ho sakti hai. Iski keemat teen tarah se chukti
+hai — `signin-check.mjs` **asli form** se login karti hai aur jaan-boojh kar
+helper par NAHI hai (wahi canary); `001_test_sso_procedures.sql` login procedure
+khud test karti hai (73 check); aur har cached token `GET /api/auth/me` se
+validate hota hai, TTL 20 minute — re-seed ke baad ka purana token is check se
+bach nahi sakta.
+
+🔴 **Cache ka khatra bhi asli hai, aur wo audit se nikla:** role aur permission
+token ke **andar** safar karte hain. Jo suite kisi ka access badal kar phir login
+karti hai, use naya token chahiye. Saare 22 call site gine gaye — **theek ek**
+aisa hai: `team-contract.mjs` colleague ko school se nikaalne ke BAAD login
+karti hai, aur assertion naye token ke baare mein hi hai. Wahan
+`{ fresh: true }` hai.
+
+⚠️ **Proof (API restart ke BINA):** per-IP window jaan-boojh kar bhara gaya (7
+login → 429), phir dono affected suite back-to-back —
+`screens-3f` **27/27** (cache se, ek bhi login kharch nahi) aur
+`teacher-profile` **33/33** (har run naya teacher banati hai, to cache mumkin
+hi nahi — output mein teen backoff dikhte hain, phir green).
+
+#### ⚠️ Browser FORM login par ek alag sabak
+
+`applications-screens.mjs` chaar jagah **asli form** se login karti hai, aur wo
+cache nahi ho sakta — wahi uska maqsad hai. Pehla fix form ka error message
+padhta tha ("too many attempts" → environmental). **Wo galat tha:** limiter bhar
+jaane par login screen *har* submission par wahi message dikhati hai — galat
+password par bhi, toote form par bhi. Jab distinction ki sabse zyada zaroorat
+hai, screen wahi batana band kar deti hai.
+
+🔴 Ab **API se poocha jaata hai**: ek request, aur 429 hone par wo muft hai.
+429 = limiter, aur screen ke baare mein kuch nahi kaha ja sakta → cached session
+inject, output mein likh kar. Koi doosra status = API in credentials ka jawaab
+de raha hai, matlab **screen** hi fail hui → throw, status message mein.
+
+### G35. `offers.mjs` ek baar fail hui aur kaun si assertion thi, pata nahi — 🟡 OPEN (6C-0, 2026-10-11)
+
+6C-0 ke regression ke pehle batch mein — **token cache clear karne ke turant
+baad** — `offers.mjs` ne **56/57** diya. Us run ka output rakha nahi gaya, aur
+uske baad **chaar** run saaf 57/57 aaye.
+
+🔴 **Isliye number mila hai, aur ye khud ek sabak hai:** regression ke pehle
+batch ne sirf summary line grep ki thi, poora output nahi rakha. Ek flake jo
+reproduce na ho, aur jiska output bhi na ho, wo bhool jaane ke liye hi bachta
+hai. Baaki batch log file mein chale.
+
+**Sabse mumkin do wajah:**
+1. Race section ka `ranTogether` (gate gap 0–2 ms, tolerance 50 ms) — cold
+   cache wale run mein pehla login + `/auth/me` extra latency de sakta tha.
+2. Exit wala error-log count assertion (`22 -> 23`) — kisi aur cheez ne ek row
+   likh di ho.
+
+**Band kaise hoga:** agli baar jab `offers.mjs` fail ho, poora output rakho
+(`> log 2>&1`) aur assertion ka naam yahan likho. Jaan-boojh kar guess nahi
+likha gaya — galat wajah likh dena is gap ko band karne se bura hota.
+
+### G36. Shared local password 17 committed script mein hai — 🟡 OPEN (6C-0, 2026-10-11)
+
+`local-accounts.md` **gitignored hai** (theek), par `Greenwood#2027!`
+`git grep` par **17 committed file** mein milta hai — `scripts/verify/*.mjs` aur
+`scripts/seed-school-viewer.mjs`.
+
+🔴 **Ye 6C-0 mein isliye nikla ki ek file ab bhi purana niyam maan rahi thi.**
+`signin-check.mjs` password `JP_SCHOOL_PASSWORD` env var se maangti thi aur
+uske bina **chalti hi nahi thi** — wahi G33 wala aakaar. Aur wo discipline kuch
+bacha nahi rahi thi: value pehle se repo ki history mein 17 baar hai. Niyam har
+doosri jagah chhod diya gaya tha, keemat sirf wahi ek file chuka rahi thi — chal
+na kar.
+
+⚠️ Aur wo file ab **sabse zyada maayne rakhti hai**: `lib/login.mjs` token
+cache karta hai, to asli form se login karne wali yahi bachi hai (2.75 ka
+canary). Isliye use gitignored file padhne par laga diya gaya — jo us comment ka
+asli iraada tha — aur corpus-wide fix ko ye number mila.
+
+**Band kaise hoga:** ek chhota `lib/accounts.mjs` jo `local-accounts.md` ki
+table padhe (`signin-check` mein wo paanch line pehle se likhi hui hain), aur
+18 suite apne hardcoded constant uski jagah use karein. Uske baad history ka
+sawaal bachta hai — in accounts ke password **local dev** ke hain, to sabse
+saaf raasta local seed ke password rotate karna hai, history rewrite nahi.
+
+🟢 **Ye production secret nahi hai** — teenon DB local hain aur accounts seed
+ke hain. Isliye 🟡, 🔴 nahi. Par "password repo mein nahi jaata" wala niyam
+likha hua tha aur toota hua hai, aur toota hua niyam likhe hue niyam se bura
+hota hai.
 
 ### 2.45 `jp_mdm` — PHASE 2A BUILD NOTES
 
@@ -6927,6 +7046,107 @@ baar test ne use pehle pakad liya — isiliye wo test wahan hai.
 
 ---
 
+### 2.75 VERIFICATION KA APNA INFRASTRUCTURE — PHASE 6C-0
+
+G33 aur G34 band, 6C ka ek bhi line likhne se pehle. Ek shared login helper,
+ek rebase hui suite — aur paanch cheezein jo dhoondhne nahi gaya tha.
+
+```
+lib/login.mjs         naya    backoff + token cache, 18 suite us par
+browse-contract.mjs   31/31   3E ke baad PEHLI baar chali
+screens-3f.mjs        27/27   (25 -> 27, do entry assertion)
+applications-screens  87/87   form login ab API se discriminate karta hai
+team-contract.mjs     49/49   (48 tha — assertion chup-chaap chal hi nahi rahi thi)
+```
+
+#### 🔴 JO POOCHA GAYA THA WO AADHA ILAAJ THA
+
+Brief ne "retry + backoff on 429" kaha. Wo per-IP window (5/60 s) theek karta
+hai. Par jo cheez do baar 6B mein suite tod chuki thi wo
+`LoginPerIdentifier` **10 / 3600 s** hai, aur use test run ke andar wait karke
+nahi khola ja sakta — 6B mein har baar `JP.Sso.Api` restart karna pada tha.
+
+Isliye helper mein **token cache** bhi hai. Yahi wo hissa hai jo gap ko asal
+mein band karta hai; backoff akela usi jagah phir phansta.
+
+#### ⚠️ EK DEV SERVER JO MAINE KHUD ZEHRILA KIYA
+
+6C-0 ke beech `screens-3f` chaar baar crash hui. Pehle laga migration ne todi.
+Nahi — browser console kehta tha:
+
+```
+ReferenceError: ngDevMode is not defined
+```
+
+🔴 **`npm run build` chalte `ng serve` ke saath.** 6B ke "paanchon frontend
+warnings=0" ne production build kiya jabki dev server chal rahe the, aur dev
+server ne production chunk serve kar diya. Screen bilkul theek thi — paanchon
+dev server restart karne par (2.42: `jp-shared` pehle) 27/27.
+
+⚠️ Ye theek us tarah ka jaal hai jaisa "DLL lock: API band karo build se
+pehle". **Frontend build karne se pehle dev server band karo** — warna jo
+failure milti hai wo bilkul toote screen jaisi dikhti hai.
+
+#### 🔴 SAATVI FIXTURE CONTAMINATION, AUR ISME DO NAYI BAAT
+
+Un chaar crashed run ne peechhe chhoda: **12 photo** aur **4 LIVE campus**
+(`North Wing / NW-01`). `screens-3f` ka teardown file ke **aakhir** mein hai,
+to crash hone par chalta hi nahi.
+
+Jo naya seekha:
+
+1. 🔴 **`team-contract.mjs` 49 se 48 check par aa gayi, aur kuch bhi red nahi
+   tha.** Wo apna campus banati hai *sirf tab* jab "North Wing" naam ka koi
+   campus na ho. Stray campus maujood → wo branch skip → uska cleanup
+   assertion **chala hi nahi**. Ek suite jo chupchaap **chhoti** ho jaaye, fail
+   hone wali suite se zyada khatarnak hai.
+2. 🔴 **`browse-contract.mjs` ne ek-campus wale school ke liye "5 branch(es)"
+   padha.**
+
+Ab `screens-3f` ka fixture **banane se pehle saaf karta hai**, apne hi
+signature par (teen caption, aur `BranchCode = 'NW-01'` — `team-contract` ke
+campus ka code hota hi nahi, to ye uske fixture tak pahunch nahi sakta), aur
+entry par assert karta hai. Crash-safe banane ka tareeka teardown par bharosa
+karna nahi hai.
+
+#### ⚠️ EK NUL BYTE, 3H KE COMMIT SE
+
+`screens-3h.mjs` mein offset 12328 par ek `\0` tha — ek comment ke beech. Chal
+rahi thi theek, par **`grep` poori file ko binary maan kar skip kar deta tha**,
+to koi bhi grep-based audit us file ko dekhta hi nahi. Hata diya.
+
+#### 🔴 FORM LOGIN: SCREEN KA MESSAGE DISCRIMINATE NAHI KAR SAKTA
+
+`applications-screens` chaar jagah asli form se login karti hai (cache nahi ho
+sakta — wahi maqsad hai). Pehla fix screen ka message padhta tha. Galat:
+limiter bhar jaane par login screen **har** submission par "Too many attempts"
+dikhati hai — galat password par bhi. Ab **API se poocha jaata hai**: 429 =
+limiter (session inject, likh kar), koi doosra status = screen fail hui (throw).
+
+⚠️ Blanket fallback likhna sabse aasaan galti hoti: toota sign-in screen is
+suite se chup-chaap pass ho jaata, jo us false red se bura hai jise theek kiya
+ja raha tha.
+
+#### 🔴 AUR CANARY KHUD CHAL NAHI RAHI THI
+
+2.75 ka poora trade `signin-check.mjs` par tika hai — token cache ke baad asli
+form se login karne wali wahi bachi hai. Wo **do** wajah se chal nahi rahi thi:
+`import { chromium } from 'playwright'` is repo se resolve nahi hota (baaki
+saari suite `createRequire` se npx cache padhti hain), aur wo
+`JP_SCHOOL_PASSWORD` env var ke bina shuru hone se mana kar deti thi — theek
+wahi aakaar jisne G33 ko chaar phase tak zinda rakha.
+
+⚠️ Dono theek. Ab wo gitignored `local-accounts.md` padhti hai, aur chal kar
+dikhati hai: form bhara, `/dashboard` par pahunchi, `<ui-app-shell>` maujood,
+console error zero. 🟢 **Ek bonus:** wo storage key bhi confirm karti hai
+(`jp.school.accessToken` / `jp.school.refreshToken`) jin par token-injection
+wala raasta khada hai — guess nahi, dekha hua.
+
+🟡 Aur usne **G36** khola: wo password 17 committed script mein pehle se hai, to
+us ek file ki discipline kuch bacha nahi rahi thi.
+
+---
+
 ## 3. SCOPE (Client spec ke against)
 
 ### IN SCOPE — MVP
@@ -7142,6 +7362,7 @@ naya Code, agla free Id, kuch renumber mat karo.
 | 2026-09-19 | 6A-0 | **G14 ka bakaya chukaya — offer ka ek bhi line likhne se pehle.** `approval-levels.mjs` 31/31: level-2 reject (poori request rejected, level 2 par rukta hai), level-2 resubmit (ResubmitRequired level 2 par, par applicant ke resubmit par **level 1 reset** — dono level dobara), per-level role scoping (dono taraf FORBIDDEN), aur level-2 concurrency (gate instants, gap 0 ms, ek jeeta ek CONCURRENCY_CONFLICT). 🔴 **Ek asli defect mila:** procedure `t_mdm_request_levels` ko **do baar** padhta tha aur dono read "org override" ka matlab alag samajhte the — `IsFinal` org row ko preference deta tha, permission check dono rows par ek saath chalta tha, to override ne role **joda** banisbat badle ke. Jis organisation ne apni approval narrow ki, wahi ek case chup-chaap kaam nahi karta tha — aur dikhta nahi tha kyunki koi override hai hi nahi. Ab effective row **ek baar** resolve hota hai aur dono faisle usse padhte hain. ⚠️ Mere do test galat the (trail submission se shuru hota hai; override wala test galat level par pooch raha tha) — dono theek. **G14 CLOSED**, **G31 open** (engine normal concurrency conflict ko error-log karta hai — 5A ke ulta). Purani SQL suite 30/30 unchanged, `run_all` ×2 → 0 objects | ✅ Done |
 | 2026-09-19 | 6A | **Offer Lite — backend.** `t_app_offers`, `m_app_offer_status`, chaar write + do read procedure, chhe route, API. 🔴 **Do machine, ek nahi:** offer (Sent/Accepted/Declined/Withdrawn) aur application (5 → 7 → 8 → 10) — ek transaction, alag sawaal. 🔴 **Map ne 7..10 le liye aur har edge faisla hai:** 5→7 hi (offer faisle ke baad aata hai), 7→5 withdrawal ka landing (re-offer special case nahi, pehla case dobara), **9→7 decline ke baad dusra offer ALLOWED** (mol-bhaav product ke andar rahe; poora trail bachta hai), 8→10 alag step (accept karna aa jaana nahi). 🔴 **Generic status endpoint ab bhi 7..10 refuse karta hai** — wo stages sirf offer actions se bante hain, warna school application ko OfferSent par set kar deta bina offer ke. `OFFER_STAGE_UNAVAILABLE` **retire**, naya `OFFER_ACTION_REQUIRED`. 🔴 **`ALREADY_OFFERED` sirf race se milta hai** (map `7→7` ko INSERT se pehle rok deta hai) — 3C wala aakaar, to suite do session ek hi instant par arm karti hai (**gap 0–2 ms**) aur ek doosra index bana kar sabit karti hai ki CATCH *kaun sa* index dekhta hai. 🔴 **Do permission:** OFFER.CREATE bhejta, OFFER.APPROVE hire confirm karta (SENIOR_HR ke paas pehla hi hai). 🔴 **Ek offer accept karne se baaki applications ko kuch nahi hota** — faisla, teen wajah ke saath, aur teesri 2.56 hai. OFFER_APPROVAL ka level ADMIN se **SCHOOL_OWNER** par theek hua (2C ki galti), par uska koi consumer nahi: **G32**. ⚠️ Mere do test galat the (3C negative ka premise khud banana pada — chhathi fixture contamination; aur scope negative ke liye aisa actor chahiye tha jiske paas permission HO). ⚠️ `applications-race` ki overlap assertion flake hui — proof se evidence par utari. offers 57/57, swagger floor 89→95, Phase 5 ki do suite usi commit mein update, saari purani suites green, `run_all` ×2 → 0 objects | ✅ Done |
 | 2026-10-11 | 6B | **Teacher search + invites — backend.** `m_app_invite_status` (ACCEPTED ke saath, jo schema mein **tha hi nahi**), `t_app_teacher_invites`, `USP_SearchTeachers` (server-side paging/filtering pehle din se, pageSize 100 par clamp, suspended bahar), paanch invite procedure, chhe route. 🔒 **Consent path 2 — doosra aur aakhiri:** `fn_TeacherContactUnlocked` ko doosra EXISTS mila, **usi function mein**, aur guard `sys.sql_expression_dependencies` se poochta hai (closed set — theek do table, "contains" nahi). Invite dekhna kuch nahi kholta, ignore karna kuch nahi kholta, payment status kuch nahi kholta. 🔴 **Boolean ka pehla asli consumer** — mode admin screen se badla, agli search `403 PLAN_LACKS_FEATURE`, ledger `0 -> 0` (2.64). 🔴 **Insert pehle, meter baad mein** — index sasta guard hai; race (gate gap 0 ms, do spid) se sabit. 🔴 **Apply karna open invitation APPLIED par le jaata hai** usi transaction mein, aur unlock application se aata hai — application hataane par unlock band, invitation APPLIED par khadi. 🔴 **Ek field jo 3E se khaali ja rahi thi:** `TeacherContactDto.FullName` — proc project nahi karti thi, row type mein property nahi thi, service mein `= string.Empty` hardcoded tha; **response body padhne se mili, kisi assertion se nahi.** Teenon theek, dono taraf guard. ⚠️ Mere chaar test galat the (envelope ka `code` padha DTO ka nahi; section 4 ka teacher bina resume ka tha — RESUME_REQUIRED sahi tha; cleanup invitation se pehle job delete kar rahi thi — FK; `USP_ConsumeFeature` ko `@FeatureCode` bheja). `teacher-search` 33/33 · `invites` 39/39 · `applications-consent` 31 → **49/49** (dono path ek run mein) · swagger floor 95 → **101**. **G33** (browse-contract 3E se chal hi nahi rahi) aur **G34** (purani suites mein 429 retry nahi — false red) open | ✅ Done |
+| 2026-10-11 | 6C-0 | **Verification ka bakaya chukaya — 6C ka ek bhi line likhne se pehle.** `scripts/verify/lib/login.mjs` naya, **18 suite** us par. 🔴 **Jo poocha gaya tha wo aadha ilaaj tha:** backoff per-IP (5/60s) theek karta hai, par jo cheez 6B mein do baar suite todi wo per-identifier **10/3600s** hai — use run ke andar wait karke khola hi nahi ja sakta, 6B mein har baar `JP.Sso.Api` restart karna pada tha. Isliye **token cache** bhi, aur wahi gap band karta hai. Trade likh kar rakha (warm cache = suite `/auth/login` chhue bina pass ho sakti; `signin-check` asli form se chalti hai aur jaan-boojh kar helper par nahi — canary; har cached token `/auth/me` se validate, TTL 20 min). Khatra audit se nikla: role token ke **andar** hai, to 22 call site gine gaye — theek **ek** ko `{ fresh: true }` chahiye tha (`team-contract`, colleague ko nikaalne ke baad). **Proof bina restart:** per-IP jaan-boojh kar bhara (7 login → 429), phir `screens-3f` 27/27 (cache se) aur `teacher-profile` 33/33 (har run naya teacher — cache mumkin nahi, teen backoff output mein dikhte hain). **G33 band, 31/31** — `browse-contract` 3E ke baad pehli baar chali; SchoolId ab caller ke uid se (purana code naam se dhoondta tha aur doosre owner par ek school suspend karke doosre ko query karta — PASS jo kuch sabit na kare), aur 🔒 wo assertion aa gayi jiske liye gap bana tha: 403 message dono consent path naam leta hai aur **paisa teesra raasta nahi** offer karta. ⚠️ **Paanch cheezein jo dhoondhne nahi gaya tha:** (1) `npm run build` chalte `ng serve` ke saath dev server ko zehrila kar deta hai — `ngDevMode is not defined`, aur failure bilkul toote screen jaisi dikhti hai; (2) **saatvi contamination** — chaar crashed run ne 12 photo + 4 LIVE campus chhode, fixture ab banane se pehle saaf karta hai; (3) 🔴 **`team-contract` 49 se 48 check par aa gayi thi aur kuch bhi red nahi tha** — stray campus ki wajah se uska create-branch skip hua aur cleanup assertion chala hi nahi; chupchaap chhoti hui suite fail hone wali se bad-tar hai; (4) `browse-contract` ne ek-campus school ke liye "5 branch(es)" padha; (5) `screens-3h` mein 3H ke commit se ek NUL byte tha — `grep` poori file skip kar deta tha. 🔴 Form login ka discriminator **API** hai, screen ka message nahi — limiter bhar jaane par screen har submission par "Too many attempts" dikhati hai, galat password par bhi. **G35 open** (`offers.mjs` ek baar 56/57, output rakha nahi gaya, chaar run baad saaf — guess likhna band karne se bura hai) | ✅ Done |
 
 ---
 
@@ -8032,6 +8253,62 @@ pehle padhni thi).
 
 ---
 
+## ✅ 6C-0 COMPLETE — 2026-10-11 (VERIFICATION KA BAKAYA: G33 + G34 BAND)
+
+Details **2.75**. 6C ka ek bhi line likhne se pehle.
+
+```
+lib/login.mjs naya · 18 suite us par · browse-contract 31/31 (3E ke baad pehli baar)
+screens-3f 27/27 · applications-screens 87/87 · team-contract 49/49
+```
+
+🔴 **Jo poocha gaya tha wo aadha ilaaj tha.** Backoff per-IP window theek karta
+hai; per-identifier **10/3600 s** ko run ke andar wait karke khola nahi ja
+sakta. Token cache wo hissa hai jo gap band karta hai — aur uska trade likh kar
+rakha hai, kyunki warm cache ka matlab suite `/auth/login` chhue bina pass ho
+sakti hai.
+
+⚠️ **Proof API restart ke bina:** per-IP jaan-boojh kar bhara gaya, phir dono
+affected suite back to back — `screens-3f` 27/27 (cache se) aur
+`teacher-profile` 33/33 (naya teacher har run, to backoff hi kaam karta hai aur
+output mein teen wait dikhte hain).
+
+🔒 **G33 ki asli keemat ye thi:** jo assertion wo file rakhti hai — locked
+contact ka 403 dono consent path naam leta hai — 6B mein **haath se** check hui
+thi. Ab assertion hai, aur saath mein ye bhi ki message paisa teesra raasta
+nahi batata.
+
+🔴 **Teen cheezein jo is kaam ne pakdi aur jo isse badi hain:**
+
+1. **`npm run build` chalte dev server ke saath use zehrila kar deta hai.**
+   `ngDevMode is not defined`, aur failure bilkul toote screen jaisi lagti hai.
+   6B ke "paanchon frontend warnings=0" ne yahi kiya tha. Frontend build se
+   pehle dev server band karo (2.42 ka start order wapas chalao).
+2. **`team-contract` 49 se 48 check par aa gayi thi, aur kuch bhi red nahi
+   tha.** Stray campus ne uska create-branch skip karwa diya, aur uska cleanup
+   assertion chala hi nahi. **Chupchaap chhoti hui suite fail hone wali se
+   zyada khatarnak hai** — green dekh kar koi nahi ginta.
+3. **Limiter bhar jaane par login screen har failure ko "too many attempts"
+   bata deti hai**, galat password ko bhi. Screen ka message discriminator
+   nahi ban sakta; API ban sakta hai.
+
+🔴 **Aur canary khud chal nahi rahi thi** — `signin-check.mjs`, jis par 2.75 ka
+poora trade tika hai. Playwright import resolve nahi hota tha aur password env
+var ke bina shuru hone se mana kar deti thi (G33 wala hi aakaar). Dono theek; ab
+chal kar dikhati hai: `/dashboard`, app shell, zero console error — aur saath
+mein wo storage key confirm karti hai jin par injection wala raasta khada hai.
+
+🟡 **G35 open:** `offers.mjs` ne pehle batch mein ek baar 56/57 diya, output
+rakha nahi gaya, aur uske baad chaar run saaf 57/57. Wajah **guess nahi likhi** —
+galat wajah likh kar gap band karna, gap khula rakhne se bura hai. Us batch ke
+baad saari suite log file mein chali.
+
+🟡 **G36 open:** `Greenwood#2027!` 17 committed script mein hai.
+`local-accounts.md` gitignored hai, par value history mein pehle se hai — to wo
+niyam likha hua hai aur toota hua hai. Local seed ke account hain, isliye 🟡.
+
+---
+
 ## ▶️ NEXT: PHASE 6C — NOTIFICATIONS + SAARE SCREENS
 
 6B ke baad aakhri boundary. Brief ke teen workstream mein se do band
@@ -8057,8 +8334,10 @@ pehle padhni thi).
   branch na kare (2.21).
 - **G27** — teesri copy pehle se debt hai; chauthi likhne se pehle component
   banao.
-- **G34** — regression chalane se pehle `JP.Sso.Api` restart, warna purani
-  suites 429 par false red dengi.
+- **2.75 / G34** — login shared helper se aata hai, to regression ke liye
+  `JP.Sso.Api` restart karne ki zaroorat **nahi** rahi. ⚠️ Par frontend
+  `npm run build` chalte dev server ke saath mat karo — wo dev server ko
+  zehrila kar deta hai aur failure toote screen jaisi dikhti hai.
 - **2.68 / G26** — naya jp_app master whitelist mein **usi commit** mein.
 
 ## Uske baad

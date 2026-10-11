@@ -42,6 +42,7 @@
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { createRequire } from 'node:module';
+import { session as loginSession } from './lib/login.mjs';
 
 const require = createRequire(import.meta.url);
 const { chromium } = require(
@@ -96,23 +97,20 @@ const j = async (url, opts) => {
   return { http: r.status, body: b, text: t };
 };
 
-const login = async (who, attempt = 1) => {
-  const r = await j(`${SSO}/auth/login`, {
-    method: 'POST', headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ loginId: who.id, password: who.pw }),
-  });
+/*
+  🔴 SIGN-IN COMES FROM THE SHARED HELPER NOW — G34.
 
-  if (r.http === 429 && attempt <= 5) {
-    console.log(`  … rate limited; waiting 20s (attempt ${attempt})`);
-    await wait(20_000);
+  This file used to carry its own login() with a 20-second retry. Every suite
+  did, each slightly differently, and all of them shared the same blind spot:
+  the per-IDENTIFIER limit is 10 per HOUR, and no backoff inside a test run can
+  wait that out. A full regression spent it around the sixth suite and the next
+  one died on a null token — a false red that reads like a broken screen.
 
-    return login(who, attempt + 1);
-  }
-
-  if (!r.body?.data?.accessToken) throw new Error(`${who.id}: ${r.http} ${r.body?.message ?? r.text}`);
-
-  return r.body.data;
-};
+  `lib/login.mjs` adds a token cache on top of the backoff, which is the part
+  that actually closes that window. See its header for the trade it makes and
+  the one call site that must bypass it.
+*/
+const login = loginSession;
 
 const H = (t) => ({ authorization: `Bearer ${t}`, 'content-type': 'application/json' });
 

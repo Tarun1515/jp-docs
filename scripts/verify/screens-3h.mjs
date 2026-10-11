@@ -31,6 +31,7 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
+import { session as loginSession } from './lib/login.mjs';
 
 const require = createRequire(import.meta.url);
 const { chromium } = require(
@@ -76,23 +77,20 @@ const j = async (url, opts) => {
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /** Signs in, waiting out the 5-per-minute-per-IP limiter rather than failing. */
-const login = async (loginId, password, attempt = 1) => {
-  const r = await j(`${SSO}/auth/login`, {
-    method: 'POST', headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ loginId, password }),
-  });
+/*
+  🔴 SIGN-IN COMES FROM THE SHARED HELPER NOW — G34.
 
-  if (r.http === 429 && attempt <= 4) {
-    console.log(`  … rate limited; waiting 20s (attempt ${attempt})`);
-    await wait(20_000);
+  This file used to carry its own login() with a 20-second retry. Every suite
+  did, each slightly differently, and all of them shared the same blind spot:
+  the per-IDENTIFIER limit is 10 per HOUR, and no backoff inside a test run can
+  wait that out. A full regression spent it around the sixth suite and the next
+  one died on a null token — a false red that reads like a broken screen.
 
-    return login(loginId, password, attempt + 1);
-  }
-
-  if (!r.body?.data?.accessToken) throw new Error(`${loginId}: ${r.http} ${r.body?.message}`);
-
-  return r.body.data;
-};
+  `lib/login.mjs` adds a token cache on top of the backoff, which is the part
+  that actually closes that window. See its header for the trade it makes and
+  the one call site that must bypass it.
+*/
+const login = loginSession;
 
 const readMail = (file) => {
   try { return fs.readFileSync(path.join(SSO_MAIL_DROP, file), 'utf8'); } catch { return ''; }
@@ -136,12 +134,25 @@ const setKnownPassword = async (email) => {
     That also makes the run cheap after the first — no email, no token, no
     password change on an account that already has one.
   */
-  const existing = await j(`${SSO}/auth/login`, {
-    method: 'POST', headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ loginId: email, password: PASSWORD }),
-  });
+  /*
+    ⚠️ THROUGH THE SHARED HELPER, AND THE REASON IS NOT TIDINESS — G34.
 
-  if (existing.body?.data?.accessToken) return true;
+    This is a PROBE: it asks "does the known password still work, or must I run
+    the reset flow?" Written as a raw call it read a 429 the same way it read a
+    401 — as "no" — and then ran a reset to the SAME password, which 2.6
+    refuses. A full limiter therefore ended with this account declared unusable
+    and the suite failing on a password that was perfectly fine.
+
+    The helper retries 429 and throws only on a real refusal, so the catch below
+    means what it says.
+  */
+  try {
+    await loginSession(email, PASSWORD);
+
+    return true;
+  } catch {
+    /* A genuine refusal — fall through and run the reset flow. */
+  }
 
   await j(`${SSO}/auth/forgot-password`, {
     method: 'POST', headers: { 'content-type': 'application/json' },
@@ -300,7 +311,7 @@ await page.waitForTimeout(300);
 const subjectChips = await subjectSelect.locator('.multi__chip').allTextContents();
 
 check('🔴 …and Enter selects exactly the active option',
-  subjectChips.some((chip) => chip.trim().startsWith(activeAfterArrows ?? ' ')),
+  subjectChips.some((chip) => chip.trim().startsWith(activeAfterArrows ?? '')),
   `active "${activeAfterArrows}" → chips [${subjectChips.map((c) => c.trim()).join(', ')}]`);
 
 // Fill it up, to photograph the case that used to break the layout.

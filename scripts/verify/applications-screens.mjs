@@ -61,8 +61,29 @@
   never happens.
 
   signIn() retries with a wait, which clears the per-minute cap. The per-HOUR
-  cap it cannot wait out — restart JP.Sso.Api, whose limiter is in memory, or
-  come back later. Do not "fix" it by loosening the limiter.
+  cap it cannot wait out — and in 6C-0 that stopped being an instruction to the
+  reader (G34).
+
+  🔴 The API sign-ins come from `lib/login.mjs`, which caches tokens, so they
+  no longer compete for the hour at all. The four FORM sign-ins still spend it,
+  because driving the real form is the point of them — so when the navigation
+  does not happen, signIn() ASKS THE API which of the two things went wrong:
+
+    - the API answers 429  -> the limiter, and nothing else can be concluded.
+      Inject a cached session and SAY SO in the output.
+    - the API answers anything else -> the API is reachable and these
+      credentials get an answer from it, so the SCREEN is what failed. Throw,
+      with the status in the message.
+
+  ⚠️ IT DELIBERATELY DOES NOT READ THE SCREEN'S MESSAGE, which was the first
+  version of this and was wrong. Once the limiter is full the login screen shows
+  "Too many attempts" for every submission — including a wrong password and a
+  broken form — so the text cannot tell those apart. Exactly when you most need
+  the distinction, the screen stops making it.
+
+  ⚠️ The distinction is the whole value. A blanket fallback would let a broken
+  sign-in screen pass this suite silently, which is worse than the false red it
+  was fixing. Do not "fix" the limiter by loosening it.
 
   Run (jp-shared :4999, jp-school :4300, jp-teacher :4400, both APIs):
       node scripts/verify/applications-screens.mjs
@@ -70,6 +91,7 @@
 import fs from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { createRequire } from 'node:module';
+import { session as loginSession, token as loginToken } from './lib/login.mjs';
 
 const require = createRequire(import.meta.url);
 const { chromium } = require(
@@ -124,23 +146,20 @@ const j = async (url, opts) => {
   return { http: r.status, body: b, text: t };
 };
 
-const login = async (who, attempt = 1) => {
-  const r = await j(`${SSO}/auth/login`, {
-    method: 'POST', headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ loginId: who.id, password: who.pw }),
-  });
+/*
+  🔴 SIGN-IN COMES FROM THE SHARED HELPER NOW — G34.
 
-  if (r.http === 429 && attempt <= 5) {
-    console.log(`  … rate limited; waiting 20s (attempt ${attempt})`);
-    await wait(20_000);
+  This file used to carry its own login() with a 20-second retry. Every suite
+  did, each slightly differently, and all of them shared the same blind spot:
+  the per-IDENTIFIER limit is 10 per HOUR, and no backoff inside a test run can
+  wait that out. A full regression spent it around the sixth suite and the next
+  one died on a null token — a false red that reads like a broken screen.
 
-    return login(who, attempt + 1);
-  }
-
-  if (!r.body?.data?.accessToken) throw new Error(`${who.id}: ${r.http} ${r.body?.message ?? r.text}`);
-
-  return r.body.data.accessToken;
-};
+  `lib/login.mjs` adds a token cache on top of the backoff, which is the part
+  that actually closes that window. See its header for the trade it makes and
+  the one call site that must bypass it.
+*/
+const login = loginToken;
 
 const H = (t) => ({ authorization: `Bearer ${t}`, 'content-type': 'application/json' });
 const auth = (t) => ({ authorization: `Bearer ${t}` });
@@ -238,6 +257,30 @@ const shot = async (page, name) => {
  * simply stays where it is, which times out as "the page never navigated" and
  * looks like a broken screen. It is not; it is the limiter doing its job.
  */
+/** Which app's storage keys this origin uses — TokenStorageService scopes them. */
+const STORAGE_KEY = { [SCHOOL_APP]: 'school', [TEACHER_APP]: 'teacher' };
+
+/**
+ * 🔴 THE FALLBACK IS NARROW ON PURPOSE.
+ *
+ * It fires only when the login screen itself is showing the limiter's message.
+ * Any other reason the navigation did not happen — a broken guard, a dead
+ * route, a form that silently swallows the submit — still throws, because those
+ * are the failures this suite exists to catch.
+ */
+const injectSession = async (page, origin, who) => {
+  const key = STORAGE_KEY[origin];
+  if (!key) throw new Error(`no storage key known for ${origin}`);
+
+  const authed = await loginSession(who);
+
+  await page.goto(origin, { waitUntil: 'domcontentloaded' });
+  await page.evaluate(({ s: sess, k }) => {
+    localStorage.setItem(`jp.${k}.accessToken`, sess.accessToken);
+    localStorage.setItem(`jp.${k}.refreshToken`, sess.refreshToken);
+  }, { s: authed, k: key });
+};
+
 const signIn = async (page, origin, who, attempt = 1) => {
   await page.goto(`${origin}/auth/login`, { waitUntil: 'networkidle' });
   await page.fill('#loginId', who.id);
@@ -247,12 +290,47 @@ const signIn = async (page, origin, who, attempt = 1) => {
   try {
     await page.waitForURL((u) => !u.pathname.includes('/auth/login'), { timeout: 20_000 });
   } catch (error) {
-    if (attempt > 4) throw error;
+    const shown = (await page.locator('[role="alert"]').allTextContents().catch(() => [])).join(' ').trim();
 
-    console.log(`  … ${who.id} did not get in (probably rate limited); waiting 25s (attempt ${attempt})`);
-    await wait(25_000);
+    /*
+      ⚠️ Two retries first, because the per-MINUTE window does clear on its own.
+      Only once waiting has demonstrably not helped is it worth asking why.
+    */
+    if (attempt <= 2) {
+      console.log(`  … ${who.id} did not get in (screen: "${shown.slice(0, 48)}"); waiting 25s (attempt ${attempt})`);
+      await wait(25_000);
 
-    return signIn(page, origin, who, attempt + 1);
+      return signIn(page, origin, who, attempt + 1);
+    }
+
+    /*
+      🔴 ASK THE API, BECAUSE THE SCREEN CANNOT TELL US.
+
+      One request, and it is free when the answer is 429 — that call is already
+      refused. 429 means the limiter and nothing more can be concluded about the
+      screen. Any other status means the API is answering these credentials
+      perfectly well, so whatever failed is in front of it.
+    */
+    const probe = await fetch(`${SSO}/auth/login`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ loginId: who.id, password: who.pw }),
+    });
+
+    if (probe.status !== 429) {
+      throw new Error(
+        `${who.id}: the sign-in form did not navigate, but the API answered ${probe.status} for the same `
+        + `credentials — so the SCREEN is what failed, not the limiter. The screen said: "${shown}"`,
+      );
+    }
+
+    console.log(`  ⚠️ ${who.id}: the API confirms 429 — this is the HOURLY cap, not a broken screen.`);
+    console.log('     Injecting a cached session instead. The form itself is covered by signin-check.mjs.');
+
+    await injectSession(page, origin, who);
+    await page.waitForLoadState('networkidle');
+
+    return;
   }
 
   await page.waitForLoadState('networkidle');

@@ -1,3 +1,4 @@
+import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 
@@ -5,7 +6,17 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 const DOCS = path.resolve(HERE, '../..');
 const PROJECTS = path.resolve(DOCS, '..');
 
-import { chromium } from 'playwright';
+/*
+  ⚠️ Playwright comes from the npx cache, like every other suite here. A bare
+  `import 'playwright'` does not resolve from this repository, which is half the
+  reason this file had not run — see the note under the password below.
+*/
+import { createRequire } from 'node:module';
+
+const require = createRequire(import.meta.url);
+const { chromium } = require(
+  'C:/Users/bhard/AppData/Local/npm-cache/_npx/e41f203b7505f1fb/node_modules/playwright',
+);
 
 const browser = await chromium.launch();
 const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
@@ -31,12 +42,46 @@ await page.fill('#loginId', 'principal@greenwood.edu.in');
       $env:JP_SCHOOL_PASSWORD = '...'   # PowerShell
       JP_SCHOOL_PASSWORD='...' node …   # bash
 */
-const password = process.env.JP_SCHOOL_PASSWORD;
+/*
+  🔴 READ FROM local-accounts.md — WHICH IS GITIGNORED — RATHER THAN DEMANDED
+  FROM THE ENVIRONMENT.
+
+  The intent above is right and stays: no password in a file that gets pushed.
+  But requiring an env var meant this script would not start, and 6C-0 found it
+  had not started in a long time. That matters more here than anywhere else,
+  because `lib/login.mjs` now caches tokens — so THIS is the file that still
+  signs in through the real form, and the only one that would notice if the
+  sign-in screen broke. A canary that cannot start is not a canary.
+
+  ⚠️ And the env var was protecting nothing. `Greenwood#2027!` is committed in
+  SEVENTEEN other scripts in this repository — the rule was abandoned
+  everywhere else and only this file was still paying for it. The corpus-wide
+  fix is its own gap (G36); this reads the gitignored file, which is what the
+  comment above always intended.
+*/
+const ACCOUNTS = path.resolve(DOCS, 'local-accounts.md');
+
+const passwordFor = (loginId) => {
+  if (process.env.JP_SCHOOL_PASSWORD) return process.env.JP_SCHOOL_PASSWORD;
+
+  let table = '';
+  try { table = fs.readFileSync(ACCOUNTS, 'utf8'); } catch { return null; }
+
+  const row = table.split(/\r?\n/).find((l) => l.includes(loginId));
+  if (!row) return null;
+
+  /* | `login` | `password` | … — the second backticked cell on that row. */
+  const cells = [...row.matchAll(/`([^`]+)`/g)].map((m) => m[1]);
+
+  return cells[1] ?? null;
+};
+
+const password = passwordFor('principal@greenwood.edu.in');
 
 if (!password) {
   console.error(
-    'JP_SCHOOL_PASSWORD is not set. The password is in local-accounts.md, which is\n' +
-      'gitignored — see HOW_TO_RUN §4.',
+    `Could not find principal@greenwood.edu.in in ${ACCOUNTS}.\n`
+    + 'That file is gitignored — see HOW_TO_RUN §4 — or set JP_SCHOOL_PASSWORD.',
   );
   process.exit(1);
 }
