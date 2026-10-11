@@ -279,7 +279,15 @@ try {
 
   await page.waitForTimeout(900);
 
-  const banner = await page.locator('.banner--alert').textContent();
+  /*
+    ⚠️ `.banner--alert` -> `.banner--danger` in 6C-0's G27 extraction, and the rename is the
+    point rather than a side effect. The old modifier was named for THIS
+    screen's situation; a design-system modifier has to be named for severity,
+    or the next screen with a different situation writes its own copy — which is
+    how there came to be three. Shipped state changed, so this guard changed
+    with it, in the same commit, with the reason (5B's rule).
+  */
+  const banner = await page.locator('.banner--danger').textContent();
   check('…and the screen says so, loudly',
     /switched off/i.test(banner ?? ''), banner?.replace(/\s+/g, ' ').trim());
 

@@ -1,7 +1,7 @@
 # TEACHER RECRUITMENT PORTAL — PROJECT MEMORY
 
 > **Ye file har kaam ke baad update hogi.** Har naye chat/session mein sabse pehle ye file padho.
-> Last updated: **2026-10-11** | Phase **3 COMPLETE** + **2.5 engine** + **4 jobs COMPLETE** + **2.67 swagger fix** + **PRE-5 (G26 band, 2.68/2.69)** + **PRE-5b (baseline green)** + **5A applications BACKEND (2.70, G28)** + **5B applications SCREENS COMPLETE — PHASE 5 POORA (2.71, G30)** + **6A-0 approval engine above level 1 (2.72, G14 BAND, G31)** + **6A Offer Lite BACKEND COMPLETE (2.73, G32)** + **6B TEACHER SEARCH + INVITES BACKEND COMPLETE — 🔒 CONSENT PATH 2 (2.74, G33, G34)** + **6C-0 verification ka bakaya: G33 aur G34 BAND (2.75, G35, G36)** | Next: **Phase 6C — Notifications + saare screens**
+> Last updated: **2026-10-11** | Phase **3 COMPLETE** + **2.5 engine** + **4 jobs COMPLETE** + **2.67 swagger fix** + **PRE-5 (G26 band, 2.68/2.69)** + **PRE-5b (baseline green)** + **5A applications BACKEND (2.70, G28)** + **5B applications SCREENS COMPLETE — PHASE 5 POORA (2.71, G30)** + **6A-0 approval engine above level 1 (2.72, G14 BAND, G31)** + **6A Offer Lite BACKEND COMPLETE (2.73, G32)** + **6B TEACHER SEARCH + INVITES BACKEND COMPLETE — 🔒 CONSENT PATH 2 (2.74, G33, G34)** + **6C-0 verification ka bakaya: G33 aur G34 BAND (2.75, G35, G36)** + **6C-1 NOTIFICATIONS BACKEND + G27 BAND (2.76, G37)** | Next: **6C-2 — saare screens (search+invite, invitations, offer ke dono taraf, notification centre)**
 >
 > 🔴 **Ye do line har phase ke close-out mein update hongi.** File 3I tak
 > pahunch chuki thi aur ye header **Phase 0** par khada tha — saat phase purana,
@@ -1988,7 +1988,7 @@ Paanchon values ab bhi **humari** hain, client ki nahi (2.47). Endpoint hone ka
 matlab hai ki unhe badalna ab **data change** hai, deployment nahi — jo poora
 point tha. `Code` stable, `Name` client ka.
 
-### G27. `.tabs` aur `.banner` teen-teen jagah hand-rolled hain — 🟡 OPEN (PRE-5b, 2026-09-19)
+### G27. `.tabs` aur `.banner` teen-teen jagah hand-rolled hain — ✅ CLOSED (6C-1, 2026-10-11)
 
 Design system mein dono hain hi **nahi**, aur teen-teen component ne apni copy
 likh li hai:
@@ -2035,6 +2035,84 @@ tha. Teacher ki "My applications" par isliye tabs nahi, wahi toolbar hai.
 jaan-boojh ka hai ya drift — ye tay karo, phir ek version system mein daal kar
 teeno hatao. Screens dobara verify (screens-25, jobs-screens,
 applications-screens).
+
+#### ✅ Band kaise hua — 6C-1, **chhe copy se zero**
+
+Reconcile pehle, nikaalna baad mein — jaisa plan ne kaha tha. Aur farak **drift
+nahi** tha, teen alag wajah thi:
+
+| Farak | matrix | queue | job-list | Faisla |
+|---|---|---|---|---|
+| `background/border/cursor` reset | ✓ | ✗ | ✓ | dono chahiye — `<button>` wale |
+| `text-decoration: none` | ✗ | ✓ | ✗ | dono chahiye — `<a routerLink>` wala |
+| `overflow-x` + `white-space` | ✗ | ✗ | ✓ | **rakha** — chhe tab 375 par scroll karte hain, do kabhi nahi |
+| `margin-bottom: $space-4` | ✓ | ✗ | ✓ | **hataya** — minority sahi thi |
+
+🔴 **Element alag tha, galti nahi.** matrix aur job-list `<button>` render karte
+hain (local state), queue `<a routerLink>` (asli route — back, refresh, bookmark
+sab chalta). Shared version mein dono reset hain; ek doosre ko nuksaan nahi
+karta.
+
+🔴 **Margin par minority jeeti, aur ye seekhne wali baat hai.** queue apna page
+`.page` mein wrap karti hai — `flex-column($space-5)`, matlab **gap** — to child
+ka apna margin spacing double kar deta. Baaki do us idiom se purani hain aur
+apni page spacing haath se likhti hain. System ka apna convention faisla kar
+deta hai: `.note` par `margin: 0` likha hua hai. **Jo component bahar ka margin
+thopta hai use rakha nahi ja sakta** — aur theen copy isi wajah se bani thi.
+
+`.banner` ka base teenon mein **byte-identical** tha; sirf modifier alag the,
+aur teenon apni SITUATION se naam paaye the — `--alert`, `--locked`, `--info`.
+🔴 **Situational naam hi wajah hai ki teen the:** "locked" ek screen ki kahani
+hai, to agli screen apni kahani ke liye chautha rule likhti. Ab severity se naam
+hain (`--info`/`--success`/`--warning`/`--danger`), aur do rename **usi commit
+mein** hue — `jobs-screens` aur `screens-25` ke locator ke saath (5B ka rule).
+
+Bacha kya: **paanch ek-line opt-in** (`margin-bottom`), har ek ke saath wajah.
+⚠️ Asli follow-up: matrix aur job-list ko `.page` ke andar le jao aur ye paanch
+line bhi hata do — par wo layout change hai apne visual risk ke saath, aur use
+6C mein chupke se nahi ghusaaya gaya.
+
+Verify: `screens-25` 19/19 · `jobs-screens` 56/56 · `applications-screens`
+87/87 · scss depth budget clean · paanchon frontend warnings=0.
+
+⚠️ **Teacher ki "My applications" ab bhi select hai, aur wajah ka aadha hissa
+expire ho gaya.** Us comment mein likha tha ".tabs system mein nahi hai (G27)" —
+ab hai. Baaki wajah apne paon par khadi hai: har option apna **count** carry
+karti hai, jiske liye tab strip mein jagah nahi. Comment theek kar diya — toota
+hua reason likha chhod dena usi class ki galti hai jo G27 thi.
+
+### G37. Teacher verification product se di hi nahi ja sakti — 🟡 OPEN (6C-1, 2026-10-11)
+
+`ApprovalOrchestrationService.RunTeacherVerification` ek **FAILED** outcome
+return karti hai, aur uska message kehta hai:
+
+```
+"setting IsVerified requires t_app_teachers, which is Phase 3"
+```
+
+🔴 **Phase 3 ship ho chuka hai.** `t_app_teachers` maujood hai, teacher profile
+poora feature hai, 6B ki search `IsVerified` par filter karti hai aur badge
+dikhati hai, dashboard use padhta hai. Phir bhi **koi procedure aur koi C# line
+`t_app_teachers.IsVerified` set nahi karti** — `grep` par ek bhi nahi. Is
+database ke chaar verified teacher **seed row** hain.
+
+⚠️ Matlab: admin verification queue mein teacher ko approve kar sakta hai,
+approval trail likha jaata hai, aur badge **kabhi nahi** lagta. Koi error nahi —
+outcome "failed" aata hai aur orchestration ka ye hissa pehle se failure report
+karne ke liye likha hua tha, to kisi ko shaq bhi nahi hua.
+
+🔴 **6C-1 mein ye isliye nikla** ki notification type 13/14
+(VERIFICATION_APPROVED / REJECTED) ke liye consumer dhoondhte waqt uski jagah
+dekhi gayi. Wo do type **jaan-boojh kar seed NAHI kiye** — seeding unhe theek
+G32 ka aakaar de deta (config maujood, consumer nahi), aur 029 mein ab ek
+build-time guard hai jo **har seeded type ke liye uska procedure naam se**
+maangta hai.
+
+**Band kaise hoga:** ek `USP_SetTeacherVerified` (badge + trail), stub ki jagah
+usse call, aur uske saath hi type 13/14 seed + API-layer notification (2.48:
+HTTP 200 ka matlab approval hua, notification nahi). ⚠️ Aur uske saath ek test
+chahiye jo **asli queue se approve karke badge dekhe** — kyunki ye bug poore
+Phase 3 se 6C tak isliye bacha ki koi test badge ke us raaste par nahi chala.
 
 ### G28. Teacher application WITHDRAW nahi kar sakta — 🟡 OPEN, jaan-boojh kar (5A, 2026-09-19)
 
@@ -7147,6 +7225,167 @@ us ek file ki discipline kuch bacha nahi rahi thi.
 
 ---
 
+### 2.76 NOTIFICATIONS — PHASE 6C-1 (BACKEND) + G27
+
+`m_app_notification_type`, `t_app_notifications`, gyaarah procedure, chaar
+route, ek email worker — aur design system mein `.tabs` + `.banner` (G27).
+
+```
+notifications.mjs     74/74   (events · silences · fan-out · scope · contact ·
+                               read state · email · orphans · exit)
+swagger               25/25   (floor 101 -> 105, chaar naye route)
+regression: approval-levels 31 · offers 57 · race 28 · consent 49 · search 33 ·
+            invites 39 · lifecycle 75 · jobs-consume 23 · jobs-lifecycle 34 ·
+            entitlement 34+35 · team 49 · branches 37 · browse 31 ·
+            teacher-profile 33 · screens-3f 27 · 3h 21 · 3i 17 · 25 19 ·
+            dashboards 28 · jobs-screens 56 · applications-screens 87 ·
+            signin-check (0 console errors)
+SQL: approval 30 · branch 48 · teacher 45 · team 52 · sso 73 · error-log 17
+backend 0/0 · paanchon frontend warnings=0 · run_all ×2 → 35/94/11, 38/21, 20/36
+```
+
+#### 🔒 SCOPE RecipientUserUid HAI, AUR DOOSRA RAASTA HAI HI NAHI
+
+`t_app_notifications` mein **SchoolId nahi hai, OrganizationUid nahi hai** —
+aur wahi absence design hai. Brief ne lock kiya tha: "a user reads exactly their
+rows, 404-class behaviour for anyone else's".
+
+🔴 "Reporting ke liye" SchoolId daalna aasaan tha. Usi din wo query ban jaati
+jo koi aakhir mein likhta hai — ek school ki saari notification, jo bhi senior
+kaafi ho wo padh le — aur tab se per-user scope ek **convention** hoti, fact
+nahi. **Filter karne ke liye column hi nahi hai, to wo query likhi hi nahi ja
+sakti.**
+
+Isliye school ka event **fan out** hota hai: har recipient ki apni row, apni
+read state. Wahi imaandaar model bhi hai — "read" aadmi karta hai, organisation
+nahi.
+
+#### 🔴 CREATORS EVENT KI APNI TRANSACTION MEIN CHALTE HAIN
+
+`USP_ApplyToJob`, `USP_SendOffer`, `USP_RespondToInvite` — sab apne andar se
+notification likhte hain. Ek hi database, to atomic guarantee **muft** hai: jo
+application maujood hai uski notification bhi hai, aur rollback dono le jaata
+hai.
+
+⚠️ Ye 2.48 ke khilaaf nahi hai. Wo decision **CROSS-database** orchestration ke
+baare mein hai; notification usi jp_app mein rehti hai jahan har event hai. Jahan
+guarantee muft mili, use lena over-engineering nahi — wo "teacher ko bata diya
+gaya" aur "teacher ko shaayad bata diya gaya" ka farak hai.
+
+#### 🔴 EK JAAL JO CHUP-CHAAP KAAM KARTA DIKHTA
+
+Dono creator **result set return nahi karte**, OUTPUT parameter use karte hain.
+Wajah: `EXEC` se bulaayi gayi procedure apne result set **client** ko bhejti
+hai, execution order mein. To:
+
+```
+USP_ApplyToJob
+  … INSERT application …
+  EXEC USP_CreateSchoolNotifications   -- result set #1 ban jaata
+  SELECT @Status, @Code, @Message, @Id -- asli jawaab, #2
+```
+
+…aur Dapper ka `QueryFirstOrDefault` **notification ki row** padhta. Apply
+"Notifications created." return karta, Id mein recipient count, **aur kuch error
+na aata** — kyunki 2.21 ne dono ka shape ek jaisa banaya hua hai.
+
+⚠️ Notification likhna us event ka jawaab **badal nahi sakta**. OUTPUT parameter
+wire tak pahunch hi nahi sakta, to badal nahi sakta.
+
+#### 🔴 CHUPPIYAN BHI FAISLA HAIN, AUR 5 SABSE AHEM
+
+Chhe stage mein se teen par teacher ko bataya jaata hai (2 dekha, 3 shortlist,
+6 reject). Baaki teen par nahi:
+
+- **1 Applied** — teacher ne abhi khud kiya, batana shor hai.
+- **4 Interviewed** — baad mein record hota hai; wo wahan the.
+- **5 Selected** — 🔴 school ka **andar ka** faisla. Teacher tak jo jaata hai wo
+  **OFFER** hai (2.73 ki do machine). Yahan batana teacher ko aise offer ka
+  intezaar karwa deta jo school ne bheja hi nahi, aur bhej bhi na sakta ho.
+
+`notifications.mjs` teeno chuppi assert karti hai — Selected par count
+**pehle = baad** naapa jaata hai.
+
+#### 🔴 DO RAASTE EK HI MOVE BANATE HAIN
+
+Stage 2 do jagah se aata hai: school dropdown se set kare
+(`USP_SetApplicationStatus`), ya koi application **khole**
+(`USP_MarkApplicationViewed` — asli duniya mein yahi hota hai). Isliye faisla
+`USP_NotifyApplicationStatus` mein **ek jagah** hai aur dono usse call karti
+hain. Dono apna copy likhtin to teacher ko alag-alag baat pahunchti, is baat par
+ki school ne kaun sa raasta liya — aur wo farak kisi aise test mein kabhi na
+dikhta jo ek hi raasta chalata ho.
+
+#### 🔒 KISI NOTIFICATION MEIN CONTACT YA PRIVATE NOTE NAHI
+
+| Kya chhoda gaya | Kyun |
+|---|---|
+| rejection ka `@Remarks` | school ka apna note hai, teacher ko kabhi nahi dikhta (016) |
+| offer decline ka `@TeacherRemarks` | teacher salary par frank ho sakta hai; wo offer record mein rahe |
+| withdraw ka `@Reason` | "internally filled" wo line nahi jo school ne teacher se kehni chuni |
+| salary | offer mein hai, ek tap door; notification email bhi banti hai |
+| email / mobile / resume | 🔒 sirf `USP_GetTeacherContactForSchool` (2.56) |
+
+Suite chaaron caller ka list **raw text** mein padhti hai aur `@yopmail.com` tak
+dhoondhti hai.
+
+🔒 **Aur unlock notification se nahi aata:** INVITE_ACCEPTED ki notification
+**delete** karke dikhaya gaya ki contact khula hi rehta hai — consent
+`IsConsent` row hai (2.56), ek sentence nahi.
+
+#### 🔴 FAN-OUT BRANCH-SCOPED HAI, AUR NEGATIVE ZYADA AHEM HAI
+
+`fn_VisibleBranches` (3G) se recipient set banta hai — owner ko sab campus,
+campus-bound viewer ko ek. ⚠️ To doosre campus wale viewer ko applicant ki
+notification nahi jaati, jiska 404 hi milta.
+
+🔴 **Positive: read-only VIEWER ko bataya jaata hai**, owner ke barabar. Agar
+fan-out sirf owner tak jaata, to jiska poora kaam applicant list dekhna hai wahi
+ek aadmi hota jise koi batata na.
+
+🔴 **Negative: `hr.lead` ko kuch nahi.** Wo **usi organisation** ka hai par
+**doosre school** (2 — Dwarka) ka owner hai. OrganizationUid par likha fan-out
+use pakad leta aur is file ka baaki sab phir bhi pass hota — do account har
+tarah se related lagte hain, siwaay us ek baat ke jo maayne rakhti hai.
+
+#### ⚠️ EMAIL POLLER HAI, AUR WO US CHOICE KA SEEDHA NATEEJA HAI
+
+Notification SQL likhta hai, event ki transaction ke andar — to jis waqt wo
+banti hai, call stack mein koi C# nahi jo jaanta ho. Isliye
+`NotificationEmailWorker` **database poll** karta hai (30 s), address resolve
+karta hai, aur message queue ko deta hai.
+
+⚠️ Transaction ke andar bhejna teen tarah se bura tha: SMTP round trip par lock,
+fail hone par us offer ka rollback jiski khabar di ja rahi thi, aur event ke kisi
+retry par dohra email.
+
+⚠️ **Kaun email bhejta hai ye TYPE tay karta hai** (`SendEmail`), caller nahi —
+chhe type: offer ke chaaron, HIRED, aur INVITE_RECEIVED. Suite assert karti hai
+ki pending queue mein **sirf** wahi type aate hain, aur queue mein **address
+nahi** hota, sirf uid (2.2).
+
+#### ⚠️ MERE CHAAR TEST GALAT THE
+
+1. `applicationStatusId` bheja jabki DTO `toStatusId` maangta hai. **Har call
+   200 deta tha aur kuch badalta nahi** — unbound property 0 ho jaati hai aur 0
+   koi stage nahi. Ek chup no-op ke neeche **atharah** assertion fail hui.
+2. Invite payload mein `branchId` nahi tha (required, aur authorization input).
+3. "HR is one of them" — HR us school ka member hi nahi hai. Assertion galat
+   thi; theek karne par wo **behtar negative** ban gayi (upar dekho).
+4. Email stamp wala test ek **background worker se race** kar raha tha — wo har
+   30 s wahi condition hata deta hai. Ab suite apni unstamped row khud banati
+   hai.
+
+#### 🔴 SUITE ASLI RAASTE CHALATI HAI, PROCEDURE NAHI BULAATI
+
+`USP_NotifyOffer` seedha bulana sirf notifier ka kaam sabit karta, ye nahi ki
+use **koi bulaata hai**. 6C ka poora risk wahi hai — type maujood, read theek,
+banata koi nahi (G32 ka aakaar). Isliye har assertion HTTP se apply/offer/invite
+karke, phir table dekh kar aati hai. **Baarah ke baarah type asli raaste se
+bane.**
+
+---
+
 ## 3. SCOPE (Client spec ke against)
 
 ### IN SCOPE — MVP
@@ -7363,6 +7602,7 @@ naya Code, agla free Id, kuch renumber mat karo.
 | 2026-09-19 | 6A | **Offer Lite — backend.** `t_app_offers`, `m_app_offer_status`, chaar write + do read procedure, chhe route, API. 🔴 **Do machine, ek nahi:** offer (Sent/Accepted/Declined/Withdrawn) aur application (5 → 7 → 8 → 10) — ek transaction, alag sawaal. 🔴 **Map ne 7..10 le liye aur har edge faisla hai:** 5→7 hi (offer faisle ke baad aata hai), 7→5 withdrawal ka landing (re-offer special case nahi, pehla case dobara), **9→7 decline ke baad dusra offer ALLOWED** (mol-bhaav product ke andar rahe; poora trail bachta hai), 8→10 alag step (accept karna aa jaana nahi). 🔴 **Generic status endpoint ab bhi 7..10 refuse karta hai** — wo stages sirf offer actions se bante hain, warna school application ko OfferSent par set kar deta bina offer ke. `OFFER_STAGE_UNAVAILABLE` **retire**, naya `OFFER_ACTION_REQUIRED`. 🔴 **`ALREADY_OFFERED` sirf race se milta hai** (map `7→7` ko INSERT se pehle rok deta hai) — 3C wala aakaar, to suite do session ek hi instant par arm karti hai (**gap 0–2 ms**) aur ek doosra index bana kar sabit karti hai ki CATCH *kaun sa* index dekhta hai. 🔴 **Do permission:** OFFER.CREATE bhejta, OFFER.APPROVE hire confirm karta (SENIOR_HR ke paas pehla hi hai). 🔴 **Ek offer accept karne se baaki applications ko kuch nahi hota** — faisla, teen wajah ke saath, aur teesri 2.56 hai. OFFER_APPROVAL ka level ADMIN se **SCHOOL_OWNER** par theek hua (2C ki galti), par uska koi consumer nahi: **G32**. ⚠️ Mere do test galat the (3C negative ka premise khud banana pada — chhathi fixture contamination; aur scope negative ke liye aisa actor chahiye tha jiske paas permission HO). ⚠️ `applications-race` ki overlap assertion flake hui — proof se evidence par utari. offers 57/57, swagger floor 89→95, Phase 5 ki do suite usi commit mein update, saari purani suites green, `run_all` ×2 → 0 objects | ✅ Done |
 | 2026-10-11 | 6B | **Teacher search + invites — backend.** `m_app_invite_status` (ACCEPTED ke saath, jo schema mein **tha hi nahi**), `t_app_teacher_invites`, `USP_SearchTeachers` (server-side paging/filtering pehle din se, pageSize 100 par clamp, suspended bahar), paanch invite procedure, chhe route. 🔒 **Consent path 2 — doosra aur aakhiri:** `fn_TeacherContactUnlocked` ko doosra EXISTS mila, **usi function mein**, aur guard `sys.sql_expression_dependencies` se poochta hai (closed set — theek do table, "contains" nahi). Invite dekhna kuch nahi kholta, ignore karna kuch nahi kholta, payment status kuch nahi kholta. 🔴 **Boolean ka pehla asli consumer** — mode admin screen se badla, agli search `403 PLAN_LACKS_FEATURE`, ledger `0 -> 0` (2.64). 🔴 **Insert pehle, meter baad mein** — index sasta guard hai; race (gate gap 0 ms, do spid) se sabit. 🔴 **Apply karna open invitation APPLIED par le jaata hai** usi transaction mein, aur unlock application se aata hai — application hataane par unlock band, invitation APPLIED par khadi. 🔴 **Ek field jo 3E se khaali ja rahi thi:** `TeacherContactDto.FullName` — proc project nahi karti thi, row type mein property nahi thi, service mein `= string.Empty` hardcoded tha; **response body padhne se mili, kisi assertion se nahi.** Teenon theek, dono taraf guard. ⚠️ Mere chaar test galat the (envelope ka `code` padha DTO ka nahi; section 4 ka teacher bina resume ka tha — RESUME_REQUIRED sahi tha; cleanup invitation se pehle job delete kar rahi thi — FK; `USP_ConsumeFeature` ko `@FeatureCode` bheja). `teacher-search` 33/33 · `invites` 39/39 · `applications-consent` 31 → **49/49** (dono path ek run mein) · swagger floor 95 → **101**. **G33** (browse-contract 3E se chal hi nahi rahi) aur **G34** (purani suites mein 429 retry nahi — false red) open | ✅ Done |
 | 2026-10-11 | 6C-0 | **Verification ka bakaya chukaya — 6C ka ek bhi line likhne se pehle.** `scripts/verify/lib/login.mjs` naya, **18 suite** us par. 🔴 **Jo poocha gaya tha wo aadha ilaaj tha:** backoff per-IP (5/60s) theek karta hai, par jo cheez 6B mein do baar suite todi wo per-identifier **10/3600s** hai — use run ke andar wait karke khola hi nahi ja sakta, 6B mein har baar `JP.Sso.Api` restart karna pada tha. Isliye **token cache** bhi, aur wahi gap band karta hai. Trade likh kar rakha (warm cache = suite `/auth/login` chhue bina pass ho sakti; `signin-check` asli form se chalti hai aur jaan-boojh kar helper par nahi — canary; har cached token `/auth/me` se validate, TTL 20 min). Khatra audit se nikla: role token ke **andar** hai, to 22 call site gine gaye — theek **ek** ko `{ fresh: true }` chahiye tha (`team-contract`, colleague ko nikaalne ke baad). **Proof bina restart:** per-IP jaan-boojh kar bhara (7 login → 429), phir `screens-3f` 27/27 (cache se) aur `teacher-profile` 33/33 (har run naya teacher — cache mumkin nahi, teen backoff output mein dikhte hain). **G33 band, 31/31** — `browse-contract` 3E ke baad pehli baar chali; SchoolId ab caller ke uid se (purana code naam se dhoondta tha aur doosre owner par ek school suspend karke doosre ko query karta — PASS jo kuch sabit na kare), aur 🔒 wo assertion aa gayi jiske liye gap bana tha: 403 message dono consent path naam leta hai aur **paisa teesra raasta nahi** offer karta. ⚠️ **Paanch cheezein jo dhoondhne nahi gaya tha:** (1) `npm run build` chalte `ng serve` ke saath dev server ko zehrila kar deta hai — `ngDevMode is not defined`, aur failure bilkul toote screen jaisi dikhti hai; (2) **saatvi contamination** — chaar crashed run ne 12 photo + 4 LIVE campus chhode, fixture ab banane se pehle saaf karta hai; (3) 🔴 **`team-contract` 49 se 48 check par aa gayi thi aur kuch bhi red nahi tha** — stray campus ki wajah se uska create-branch skip hua aur cleanup assertion chala hi nahi; chupchaap chhoti hui suite fail hone wali se bad-tar hai; (4) `browse-contract` ne ek-campus school ke liye "5 branch(es)" padha; (5) `screens-3h` mein 3H ke commit se ek NUL byte tha — `grep` poori file skip kar deta tha. 🔴 Form login ka discriminator **API** hai, screen ka message nahi — limiter bhar jaane par screen har submission par "Too many attempts" dikhati hai, galat password par bhi. **G35 open** (`offers.mjs` ek baar 56/57, output rakha nahi gaya, chaar run baad saaf — guess likhna band karne se bura hai) | ✅ Done |
+| 2026-10-11 | 6C-1 | **Notifications backend + G27 band.** `m_app_notification_type` (12 type, har ek ke liye **build-time guard** jo uska procedure naam se maangta hai — G32 ka sabak structural), `t_app_notifications`, gyaarah procedure, chaar route, email worker. 🔒 **Scope `RecipientUserUid` hai aur doosra raasta hai hi nahi** — table mein SchoolId/OrganizationUid **nahi** hai, aur wahi absence design hai: filter karne ko column na ho to "ek school ki saari notification" wali query likhi hi nahi ja sakti. School ka event fan out hota hai, har recipient ki apni read state. 🔴 **Creators event ki apni transaction mein** — ek hi DB, to atomic guarantee muft (2.48 cross-DB ke baare mein hai, ye nahi). 🔴 **Ek jaal jo chup-chaap kaam karta dikhta:** `EXEC` se bulaayi procedure apna result set **client** ko bhejti hai pehle, to creator ka Status/Code/Message/Id SELECT Dapper ko **notification ki row** de deta — apply "Notifications created." return karta, Id mein recipient count, aur **koi error nahi** (2.21 ne shape ek jaisa banaya hai). Isliye dono creator **OUTPUT-only** hain. 🔴 **Chuppiyan faisla hain:** 1 Applied, 4 Interviewed aur **5 Selected** par teacher ko kuch nahi — Selected school ka andar ka faisla hai, teacher tak **OFFER** jaata hai (2.73); suite Selected par count pehle=baad naapti hai. 🔴 **Do raaste ek move banate hain** — stage 2 dropdown se bhi aata hai aur application **kholne** se bhi, to faisla `USP_NotifyApplicationStatus` mein ek jagah hai aur dono usse call karti hain. 🔒 **Kisi notification mein contact ya private note nahi** — rejection ka Remarks, decline ka TeacherRemarks, withdraw ka Reason, salary, email/mobile/resume: paanchon bahar, chaaron caller ka list raw text mein checked. 🔒 Aur INVITE_ACCEPTED ki notification **delete karke** dikhaya ki unlock `IsConsent` row se aata hai, sentence se nahi. 🔴 **Fan-out ka negative positive se ahem:** `hr.lead` **usi organisation** ka hai par doosre school ka owner — OrganizationUid par likha fan-out use pakad leta aur baaki sab phir bhi pass hota. ⚠️ Email **poller** hai (worker 30 s), kyunki notification SQL likhta hai aur us waqt koi C# call stack mein nahi; type `SendEmail` tay karta hai, caller nahi. ⚠️ **Verification type 13/14 jaan-boojh kar seed NAHI** — unka consumer nahi hai, aur seeding G32 ka aakaar de deti. Us talash se **G37** nikla: `RunTeacherVerification` ab bhi "requires t_app_teachers, which is Phase 3" kehti hai aur **koi cheez `IsVerified` set nahi karti** — chaar verified teacher seed row hain. ✅ **G27 band:** `.tabs` + `.banner` system mein, **chhe copy se zero**, paanch ek-line margin opt-in bache (wajah ke saath); farak drift nahi tha (button vs link reset), aur margin par **minority sahi thi** (`.page` gap deta hai, `.note` par `margin: 0` likha hai). `--alert`/`--locked` → `--danger`/`--warning`, do suite locator usi commit mein. ⚠️ Mere chaar test galat the (`applicationStatusId` vs `toStatusId` — har call 200 aur kuch na badle, atharah assertion us ek chup no-op ke neeche; `branchId` chhoot gaya; "HR is one of them" jabki HR us school ka member hi nahi; aur email-stamp test **background worker se race** kar raha tha). `notifications.mjs` **74/74** · swagger floor 101 → **105** | ✅ Done |
 
 ---
 
@@ -8309,36 +8549,84 @@ niyam likha hua hai aur toota hua hai. Local seed ke account hain, isliye 🟡.
 
 ---
 
-## ▶️ NEXT: PHASE 6C — NOTIFICATIONS + SAARE SCREENS
+## ✅ 6C-1 COMPLETE — 2026-10-11 (NOTIFICATIONS BACKEND + G27)
 
-6B ke baad aakhri boundary. Brief ke teen workstream mein se do band
-(6A, 6B) — **6C** bacha hai, aur wo sabse bada hai.
+Details **2.76**. 6C ka pehla aadha: backend poora, wired, aur sabit.
 
-- **Notifications** — in-portal + email. 🔴 **Scope: `RecipientUserUid` only** —
-  ek user theek apni row padhta hai, kisi aur ki id par 404-class behaviour
-  (2.6). Koi "sab dekh lo" raasta nahi.
-- **Screens** — search + invite (jp-school), invitations (jp-teacher), offer ke
-  dono taraf, notification centre. 🔴 **G27 pehle padho** — `.tabs` aur
-  `.banner` teen-teen jagah hand-rolled hain, aur 6C unhe chauthi baar likhne
-  ka sabse bada mauka hai.
-- **🔒 Contact display** `fn_TeacherContactUnlocked` se hi, aur kahin se nahi.
-  Search screen par contact ka koi column nahi — kisi plan, kisi role ke liye
-  nahi.
-- **2.62** — "abhi nahi" (disabled + kab) vs "allowed nahi" (control hatao,
-  samjhao). Invite screen par dono case hain: quota khatam (abhi nahi) aur
-  permission nahi (allowed nahi).
+```
+notifications.mjs 74/74 · swagger 25/25 (floor 105) · 12 type, baarah asli raaste se
+G27: chhe copy se zero · screens-25 19 · jobs-screens 56 · applications-screens 87
+```
 
-### 🔴 6C shuru karne se pehle padho
+🔒 **Scope `RecipientUserUid` hai, aur table mein SchoolId/OrganizationUid
+NAHI hai.** Wahi absence design hai — filter karne ko column na ho to "ek school
+ki saari notification" wali query likhi hi nahi ja sakti.
 
-- **2.74** — invite machine aur uske refusal code, taaki screen message text par
-  branch na kare (2.21).
-- **G27** — teesri copy pehle se debt hai; chauthi likhne se pehle component
-  banao.
-- **2.75 / G34** — login shared helper se aata hai, to regression ke liye
-  `JP.Sso.Api` restart karne ki zaroorat **nahi** rahi. ⚠️ Par frontend
-  `npm run build` chalte dev server ke saath mat karo — wo dev server ko
-  zehrila kar deta hai aur failure toote screen jaisi dikhti hai.
-- **2.68 / G26** — naya jp_app master whitelist mein **usi commit** mein.
+🔴 **Baarah ke baarah type ASLI raaste se bane** (apply, open, shortlist,
+reject, offer sent/declined/re-sent/accepted/hired/withdrawn, invite
+received/accepted/ignored). Notifier seedha bulana sirf notifier ka kaam sabit
+karta — 6C ka risk ye hai ki **koi use bulaata hi na ho**.
+
+🔴 **Chuppiyan assert hui hain, aur 5 sabse ahem hai.** Selected school ka andar
+ka faisla hai; teacher tak OFFER jaata hai (2.73). Suite Selected par count
+pehle=baad naapti hai.
+
+🔴 **Ek jaal jo chup-chaap kaam karta dikhta.** `EXEC` se bulaayi procedure
+apna result set client ko **pehle** bhejti hai, to creator ka Status/Code/
+Message/Id SELECT Dapper ko notification ki row de deta — apply 200 deta,
+"Notifications created." kehta, aur koi error na aata. Dono creator OUTPUT-only
+hain.
+
+🔒 **Notification kuch unlock nahi karti** — INVITE_ACCEPTED ki row delete karke
+dikhaya gaya ki contact khula rehta hai. Consent `IsConsent` row hai (2.56).
+
+🔴 **Fan-out ka negative positive se ahem:** `hr.lead` usi organisation ka hai
+par doosre school ka owner. OrganizationUid par likha fan-out use pakad leta aur
+baaki sab phir bhi pass hota.
+
+⚠️ **Verification type 13/14 seed NAHI kiye**, kyunki unka consumer nahi hai —
+aur 029 mein ab guard hai jo **har seeded type ke liye uska procedure** maangta
+hai. Wahi talash **G37** le aayi: teacher verification product se di hi nahi ja
+sakti, Phase 3 se.
+
+✅ **G27 band** — aur farak drift nahi tha: `<button>` vs `<a>` ke reset, plus
+chhe tab ka scroll. Margin par **minority sahi thi** (`.page` gap deta hai).
+Situational modifier naam (`--alert`, `--locked`) hi wajah thi ki teen copy
+thin; ab severity se naam hain.
+
+⚠️ **Mere chaar test galat the**, aur pehla sabse mehnga: `applicationStatusId`
+bheja jabki DTO `toStatusId` maangta hai — **har call 200 deta aur kuch
+badalta nahi**, aur us ek chup no-op ke neeche atharah assertion fail hui.
+
+---
+
+## ▶️ NEXT: 6C-2 — SAARE SCREENS
+
+6C ka doosra aadha. Backend ready hai; ab screens.
+
+- **Search + invite (jp-school)** — 2.62 ke dono case ek hi screen par: quota
+  khatam ("abhi nahi" — disabled + kab) aur permission nahi ("allowed nahi" —
+  control hatao, samjhao). 🔒 Search result mein contact ka **koi column nahi**,
+  kisi plan ya role ke liye nahi.
+- **Invitations (jp-teacher)** — accept/ignore, aur accept ke baad kuch bhi
+  "unlocked" jaisa dikhana nahi: teacher ko ye batana hai ki school ab unse
+  sampark kar sakta hai, status badge nahi.
+- **Offer ke dono taraf** — school ka send/withdraw/hire, teacher ka
+  accept/decline. 2.73 ki do machine screen par bhi do rehni chahiye.
+- **Notification centre** — dono app mein, plus bell ka unread badge
+  (`/unread-count`, apna route apne filtered index ke saath). ActionUrl
+  **relative** hai; link usi app ke andar jaata hai.
+- ✅ **G27 ab raaste mein nahi hai** — `.tabs` aur `.banner` system mein hain.
+
+### 🔴 6C-2 shuru karne se pehle padho
+
+- **2.76** — notification ka `TypeCode` par branch karo, `TypeName` ya text par
+  kabhi nahi (2.21).
+- **2.62** — invite screen par dono case hain; galat wala dikhana 4B ki galti
+  dobara hai.
+- **G29** — list server-side paged hai; screen ko bhi waise hi padhna hai.
+- **2.75 / G34** — regression ke liye API restart ki zaroorat nahi, par frontend
+  `npm run build` chalte dev server ke saath **mat** karo.
 
 ## Uske baad
 

@@ -519,7 +519,15 @@ try {
   await page.goto(`${SCHOOL_APP}/jobs/${jobId}`, { waitUntil: 'networkidle' });
   await page.waitForTimeout(1400);
 
-  const lockedBanner = await page.locator('.banner--locked').count();
+  /*
+    ⚠️ `.banner--locked` -> `.banner--warning` in 6C-0's G27 extraction, and the rename is the
+    point rather than a side effect. The old modifier was named for THIS
+    screen's situation; a design-system modifier has to be named for severity,
+    or the next screen with a different situation writes its own copy — which is
+    how there came to be three. Shipped state changed, so this guard changed
+    with it, in the same commit, with the reason (5B's rule).
+  */
+  const lockedBanner = await page.locator('.banner--warning').count();
   const subjectDisabled = await page.locator('#subjectId').isDisabled();
   const titleDisabled = await page.locator('#jobTitle').isDisabled();
 

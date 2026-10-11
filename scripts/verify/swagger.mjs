@@ -70,8 +70,19 @@ const APIS = [
       Three school-side (`/api/teacher-search`, and `/api/teacher-search/invites`
       GET and POST) and three teacher-side (`/api/teacher/invites`, plus
       `{id}/viewed` and `{id}/respond`).
+
+      🔴 RAISED TO 105 ON 2026-10-11 (PHASE 6C — notifications), in the same
+      change that added the routes. Four, and they belong to NO audience in
+      particular: `/api/notifications`, `/api/notifications/unread-count`,
+      `/api/notifications/{id}/read` and `/api/notifications/read-all`.
+
+      ⚠️ That is the first controller here that is neither school-side nor
+      teacher-side, and it is deliberate — a notification belongs to a PERSON,
+      so a teacher, an owner and a viewer all read their own through the same
+      four routes. There is no `?userUid=`, and 030 removed the column that
+      would make a cross-user query expressible at all.
     */
-    minOperations: 101,
+    minOperations: 105,
   },
 ];
 
@@ -208,6 +219,58 @@ try {
     !!apply, apply ? 'present' : 'MISSING');
   check('…and the resume snapshot fetch, which RESUME.DOWNLOAD gates',
     !!resume, resume ? 'present' : 'MISSING');
+
+  /*
+    🔴 Phase 6C's notification routes, and the reason to name them is different
+    from every block above.
+
+    The others are named because a count would pass if one side of a two-sided
+    feature vanished. These are named because they are the first routes in the
+    API that belong to NOBODY in particular — no school prefix, no teacher
+    prefix, no permission attribute — and a route with no obvious owner is the
+    one somebody tidies away.
+
+    ⚠️ unread-count is listed separately on purpose. It is the one a bell polls
+    on every navigation, so if it disappeared the symptom would be a badge that
+    is permanently zero: a screen that looks fine and is lying.
+  */
+  const notifications = doc?.paths?.['/api/notifications']?.get;
+  const unread = doc?.paths?.['/api/notifications/unread-count']?.get;
+  const markRead = doc?.paths?.['/api/notifications/{notificationId}/read']?.post;
+  const readAll = doc?.paths?.['/api/notifications/read-all']?.post;
+
+  check('the notification list operation is documented (Phase 6C)',
+    !!notifications, notifications ? 'present' : 'MISSING');
+  check('…and the unread count, which every screen polls',
+    !!unread, unread ? 'present' : 'MISSING');
+  check('…and marking one read',
+    !!markRead, markRead ? 'present' : 'MISSING');
+  check('…and marking them all read',
+    !!readAll, readAll ? 'present' : 'MISSING');
+
+  /*
+    🔒 AND THE ONE THING THAT MUST NOT BE THERE.
+
+    A notification route that accepted a recipient would make the whole scope
+    argument cosmetic, so the DOCUMENT is checked for one. This is cheap and it
+    is the kind of thing a well-meaning "admin can see user notifications"
+    change adds without anybody reading 030's header.
+  */
+  const notificationPaths = Object.keys(doc?.paths ?? {}).filter((p) => p.startsWith('/api/notifications'));
+  const withRecipient = notificationPaths.filter((p) => /user|recipient/i.test(p));
+
+  check('🔒 no notification route takes a user or recipient in its path',
+    withRecipient.length === 0,
+    withRecipient.length ? `LEAKED: ${withRecipient.join(', ')}` : `${notificationPaths.length} routes, none of them`);
+
+  const recipientParams = notificationPaths.flatMap((p) =>
+    Object.values(doc.paths[p] ?? {}).flatMap((op) => (op?.parameters ?? [])
+      .filter((q) => /userUid|recipient|userId/i.test(q?.name ?? ''))
+      .map((q) => `${p} ?${q.name}`)));
+
+  check('🔒 …and none takes one as a query parameter either',
+    recipientParams.length === 0,
+    recipientParams.length ? `LEAKED: ${recipientParams.join(', ')}` : 'none');
 } catch (error) {
   check('the entitlement matrix operation is documented', false, error.message);
 }

@@ -167,7 +167,26 @@ const cleanup = () => sql(`SET NOCOUNT ON; USE jp_app;
   DELETE FROM t_app_saved_jobs WHERE TeacherId = ${teacherId};
   DELETE FROM t_app_job_subjects WHERE JobId IN (SELECT JobId FROM t_app_jobs WHERE SchoolId IN (${ownerSchool}, ${otherSchool}));
   DELETE FROM t_app_job_class_levels WHERE JobId IN (SELECT JobId FROM t_app_jobs WHERE SchoolId IN (${ownerSchool}, ${otherSchool}));
-  DELETE FROM t_app_jobs WHERE SchoolId IN (${ownerSchool}, ${otherSchool});`);
+  DELETE FROM t_app_jobs WHERE SchoolId IN (${ownerSchool}, ${otherSchool});
+  /*
+    6C -- the notifications those rows produced. Written as a reference to an
+    entity that is gone, which is the invariant notifications.mjs asserts across
+    the whole table: a notification pointing at a deleted application would lead
+    a person to a 404, and 021 argues that is worse than never telling them.
+
+    No double quotes in here on purpose: this text is passed to sqlcmd through
+    -Q, and a quote inside the query makes the shell hand sqlcmd a fragment.
+  */
+  DELETE FROM t_app_notifications
+   WHERE RefEntityTypeId = 1 AND RefEntityUid IS NOT NULL
+     AND NOT EXISTS (SELECT 1 FROM t_app_applications a WHERE a.ApplicationUid = RefEntityUid);
+  DELETE FROM t_app_notifications
+   WHERE RefEntityTypeId = 2 AND RefEntityUid IS NOT NULL
+     AND NOT EXISTS (SELECT 1 FROM t_app_teacher_invites i WHERE i.InviteUid = RefEntityUid);
+  DELETE FROM t_app_notifications
+   WHERE RefEntityTypeId = 3 AND RefEntityUid IS NOT NULL
+     AND NOT EXISTS (SELECT 1 FROM t_app_offers o WHERE o.OfferUid = RefEntityUid);
+`);
 
 /*
   🔴 CLEAN ON THE WAY IN, THEN ASSERT. A previous run that died between its
