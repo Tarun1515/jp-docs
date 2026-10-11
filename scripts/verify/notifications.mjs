@@ -189,19 +189,35 @@ try {
 
   console.log(`\n    ${types.length} types: ${types.join(', ')}\n`);
 
-  check('🔴 twelve notification types are seeded', types.length === 12, `${types.length}`);
+  /*
+    ⚠️ TWELVE BECAME FOURTEEN IN 6C-2-0, AND THE ASSERTION BELOW IT INVERTED.
+
+    6C-1 asserted twelve, and asserted that the two verification types were
+    ABSENT — because nothing created them, and a type with no consumer is the
+    G32 shape. Looking for that consumer is what found G37: nothing in the
+    product set t_app_teachers.IsVerified at all.
+
+    G37 is closed now (USP_SetTeacherVerified), so the two types arrive with
+    their consumer and these two assertions move with the shipped state, in the
+    same commit, with the reason (5B's rule).
+
+    🔴 The assertion that did NOT weaken is the one that matters: it is still
+    "exactly this many, and every one of them has a procedure named in 029's
+    build guard" — not "at least twelve".
+  */
+  check('🔴 fourteen notification types are seeded', types.length === 14, `${types.length}`);
 
   /*
-    🔴 THE TYPES THAT ARE DELIBERATELY ABSENT.
+    🔴 AND THE CONSUMER RULE IS STILL THE POINT.
 
-    029 refuses to seed VERIFICATION_APPROVED / VERIFICATION_REJECTED until
-    something creates them, because a type with no consumer is the G32 shape.
-    Asserted here so that seeding them without a consumer fails a suite as well
-    as the build.
+    029's guard lists every seeded code against the procedure that writes it and
+    fails the build if one has none. This asserts the two newest are in that
+    list rather than exceptions to it — teacher-verification.mjs then walks
+    their real path end to end.
   */
-  check('🔴 …and the two verification types are NOT seeded — no type without a consumer',
-    !types.some((t) => t.startsWith('VERIFICATION_')),
-    'VERIFICATION_APPROVED / VERIFICATION_REJECTED absent, as 029 argues');
+  check('🔴 …and the two verification types are seeded WITH their consumer (G37 closed)',
+    types.filter((t) => t.startsWith('VERIFICATION_')).length === 2,
+    types.filter((t) => t.startsWith('VERIFICATION_')).join(' · ') || 'MISSING');
 
   check('🔒 every school-facing type is audience 2 and every teacher-facing one is audience 1',
     types.filter((t) => /^(APPLICATION_RECEIVED|OFFER_ACCEPTED|OFFER_DECLINED|INVITE_ACCEPTED|INVITE_IGNORED):2:/.test(t)).length === 5
@@ -210,10 +226,19 @@ try {
 
   const emailTypes = types.filter((t) => t.endsWith(':1')).map((t) => t.split(':')[0]);
 
+  /*
+    ⚠️ SIX BECAME EIGHT (6C-2-0). A verification outcome is the slowest-moving
+    thing a teacher waits on — days, not minutes — so it is exactly the case
+    where nobody is watching the portal when it lands. The DECLINE emails too,
+    deliberately: a teacher who is never told waits forever.
+  */
+  const EMAILING = [
+    'OFFER_SENT', 'OFFER_ACCEPTED', 'OFFER_DECLINED', 'OFFER_WITHDRAWN', 'HIRED',
+    'INVITE_RECEIVED', 'VERIFICATION_APPROVED', 'VERIFICATION_REJECTED',
+  ];
+
   check('🔴 the types that also email are the interruptive ones, and only those',
-    emailTypes.length === 6
-    && ['OFFER_SENT', 'OFFER_ACCEPTED', 'OFFER_DECLINED', 'OFFER_WITHDRAWN', 'HIRED', 'INVITE_RECEIVED']
-      .every((c) => emailTypes.includes(c)),
+    emailTypes.length === EMAILING.length && EMAILING.every((c) => emailTypes.includes(c)),
     emailTypes.join(', '));
 
   const ownerToken = await loginToken(OWNER);
@@ -544,6 +569,12 @@ try {
     ⚠️ INVITE_ACCEPTED is excluded from the list above because this run DELETED
     it, two assertions ago, to prove consent does not depend on it. It was
     asserted present before that.
+
+    ⚠️ And the two VERIFICATION_* types are not in it either, because nothing in
+    this file can produce them: they come from an admin's decision on an
+    approval request, not from an application, offer or invitation.
+    teacher-verification.mjs walks that path — submit, queue, approve, badge,
+    search result — and would be the suite to fail if they stopped firing.
   */
   check('🔴 every notification type the product can send was produced by a REAL path',
     missing.length === 0,

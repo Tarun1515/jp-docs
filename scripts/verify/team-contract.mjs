@@ -119,18 +119,52 @@ check('🔴 the owner has NO campus rows — they are never enumerated (2.51)',
   the time 3F took screenshots the demo school had two campuses called "North
   Wing" — a verification script that changes the data it verifies eventually
   verifies its own leftovers.
+
+  ----------------------------------------------------------------------------
+  🔴 ITS OWN NAME, AND CREATED UNCONDITIONALLY — 6C-2-0.
+  ----------------------------------------------------------------------------
+  This used to create a campus only if none named "North Wing" already existed,
+  which made the fixture conditional on OTHER suites' leftovers. screens-3f
+  creates a "North Wing / NW-01" campus too, so a crashed screens-3f run left
+  one behind, this suite took the skip branch, and its final cleanup assertion
+  never ran — 49 checks became 48 with nothing red.
+
+  That happened twice: 6C-0 found it by hand, and 6C-1's runner found it again
+  on its first pass, which is what the manifest in suite-counts.json exists for.
+
+  🔴 A suite that gets SMALLER is more dangerous than one that fails, because
+  nobody counts a green. So the fixture is unconditional now and carries a name
+  no other suite uses — it cannot collide, so it cannot be skipped.
 */
-const existingNames = new Set(team.campuses.map((c) => c.branchName));
-let createdCampusId = null;
+const CAMPUS_NAME = 'Team Suite Annexe';
 
-if (![...existingNames].some((n) => n.includes('North Wing'))) {
-  const created = await j(`${APP}/branches`, {
-    method: 'POST', headers: auth(owner),
-    body: JSON.stringify({ branchName: 'North Wing', stateId: 32, isActive: true }),
-  });
+/*
+  ⚠️ Belt and braces: a killed run of THIS suite would leave its own annexe, and
+  then the "a second campus appears" count would be right for the wrong reason.
+  Removed on entry, through the API, like everything else here.
+*/
+for (const stale of (team.campuses ?? []).filter((c) => c.branchName === CAMPUS_NAME)) {
+  const all = (await j(`${APP}/branches?includeInactive=true`, { headers: head(owner) })).body?.data ?? [];
+  const row = all.find((c) => c.branchId === stale.branchId);
 
-  createdCampusId = created.body?.data?.branchId ?? null;
+  if (row) {
+    await j(`${APP}/branches/${stale.branchId}`, {
+      method: 'DELETE', headers: auth(owner), body: JSON.stringify({ rowVersion: row.rowVersion }),
+    });
+  }
 }
+
+team = (await j(`${APP}/school/team`, { headers: head(owner) })).body?.data;
+
+const created = await j(`${APP}/branches`, {
+  method: 'POST', headers: auth(owner),
+  body: JSON.stringify({ branchName: CAMPUS_NAME, stateId: 32, isActive: true }),
+});
+
+const createdCampusId = created.body?.data?.branchId ?? null;
+
+check('premise: this run created its own second campus, so nothing below is skipped',
+  createdCampusId !== null, `${CAMPUS_NAME} -> branch ${createdCampusId}`);
 
 team = (await j(`${APP}/school/team`, { headers: head(owner) })).body?.data;
 check('a second campus appears in the team response', team.campuses.length >= 2,
@@ -486,9 +520,15 @@ check('…and asking for both at once is refused, not silently resolved', both2.
 // ---------------------------------------------------------------------------
 console.log('\n=== 9. CLEAN UP ===');
 
-// The campus, if this run is the one that added it. Removed through the API so
-// the head-office guard and the RowVersion check both apply, exactly as they
-// would for a school doing it.
+/*
+  The campus this run added. Removed through the API so the head-office guard
+  and the RowVersion check both apply, exactly as they would for a school doing
+  it.
+
+  ⚠️ The `if` stays, but it now guards against a FAILED create rather than
+  against a skipped one — the fixture above is unconditional, so the normal path
+  always reaches the assertion inside.
+*/
 if (createdCampusId !== null) {
   const campuses = (await j(`${APP}/branches?includeInactive=true`, { headers: head(owner) })).body?.data ?? [];
   const created = campuses.find((c) => c.branchId === createdCampusId);

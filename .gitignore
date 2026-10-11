@@ -7,3 +7,6 @@ Thumbs.db
 # HOW_TO_RUN.md is pushed; this file is what its credentials table points at.
 # A password in a repository's history outlives the decision to remove it.
 local-accounts.md
+
+# Suite output kept by scripts/verify/run.mjs — G35 says keep it, git says not here.
+.verify-logs/

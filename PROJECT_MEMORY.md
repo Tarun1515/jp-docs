@@ -1,7 +1,7 @@
 # TEACHER RECRUITMENT PORTAL — PROJECT MEMORY
 
 > **Ye file har kaam ke baad update hogi.** Har naye chat/session mein sabse pehle ye file padho.
-> Last updated: **2026-10-11** | Phase **3 COMPLETE** + **2.5 engine** + **4 jobs COMPLETE** + **2.67 swagger fix** + **PRE-5 (G26 band, 2.68/2.69)** + **PRE-5b (baseline green)** + **5A applications BACKEND (2.70, G28)** + **5B applications SCREENS COMPLETE — PHASE 5 POORA (2.71, G30)** + **6A-0 approval engine above level 1 (2.72, G14 BAND, G31)** + **6A Offer Lite BACKEND COMPLETE (2.73, G32)** + **6B TEACHER SEARCH + INVITES BACKEND COMPLETE — 🔒 CONSENT PATH 2 (2.74, G33, G34)** + **6C-0 verification ka bakaya: G33 aur G34 BAND (2.75, G35, G36)** + **6C-1 NOTIFICATIONS BACKEND + G27 BAND (2.76, G37)** | Next: **6C-2 — saare screens (search+invite, invitations, offer ke dono taraf, notification centre)**
+> Last updated: **2026-10-11** | Phase **3 COMPLETE** + **2.5 engine** + **4 jobs COMPLETE** + **2.67 swagger fix** + **PRE-5 (G26 band, 2.68/2.69)** + **PRE-5b (baseline green)** + **5A applications BACKEND (2.70, G28)** + **5B applications SCREENS COMPLETE — PHASE 5 POORA (2.71, G30)** + **6A-0 approval engine above level 1 (2.72, G14 BAND, G31)** + **6A Offer Lite BACKEND COMPLETE (2.73, G32)** + **6B TEACHER SEARCH + INVITES BACKEND COMPLETE — 🔒 CONSENT PATH 2 (2.74, G33, G34)** + **6C-0 verification ka bakaya: G33 aur G34 BAND (2.75, G35, G36)** + **6C-1 NOTIFICATIONS BACKEND + G27 BAND (2.76, G37)** + **6C-2-0 G37 BAND — badge asli hua, aur shared suite runner (2.77, G35 BAND)** | Next: **6C-2 — saare screens (search+invite, invitations, offer ke dono taraf, notification centre)**
 >
 > 🔴 **Ye do line har phase ke close-out mein update hongi.** File 3I tak
 > pahunch chuki thi aur ye header **Phase 0** par khada tha — saat phase purana,
@@ -2081,7 +2081,7 @@ ab hai. Baaki wajah apne paon par khadi hai: har option apna **count** carry
 karti hai, jiske liye tab strip mein jagah nahi. Comment theek kar diya — toota
 hua reason likha chhod dena usi class ki galti hai jo G27 thi.
 
-### G37. Teacher verification product se di hi nahi ja sakti — 🟡 OPEN (6C-1, 2026-10-11)
+### G37. Teacher verification product se di hi nahi ja sakti — ✅ CLOSED (6C-2-0, 2026-10-11)
 
 `ApprovalOrchestrationService.RunTeacherVerification` ek **FAILED** outcome
 return karti hai, aur uska message kehta hai:
@@ -2113,6 +2113,54 @@ usse call, aur uske saath hi type 13/14 seed + API-layer notification (2.48:
 HTTP 200 ka matlab approval hua, notification nahi). ⚠️ Aur uske saath ek test
 chahiye jo **asli queue se approve karke badge dekhe** — kyunki ye bug poore
 Phase 3 se 6C tak isliye bacha ki koi test badge ke us raaste par nahi chala.
+
+#### ✅ Band kaise hua — 6C-2-0, **33/33**
+
+Theek usi plan par, aur test ne wahi raasta chala jo ek aadmi chalata:
+
+```
+teacher submit (HTTP)  ->  admin ka QUEUE  ->  action endpoint se approve
+   ->  orchestrationCompleted TRUE   (yahi wo cheez thi jo false aati thi)
+   ->  IsVerified 1 · VerifiedOn stamped · VerifiedByUserId = admin (40, teacher 147 nahi)
+   ->  /teacher-search ke ASLI result mein isVerified true
+   ->  verifiedOnly filter 4 se 5
+   ->  VERIFICATION_APPROVED teacher tak, admin ka note us mein NAHI (trail par HAI)
+```
+
+- **`031`** — `VerifiedByUserId` column (school ke paas 2F se hai, teacher ke
+  paas do hi the — kyunki badge kabhi set hi nahi hota tha, to teesri column ki
+  zaroorat kabhi padi nahi).
+- **`022 USP_SetTeacherVerified`** — badge + stamp + notification, **ek
+  transaction** (teenon jp_app mein hain). Idempotent: `IsVerified = 0` par
+  guarded UPDATE, aur `Changed` return hota hai, to retry-orchestration dobara
+  stamp nahi karta aur dobara batata nahi.
+- 🔴 **Decline badge CHHEENTA nahi.** `@Approved` **faisla** hai, store karne
+  wali value nahi. Ek character chhota raasta tha "@IsVerified = @Approved" —
+  aur usme pehle se verified teacher dobara submit karke decline hone par apna
+  badge chup-chaap kho deta.
+- 🔴 **Decline ka notification orchestration se nahi aata**, kyunki wo approval
+  par gated hai (Phase 2E ka wo bug jahan reject karne par school ban jaata
+  tha) — aur wo gate hilaya nahi gaya. Decline `ApprovalService` ki rejection
+  branch se batata hai: wo provisioning nahi hai, aur gate ke peeche daalne ka
+  matlab hota ki jiske documents reject hue wo **hamesha intezaar karta rahe**.
+- 🔒 **Admin ka note kisi notification mein nahi.** 022 body ko **type ki apni
+  Description** se banata hai, to aisa parameter hi nahi hai jiske through
+  "document looks edited" us aadmi tak pahunche jiske baare mein hai. Note
+  **trail par hai**, aur suite dono baat assert karti hai.
+- ⚠️ **Mera pehla build guard GALAT tha aur pehle hi run mein pakda gaya.** Usne
+  assert kiya ki "verified hai to verifier bhi hoga", aur uske comment mein
+  likha tha ki chaar seeded verified teacher ke paas `VerifiedOn` nahi hai — wo
+  **anumaan** tha. Chaaron ke paas hai (2026-08-10, seed ka timestamp) aur
+  verifier kisi ke paas nahi. To guard build hi tod deta.
+
+  🔴 Teen raaste the, do bure: un chaar row ko backfill karna (ek aisi approval
+  gadh dena jo hui nahi — wahi class ka jhooth jo missing badge tha), ya guard
+  ko date se scope karna (date check guard ke kapdon mein). Teesra liya: guard
+  wahi assert karta hai jo **har** row par sach hai (verifier ho par badge na
+  ho), aur "teenon column saath chalti hain" wali baat **suite** mein hai —
+  ek aise teacher ke against jise is product ne khud verify kiya.
+
+### G35. `offers.mjs` ek baar fail hui aur kaun si assertion thi, pata nahi — ✅ CLOSED (6C-2-0, 2026-10-11)
 
 ### G28. Teacher application WITHDRAW nahi kar sakta — 🟡 OPEN, jaan-boojh kar (5A, 2026-09-19)
 
@@ -2379,7 +2427,7 @@ hai, screen wahi batana band kar deti hai.
 inject, output mein likh kar. Koi doosra status = API in credentials ka jawaab
 de raha hai, matlab **screen** hi fail hui → throw, status message mein.
 
-### G35. `offers.mjs` ek baar fail hui aur kaun si assertion thi, pata nahi — 🟡 OPEN (6C-0, 2026-10-11)
+#### G35 ka poora vivaran (6C-0 mein likha gaya)
 
 6C-0 ke regression ke pehle batch mein — **token cache clear karne ke turant
 baad** — `offers.mjs` ne **56/57** diya. Us run ka output rakha nahi gaya, aur
@@ -2399,6 +2447,30 @@ hai. Baaki batch log file mein chale.
 **Band kaise hoga:** agli baar jab `offers.mjs` fail ho, poora output rakho
 (`> log 2>&1`) aur assertion ka naam yahan likho. Jaan-boojh kar guess nahi
 likha gaya — galat wajah likh dena is gap ko band karne se bura hota.
+
+#### ✅ Band kaise hua — 6C-2-0, mechanism se (kaaran se nahi)
+
+`scripts/verify/run.mjs`, aur wo do cheezein karta hai — dono isi gap aur 6C-0
+ke doosre incident se aayi hain:
+
+1. **Har run ka poora output file mein jaata hai, pass ho ya fail.** Koi grep ye
+   tay nahi karta ki kya rakhne laayak tha. Yahi G35 ka asli nuksaan tha.
+2. **Har suite ka assertion COUNT ek committed manifest se compare hota hai**
+   (`suite-counts.json`), aur count **ghat** jaana failure hai — chaahe saari
+   assertion pass hon.
+
+⚠️ **Us ek 56/57 ka kaaran ab bhi pata nahi**, aur wo likha hi rehna chahiye:
+uske baad kaafi saaf run aaye aur wo dobara nahi hui. Jo band hua wo **risk**
+hai — agli baar output maujood hoga.
+
+🔴 **Aur mechanism ne pehle hi poore pass par kaam kar dikhaya:** runner ne
+`team-contract` ko **48/48 — 1 assertion DID NOT RUN** par pakad liya. Wahi
+cheez jo 6C-0 mein haath se mili thi, ab khud mili. Uski wajah: suite apna
+doosra campus **tabhi** banati thi jab "North Wing" naam ka koi na ho — matlab
+uska fixture **doosri suite ke leftover par conditional** tha, aur crashed
+`screens-3f` ek chhod gayi thi. Ab uska campus ka apna naam hai
+(`Team Suite Annexe`), banti **har baar** hai, aur entry par apna leftover khud
+hataati hai. 49 → 50 (ek naya premise).
 
 ### G36. Shared local password 17 committed script mein hai — 🟡 OPEN (6C-0, 2026-10-11)
 
@@ -7386,6 +7458,106 @@ bane.**
 
 ---
 
+### 2.77 BADGE ASLI HUA — PHASE 6C-2-0 (G37 + SHARED RUNNER)
+
+6C-2 ki ek bhi screen se pehle. Screens badge teen jagah dikhati hain; aaj tak
+koi asli teacher use kama hi nahi sakta tha, to har dikhta badge seed-data ka
+jhooth hota — wahi mockup-era failure jisse bachne ke liye ye project test
+likhta hai.
+
+```
+teacher-verification.mjs  33/33   (queue -> approve -> badge -> search result)
+notifications.mjs         74/74   (12 -> 14 type, teen assertion jaan-boojh kar badli)
+run.mjs                   naya    25 suite, har ek ka output rakha jaata hai
+regression: 25/25 suite clean (334 s, ek bhi API restart ke bina)
+SQL: approval 30 · branch 48 · teacher 45 · team 52 · sso 73 · error-log 17
+backend 0/0 · run_all ×2 → 35 tables, 95 procs, 11 fns
+```
+
+#### 🔴 JO STUB CHAAR PHASE CHALA
+
+`RunTeacherVerification` ek FAILED outcome return karti thi:
+
+```
+"setting IsVerified requires t_app_teachers, which is Phase 3"
+```
+
+Phase 3 chaar phase pehle ship ho gaya tha. Admin queue se teacher approve kar
+sakta tha, trail likha jaata tha, **badge kabhi nahi lagta**. Koi error nahi —
+wo branch pehle se failure report karne ke liye likhi hui thi, to failure dikhna
+hi normal tha.
+
+🔴 **Bacha isliye ki badge ke raaste par koi test kabhi chala hi nahi.** Jis
+database mein badge wale chaar teacher **seed row** hain, usme badge ke baare
+mein har assertion aise data ke against pass hoti hai jo kisi ne kamaya nahi.
+
+#### ⚠️ EntityUid = TeacherUid, AUR REQUESTOR NAHI
+
+025 ka column comment kehta hai: "the thing being approved: a school, a teacher,
+a branch". School wala raasta requestor se resolve karta hai (us waqt school
+bana hi nahi hota), par teacher **pehle se maujood** hai — to uska apna uid hi
+sahi identifier hai. Requestor se resolve karna pehli baar galat aadmi verify
+kar deta jab admin kisi ki taraf se submit karta.
+
+⚠️ Aur **submit ka validation type-aware hai**: type 2 ko `@FullName` chahiye
+(001). Mera pehla submit sirf type aur uid bhejta tha aur theek 400 mila — "Your
+full name is required". Wo validation sahi kaam kar rahi thi, payload maine
+padha nahi tha.
+
+#### 🔴 DECLINE BADGE CHHEENTA NAHI, AUR YE EK FAISLA HAI
+
+`@Approved` **faisla** hai, store karne wali value nahi. Ek character chhota
+raasta tha, aur usme pehle se verified teacher — dobara submit karke decline
+hone par — apna badge chup-chaap kho deta. Verification waapas lena ek asli
+action hai (wo har `verifiedOnly` search se gayab ho jaata hai), form decline
+karne ka side effect nahi.
+
+#### 🔴 DECLINE KA NOTIFICATION GATE KE PEECHE NAHI HAI
+
+Orchestration **approval** par gated hai, aur wo gate load-bearing hai: Phase 2E
+mein reject karne par school ban kar activate ho jaata tha. Gate hilaya nahi
+gaya. Par **kisi ko batana ki uska verification decline hua, provisioning nahi
+hai** — wo kuch banata nahi, kuch deta nahi, aur teacher ko iske siwaay kabhi
+kuch nahi dikhega. Gate ke peeche daalne ka matlab hota: jiske documents reject
+hue, wo hamesha intezaar karta rahe.
+
+⚠️ Us ek call ka exception **swallow** kiya gaya hai aur sirf us ek ka: faisla
+jp_mdm mein commit ho chuka hai aur rollback nahi ho sakta (2.48), to yahan fail
+karna admin ko ye batana hota ki unka rejection hua hi nahi — jabki hua.
+
+#### 🔒 ADMIN KA NOTE KISI NOTIFICATION MEIN NAHI
+
+022 body **type ki apni Description** se banata hai, to aisa parameter hi nahi
+hai jiske through note teacher tak pahunche. Note **trail par** hai, aur suite
+dono assert karti hai — nahi hai notification mein, hai trail mein. Wahi rule
+jo rejection ke `@Remarks`, offer ke `@TeacherRemarks` aur withdraw ke
+`@Reason` par hai (021).
+
+#### 🔴 SHARED RUNNER — DO INCIDENT, EK ILAAJ
+
+`scripts/verify/run.mjs`:
+
+| Kya | Kis incident se |
+|---|---|
+| har run ka poora output file mein, pass ho ya fail | **G35** — 56/57 ka output grep ne pheink diya tha |
+| assertion count ek committed manifest se compare, **ghatna = failure** | **6C-0** — `team-contract` 49 se 48 par aa gayi thi, kuch bhi red nahi |
+
+⚠️ Sequential, jaan-boojh kar: ye suites ek hi school, ek hi teacher, ek hi
+entitlement row par chalti hain aur unhe badalti-restore karti hain. Do saath
+chalaane ka matlab hota ki is project ki saari contamination ek saath hoti aur
+kis ne ki — pata na chalta.
+
+🔴 **Runner ne pehle hi pass par kaam kar dikhaya** — `team-contract` 48/48
+pakdi, saari assertion green. Wajah: uska fixture doosri suite ke leftover par
+**conditional** tha. Ab uska campus ka apna naam hai aur har baar banta hai.
+
+⚠️ **`--update` manifest ko run ke nateeje se likhta hai.** Assertion jodne ke
+baad use karo; **kisi girte count ko chhupane ke liye kabhi nahi.** Uska diff
+review mein padha jaana hai — neeche jaati line hi wo cheez hai jiske liye ye
+runner hai.
+
+---
+
 ## 3. SCOPE (Client spec ke against)
 
 ### IN SCOPE — MVP
@@ -7603,6 +7775,7 @@ naya Code, agla free Id, kuch renumber mat karo.
 | 2026-10-11 | 6B | **Teacher search + invites — backend.** `m_app_invite_status` (ACCEPTED ke saath, jo schema mein **tha hi nahi**), `t_app_teacher_invites`, `USP_SearchTeachers` (server-side paging/filtering pehle din se, pageSize 100 par clamp, suspended bahar), paanch invite procedure, chhe route. 🔒 **Consent path 2 — doosra aur aakhiri:** `fn_TeacherContactUnlocked` ko doosra EXISTS mila, **usi function mein**, aur guard `sys.sql_expression_dependencies` se poochta hai (closed set — theek do table, "contains" nahi). Invite dekhna kuch nahi kholta, ignore karna kuch nahi kholta, payment status kuch nahi kholta. 🔴 **Boolean ka pehla asli consumer** — mode admin screen se badla, agli search `403 PLAN_LACKS_FEATURE`, ledger `0 -> 0` (2.64). 🔴 **Insert pehle, meter baad mein** — index sasta guard hai; race (gate gap 0 ms, do spid) se sabit. 🔴 **Apply karna open invitation APPLIED par le jaata hai** usi transaction mein, aur unlock application se aata hai — application hataane par unlock band, invitation APPLIED par khadi. 🔴 **Ek field jo 3E se khaali ja rahi thi:** `TeacherContactDto.FullName` — proc project nahi karti thi, row type mein property nahi thi, service mein `= string.Empty` hardcoded tha; **response body padhne se mili, kisi assertion se nahi.** Teenon theek, dono taraf guard. ⚠️ Mere chaar test galat the (envelope ka `code` padha DTO ka nahi; section 4 ka teacher bina resume ka tha — RESUME_REQUIRED sahi tha; cleanup invitation se pehle job delete kar rahi thi — FK; `USP_ConsumeFeature` ko `@FeatureCode` bheja). `teacher-search` 33/33 · `invites` 39/39 · `applications-consent` 31 → **49/49** (dono path ek run mein) · swagger floor 95 → **101**. **G33** (browse-contract 3E se chal hi nahi rahi) aur **G34** (purani suites mein 429 retry nahi — false red) open | ✅ Done |
 | 2026-10-11 | 6C-0 | **Verification ka bakaya chukaya — 6C ka ek bhi line likhne se pehle.** `scripts/verify/lib/login.mjs` naya, **18 suite** us par. 🔴 **Jo poocha gaya tha wo aadha ilaaj tha:** backoff per-IP (5/60s) theek karta hai, par jo cheez 6B mein do baar suite todi wo per-identifier **10/3600s** hai — use run ke andar wait karke khola hi nahi ja sakta, 6B mein har baar `JP.Sso.Api` restart karna pada tha. Isliye **token cache** bhi, aur wahi gap band karta hai. Trade likh kar rakha (warm cache = suite `/auth/login` chhue bina pass ho sakti; `signin-check` asli form se chalti hai aur jaan-boojh kar helper par nahi — canary; har cached token `/auth/me` se validate, TTL 20 min). Khatra audit se nikla: role token ke **andar** hai, to 22 call site gine gaye — theek **ek** ko `{ fresh: true }` chahiye tha (`team-contract`, colleague ko nikaalne ke baad). **Proof bina restart:** per-IP jaan-boojh kar bhara (7 login → 429), phir `screens-3f` 27/27 (cache se) aur `teacher-profile` 33/33 (har run naya teacher — cache mumkin nahi, teen backoff output mein dikhte hain). **G33 band, 31/31** — `browse-contract` 3E ke baad pehli baar chali; SchoolId ab caller ke uid se (purana code naam se dhoondta tha aur doosre owner par ek school suspend karke doosre ko query karta — PASS jo kuch sabit na kare), aur 🔒 wo assertion aa gayi jiske liye gap bana tha: 403 message dono consent path naam leta hai aur **paisa teesra raasta nahi** offer karta. ⚠️ **Paanch cheezein jo dhoondhne nahi gaya tha:** (1) `npm run build` chalte `ng serve` ke saath dev server ko zehrila kar deta hai — `ngDevMode is not defined`, aur failure bilkul toote screen jaisi dikhti hai; (2) **saatvi contamination** — chaar crashed run ne 12 photo + 4 LIVE campus chhode, fixture ab banane se pehle saaf karta hai; (3) 🔴 **`team-contract` 49 se 48 check par aa gayi thi aur kuch bhi red nahi tha** — stray campus ki wajah se uska create-branch skip hua aur cleanup assertion chala hi nahi; chupchaap chhoti hui suite fail hone wali se bad-tar hai; (4) `browse-contract` ne ek-campus school ke liye "5 branch(es)" padha; (5) `screens-3h` mein 3H ke commit se ek NUL byte tha — `grep` poori file skip kar deta tha. 🔴 Form login ka discriminator **API** hai, screen ka message nahi — limiter bhar jaane par screen har submission par "Too many attempts" dikhati hai, galat password par bhi. **G35 open** (`offers.mjs` ek baar 56/57, output rakha nahi gaya, chaar run baad saaf — guess likhna band karne se bura hai) | ✅ Done |
 | 2026-10-11 | 6C-1 | **Notifications backend + G27 band.** `m_app_notification_type` (12 type, har ek ke liye **build-time guard** jo uska procedure naam se maangta hai — G32 ka sabak structural), `t_app_notifications`, gyaarah procedure, chaar route, email worker. 🔒 **Scope `RecipientUserUid` hai aur doosra raasta hai hi nahi** — table mein SchoolId/OrganizationUid **nahi** hai, aur wahi absence design hai: filter karne ko column na ho to "ek school ki saari notification" wali query likhi hi nahi ja sakti. School ka event fan out hota hai, har recipient ki apni read state. 🔴 **Creators event ki apni transaction mein** — ek hi DB, to atomic guarantee muft (2.48 cross-DB ke baare mein hai, ye nahi). 🔴 **Ek jaal jo chup-chaap kaam karta dikhta:** `EXEC` se bulaayi procedure apna result set **client** ko bhejti hai pehle, to creator ka Status/Code/Message/Id SELECT Dapper ko **notification ki row** de deta — apply "Notifications created." return karta, Id mein recipient count, aur **koi error nahi** (2.21 ne shape ek jaisa banaya hai). Isliye dono creator **OUTPUT-only** hain. 🔴 **Chuppiyan faisla hain:** 1 Applied, 4 Interviewed aur **5 Selected** par teacher ko kuch nahi — Selected school ka andar ka faisla hai, teacher tak **OFFER** jaata hai (2.73); suite Selected par count pehle=baad naapti hai. 🔴 **Do raaste ek move banate hain** — stage 2 dropdown se bhi aata hai aur application **kholne** se bhi, to faisla `USP_NotifyApplicationStatus` mein ek jagah hai aur dono usse call karti hain. 🔒 **Kisi notification mein contact ya private note nahi** — rejection ka Remarks, decline ka TeacherRemarks, withdraw ka Reason, salary, email/mobile/resume: paanchon bahar, chaaron caller ka list raw text mein checked. 🔒 Aur INVITE_ACCEPTED ki notification **delete karke** dikhaya ki unlock `IsConsent` row se aata hai, sentence se nahi. 🔴 **Fan-out ka negative positive se ahem:** `hr.lead` **usi organisation** ka hai par doosre school ka owner — OrganizationUid par likha fan-out use pakad leta aur baaki sab phir bhi pass hota. ⚠️ Email **poller** hai (worker 30 s), kyunki notification SQL likhta hai aur us waqt koi C# call stack mein nahi; type `SendEmail` tay karta hai, caller nahi. ⚠️ **Verification type 13/14 jaan-boojh kar seed NAHI** — unka consumer nahi hai, aur seeding G32 ka aakaar de deti. Us talash se **G37** nikla: `RunTeacherVerification` ab bhi "requires t_app_teachers, which is Phase 3" kehti hai aur **koi cheez `IsVerified` set nahi karti** — chaar verified teacher seed row hain. ✅ **G27 band:** `.tabs` + `.banner` system mein, **chhe copy se zero**, paanch ek-line margin opt-in bache (wajah ke saath); farak drift nahi tha (button vs link reset), aur margin par **minority sahi thi** (`.page` gap deta hai, `.note` par `margin: 0` likha hai). `--alert`/`--locked` → `--danger`/`--warning`, do suite locator usi commit mein. ⚠️ Mere chaar test galat the (`applicationStatusId` vs `toStatusId` — har call 200 aur kuch na badle, atharah assertion us ek chup no-op ke neeche; `branchId` chhoot gaya; "HR is one of them" jabki HR us school ka member hi nahi; aur email-stamp test **background worker se race** kar raha tha). `notifications.mjs` **74/74** · swagger floor 101 → **105** | ✅ Done |
+| 2026-10-11 | 6C-2-0 | **G37 band — badge asli hua — 6C-2 ki ek bhi screen se pehle.** Screens badge teen jagah dikhati hain; aaj tak koi asli teacher use kama hi nahi sakta tha, to har dikhta badge seed-data ka jhooth hota. `031` (`VerifiedByUserId` — school ke paas 2F se hai, teacher ke paas do hi the kyunki badge kabhi set hi nahi hota tha), `022 USP_SetTeacherVerified` (badge + stamp + notification, **ek transaction**, idempotent), stub ki jagah asli call, type 13/14 seed **apne consumer ke saath** (029 ka guard har type ke liye procedure ka naam maangta hai), aur decline ka notification `ApprovalService` ki rejection branch se. 🔴 **Jo stub chaar phase chala:** "setting IsVerified requires t_app_teachers, which is Phase 3" — Phase 3 chaar phase pehle ship hua tha; admin approve kar sakta tha, trail likha jaata tha, badge kabhi nahi lagta, aur **koi error nahi** kyunki wo branch pehle se failure report karti thi. Bacha isliye ki **badge ke raaste par koi test kabhi chala hi nahi** — chaar badge wale teacher seed row hain, to badge ki har assertion aise data par pass hoti thi jo kisi ne kamaya nahi. 🔴 **Test wahi raasta chalta hai jo aadmi:** teacher submit (HTTP) → admin ka **queue** → action endpoint se approve → `orchestrationCompleted` **true** (yahi false aata tha) → badge + stamp + verifier **admin (40), teacher (147) nahi** → **`/teacher-search` ke asli result mein `isVerified true`** → `verifiedOnly` 4 se 5 → notification teacher tak, admin ka note us mein nahi par **trail par hai**. 🔴 **Decline badge chheenta nahi** — `@Approved` faisla hai, store karne wali value nahi (ek character chhota raasta pehle se verified teacher ka badge chup-chaap le leta). 🔴 **Decline ka notification gate ke peeche nahi** — orchestration approval par gated hai (Phase 2E ka bug) aur wo gate hilaya nahi gaya; batana provisioning nahi hai, aur peeche daalne ka matlab hota ki reject hua teacher hamesha intezaar kare. ⚠️ **Mera pehla build guard galat tha, pehle hi run mein pakda gaya** — usne maana ki seeded verified teacher ke paas `VerifiedOn` nahi hai; chaaron ke paas hai. Backfill karna ek na-hui approval gadhna hota, date se scope karna date check hota — to guard wahi assert karta hai jo har row par sach hai, aur "teenon column saath" wali baat suite mein gayi. ✅ **G35 band mechanism se:** `scripts/verify/run.mjs` — har run ka poora output file mein (G35), aur assertion count committed manifest se compare, **ghatna = failure** (6C-0 ka `team-contract`). Us 56/57 ka kaaran ab bhi pata nahi aur likha hua hai; band risk hua hai. 🔴 **Runner ne pehle hi pass par `team-contract` 48/48 pakdi** — uska fixture doosri suite ke leftover par conditional tha; ab apna campus naam, har baar banta hai (49 → 50). `teacher-verification.mjs` **33/33** · `notifications` 12 → 14 type (teen assertion wajah ke saath badli) · **25/25 suite clean, 334 s, bina kisi API restart** | ✅ Done |
 
 ---
 
@@ -8597,6 +8770,49 @@ thin; ab severity se naam hain.
 ⚠️ **Mere chaar test galat the**, aur pehla sabse mehnga: `applicationStatusId`
 bheja jabki DTO `toStatusId` maangta hai — **har call 200 deta aur kuch
 badalta nahi**, aur us ek chup no-op ke neeche atharah assertion fail hui.
+
+---
+
+## ✅ 6C-2-0 COMPLETE — 2026-10-11 (G37 BAND + SHARED RUNNER)
+
+Details **2.77**. 6C-2 ki ek bhi screen se pehle, aur wajah seedhi thi: screens
+badge teen jagah dikhati hain aur aaj tak koi asli teacher use kama hi nahi
+sakta tha.
+
+```
+teacher-verification.mjs 33/33 · notifications 74/74 · 25/25 suite clean (334 s)
+```
+
+🔴 **Badge ab asli hai, aur test wahi raasta chalta hai jo ek aadmi:** teacher
+submit karta hai, request **admin ke queue** mein aati hai, admin action
+endpoint se approve karta hai — aur phir badge `/teacher-search` ke **asli
+result** mein dikhta hai. `orchestrationCompleted` ab **true** hai; yahi wo
+cheez thi jo chaar phase se false aa rahi thi.
+
+🔴 **Jo stub chaar phase chala**, aur kisi ko dikha nahi kyunki wo branch pehle
+se failure report karne ke liye likhi hui thi. Bacha isliye ki badge ke raaste
+par koi test kabhi chala hi nahi — chaar badge wale teacher seed row hain.
+
+🔴 **Decline badge chheenta nahi** (`@Approved` faisla hai, value nahi), aur
+**decline ka notification approval gate ke peeche nahi hai** — kyunki batana
+provisioning nahi hai, aur gate (Phase 2E wala) hilaya nahi gaya.
+
+🔒 **Admin ka note kisi notification mein nahi** — body type ki apni Description
+se banti hai, to parameter hi nahi hai. Note trail par hai; suite dono assert
+karti hai.
+
+⚠️ **Mera pehla build guard galat tha aur pehle hi run mein pakda gaya** — usne
+seeded row ke baare mein anumaan lagaya tha. Teen raaste the; do (backfill, date
+scope) us jhooth ke hi aage the jo theek kiya ja raha tha.
+
+✅ **G35 band, mechanism se.** `run.mjs` har run ka poora output rakhta hai aur
+assertion count manifest se compare karta hai — **ghatna failure hai**. Us ek
+56/57 ka kaaran ab bhi pata nahi; likha hua hai aur waisa hi rehna chahiye.
+
+🔴 **Aur runner ne pehle hi pass par kaam kar dikhaya:** `team-contract`
+**48/48** — saari green, ek assertion chali hi nahi. Uska fixture doosri suite
+ke leftover par conditional tha. **Chupchaap chhoti hui suite fail hone wali se
+zyada khatarnak hai**, aur ab wo khud pakdi jaati hai.
 
 ---
 
