@@ -1,7 +1,7 @@
 # TEACHER RECRUITMENT PORTAL — PROJECT MEMORY
 
 > **Ye file har kaam ke baad update hogi.** Har naye chat/session mein sabse pehle ye file padho.
-> Last updated: **2026-10-11** | Phase **3 COMPLETE** + **2.5 engine** + **4 jobs COMPLETE** + **2.67 swagger fix** + **PRE-5 (G26 band, 2.68/2.69)** + **PRE-5b (baseline green)** + **5A applications BACKEND (2.70, G28)** + **5B applications SCREENS COMPLETE — PHASE 5 POORA (2.71, G30)** + **6A-0 approval engine above level 1 (2.72, G14 BAND, G31)** + **6A Offer Lite BACKEND COMPLETE (2.73, G32)** + **6B TEACHER SEARCH + INVITES BACKEND COMPLETE — 🔒 CONSENT PATH 2 (2.74, G33, G34)** + **6C-0 verification ka bakaya: G33 aur G34 BAND (2.75, G35, G36)** + **6C-1 NOTIFICATIONS BACKEND + G27 BAND (2.76, G37)** + **6C-2-0 G37 BAND — badge asli hua, aur shared suite runner (2.77, G35 BAND)** | Next: **6C-2 — saare screens (search+invite, invitations, offer ke dono taraf, notification centre)**
+> Last updated: **2026-10-11** | Phase **3 COMPLETE** + **2.5 engine** + **4 jobs COMPLETE** + **2.67 swagger fix** + **PRE-5 (G26 band, 2.68/2.69)** + **PRE-5b (baseline green)** + **5A applications BACKEND (2.70, G28)** + **5B applications SCREENS COMPLETE — PHASE 5 POORA (2.71, G30)** + **6A-0 approval engine above level 1 (2.72, G14 BAND, G31)** + **6A Offer Lite BACKEND COMPLETE (2.73, G32)** + **6B TEACHER SEARCH + INVITES BACKEND COMPLETE — 🔒 CONSENT PATH 2 (2.74, G33, G34)** + **6C-0 verification ka bakaya: G33 aur G34 BAND (2.75, G35, G36)** + **6C-1 NOTIFICATIONS BACKEND + G27 BAND (2.76, G37)** + **6C-2-0 G37 BAND — badge asli hua, aur shared suite runner (2.77, G35 BAND)** | Next: **6C-2 jaari — notification centre HO GAYA; bacha: search+invite, invitations inbox, offer ke dono taraf**
 >
 > 🔴 **Ye do line har phase ke close-out mein update hongi.** File 3I tak
 > pahunch chuki thi aur ye header **Phase 0** par khada tha — saat phase purana,
@@ -8816,9 +8816,58 @@ zyada khatarnak hai**, aur ab wo khud pakdi jaati hai.
 
 ---
 
-## ▶️ NEXT: 6C-2 — SAARE SCREENS
+## ▶️ 6C-2 — SAARE SCREENS (CHAL RAHA HAI)
 
 6C ka doosra aadha. Backend ready hai; ab screens.
+
+### ✅ Notification centre — HO GAYA (2026-10-11)
+
+```
+notification-screens.mjs  21/21   dono portal · badge · panel · 2.62 · 375 · viewer
+26/26 suite clean (330 s) · paanchon frontend warnings=0
+```
+
+`jp-shared` mein: `NotificationService` (core) + `ui-notification-bell` (ui),
+aur bell **`ui-app-shell` ke header mein** — to wo dono portal ki **har screen**
+par hai. 🔴 G27 ka seedha natija: dono app ko ye day one chahiye tha, to do copy
+likhna wahi kahani dobara shuru karta — aur do copy unread state ke baare mein
+alag-alag baat kehne lagtin.
+
+- 🔒 **Scope galat karne ko kuch hai hi nahi** — service ka koi method user
+  nahi leta, kyunki koi route leta hi nahi (030). Suite nateeja dikhati hai,
+  iraada nahi: owner ke panel mein "New application", teacher ke mein
+  "Shortlisted", do browser context mein ek saath.
+- ⚠️ Bell **poll** karta hai, **60 s** par. Websocket is product mein nahi hai
+  aur ek number ke liye wo bada infrastructure hota. 60 isliye ki ye event
+  (application, offer, invite) din mein kuch baar hote hain — 5 s poll ka matlab
+  720 request/ghanta per tab, ek aise number ke liye jo do baar badalta hai.
+  Poll **signed-in par gated** hai: signed out poll ka matlab har minute 401,
+  jise auth interceptor session refresh karne layak samajhta.
+- 🔴 **Zero kuch nahi dikhata**, "0" nahi — zero wala badge aadmi ko khaali list
+  dekhne bhejta hai. Aur count button ke apne `aria-label` mein hai, rang par
+  nahi tika.
+- 🔴 **2.62 ke dono aadhe ek hi control par:** "Mark all read" kuch unread na ho
+  to **disabled** hai aur **dikhta** hai — wahi control hai jo agle hi lamhe kaam
+  karega, hata dena "tumhe ijazat nahi" padha jaata. Suite present AUR disabled
+  dono assert karti hai.
+- ⚠️ **Failed load bolta hai.** Khaali list ka matlab "tumhare paas kuch nahi" —
+  wo "hum pooch nahi paaye" se alag baat hai, aur pehli dikhana jab doosri sach
+  ho, wahi tareeka hai jisse koi offer miss karta hai. Badge ka poll ulta
+  **chup** rehta hai: us par user kuch kar nahi sakta, aur har 60 s ka toast
+  logon ko wo toast dismiss karna sikha deta hai jo asli hota hai.
+- 🔒 Sign-out par count **gira** diya jaata hai — shared machine par agla aadmi
+  warna kisi aur ki ginti wala badge inherit karta.
+
+### ⏳ 6C-2 mein jo bacha hai
+
+1. **Search + invite screens (jp-school)** — 2.62 ke dono case ek screen par
+   (quota khatam = abhi nahi; permission nahi = allowed nahi). 🔒 Result mein
+   contact ka koi column nahi.
+2. **Invitations inbox (jp-teacher)** — accept/ignore, aur accept ke baad
+   "unlocked" jaisa kuch dikhana nahi.
+3. **Offer screens dono taraf** — school ka send/withdraw/hire, teacher ka
+   accept/decline. 2.73 ki do machine screen par bhi do rehni chahiye.
+4. Screenshots + README pass.
 
 - **Search + invite (jp-school)** — 2.62 ke dono case ek hi screen par: quota
   khatam ("abhi nahi" — disabled + kab) aur permission nahi ("allowed nahi" —
