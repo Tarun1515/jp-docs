@@ -1,7 +1,7 @@
 # TEACHER RECRUITMENT PORTAL — PROJECT MEMORY
 
 > **Ye file har kaam ke baad update hogi.** Har naye chat/session mein sabse pehle ye file padho.
-> Last updated: **2026-10-11** | Phase **3 COMPLETE** + **2.5 engine** + **4 jobs COMPLETE** + **2.67 swagger fix** + **PRE-5 (G26 band, 2.68/2.69)** + **PRE-5b (baseline green)** + **5A applications BACKEND (2.70, G28)** + **5B applications SCREENS COMPLETE — PHASE 5 POORA (2.71, G30)** + **6A-0 approval engine above level 1 (2.72, G14 BAND, G31)** + **6A Offer Lite BACKEND COMPLETE (2.73, G32)** + **6B TEACHER SEARCH + INVITES BACKEND COMPLETE — 🔒 CONSENT PATH 2 (2.74, G33, G34)** + **6C-0 verification ka bakaya: G33 aur G34 BAND (2.75, G35, G36)** + **6C-1 NOTIFICATIONS BACKEND + G27 BAND (2.76, G37)** + **6C-2-0 G37 BAND — badge asli hua, aur shared suite runner (2.77, G35 BAND)** + **6C-2 SCREENS COMPLETE — 🔒 consent path 2 screen se, devtools-forced negatives dono taraf (2.78)** + **6.5A BILLING BACKEND COMPLETE — manual first, seam service par, expiry derived (2.79, G38)** | Next: **6.5B billing screens** — ⚠️ Point 7 (interview/offer scope) par client ka likha jawab abhi bhi pending hai
+> Last updated: **2026-10-11** | Phase **3 COMPLETE** + **2.5 engine** + **4 jobs COMPLETE** + **2.67 swagger fix** + **PRE-5 (G26 band, 2.68/2.69)** + **PRE-5b (baseline green)** + **5A applications BACKEND (2.70, G28)** + **5B applications SCREENS COMPLETE — PHASE 5 POORA (2.71, G30)** + **6A-0 approval engine above level 1 (2.72, G14 BAND, G31)** + **6A Offer Lite BACKEND COMPLETE (2.73, G32)** + **6B TEACHER SEARCH + INVITES BACKEND COMPLETE — 🔒 CONSENT PATH 2 (2.74, G33, G34)** + **6C-0 verification ka bakaya: G33 aur G34 BAND (2.75, G35, G36)** + **6C-1 NOTIFICATIONS BACKEND + G27 BAND (2.76, G37)** + **6C-2-0 G37 BAND — badge asli hua, aur shared suite runner (2.77, G35 BAND)** + **6C-2 SCREENS COMPLETE — 🔒 consent path 2 screen se, devtools-forced negatives dono taraf (2.78)** + **6.5A BILLING BACKEND COMPLETE — manual first, seam service par, expiry derived (2.79, G38)** + **6.5B BILLING SCREENS COMPLETE — PHASE 6.5 POORA (2.80)** | Next: **Phase 7 / client ke jawab** — ⚠️ Point 7 (interview/offer scope) aur §4 Q4 (billing MVP ka likhit confirmation) dono pending hain
 >
 > 🔴 **Ye do line har phase ke close-out mein update hongi.** File 3I tak
 > pahunch chuki thi aur ye header **Phase 0** par khada tha — saat phase purana,
@@ -7878,6 +7878,143 @@ SCHOOL_OWNER ko grant karte hi build exit 1, role ke naam ke saath.
 
 ---
 
+### 2.80 BILLING SCREENS — PHASE 6.5B
+
+6.5A ka backend ship ho gaya tha aur **andar jaane ka koi raasta nahi tha** —
+route maujood, link koi nahi. Ye wo screens hain.
+
+```
+billing-screens.mjs   60/60   panel, flow, viewer, teen forced negative,
+                              admin queue + mismatch, lapsed, 375
+regression: 31/31 suite clean, 1214 assertion, 569 s
+SQL: 296 assertion, 0 fail · backend 0/0 (--no-incremental)
+paanchon frontend 0 warning · run_all ×2 content-identical
+menus 34 → 37 (36 active) · 34 active RoutePath, 0 dangling (naapa gaya)
+```
+
+#### 🔴 EK COMPONENT, DONO PORTAL — AUR ADMIN KA ALAG
+
+`UiBillingPageComponent` `jp-shared` mein hai aur **school aur teacher dono
+usi par route karte hain**, wrap nahi karte. Wajah wahi hai jo 6C-2 mein
+`/notifications` ki thi: dono ek hi chaar sawaal poochhte hain, aur unke peeche
+har route owner ko **token se** nikalta hai (2.39, 2.51) — to wrap karne ke
+liye kuch portal-specific hi nahi hai, aur G27 ka sabaq hai ki doosri copy
+wahin se do same screens alag hone lagti hain.
+
+⚠️ **Admin ka screen ALAG hai, shared nahi.** "Main kis plan par hoon" aur
+"sabke payment jo confirm hone baaki hain" do kaam hain jo ek hi table ko chhute
+hain; unke beech component baantna **naam** baantna hota, screen nahi.
+
+#### 🔴 EK ASLI HOLE, JO 6.5A SE KHULA THA
+
+6.5A ne `POST /api/billing/plan-change` bina kisi permission check ke ship kiya
+tha. Owner token se aata hai, to **kisi doosre** ke account ke liye plan koi
+nahi maang sakta tha — par ek school ka **koi bhi** member apne account ke liye
+maang sakta tha, including `SCHOOL_VIEWER`, jo design se read-only hai aur
+jiski screens se wo har action **ghayab** rehta hai jo wo nahi kar sakta.
+
+⚠️ **Ye poochh kar mila ki naya menu row kisko dikhta hai, kisi test ke fail hone
+se nahi.** Row jaan-boojh kar ungated hai (apna plan dekhna privilege nahi hai),
+to wo viewer ko dikha — aur usi se ye sawaal aaya ki viewer phir **kar** kya
+sakta hai.
+
+🔴 **`BILLING.MANAGE`** (jp_sso 007): SCHOOL_OWNER aur TEACHER ke paas, aur
+007 ka guard **closed set** assert karta hai (SCHOOL_VIEWER ko grant karte hi
+build exit 1 — chala kar dekha). Reuse pehle dhoonda gaya: `PROFILE.EDIT`,
+`USER.MANAGE`, `BRANCH.MANAGE` teeno **sirf** SCHOOL_OWNER ke paas hain, to
+aaj koi bhi theek chalta — par unmein se ek bhi "is account ko paise ka
+zimmedaar bana sakta hai" ka **matlab** nahi rakhta, aur pehla school jo billing
+ke liye finance wala banda chahega usey migration karna padta, dabaav mein.
+
+⚠️ **Teacher ko bhi mila**, kyunki teacher **khud account hai** — ek hi teacher
+role hai, koi team nahi, to na dena matlab koi teacher kabhi plan badal hi nahi
+sakta.
+
+#### 🔒 KYA GATED HAI AUR KYA JAAN-BOOJH KAR NAHI
+
+| | |
+|---|---|
+| **Gated** | Plan change **request** karna. Paise ka commitment hai. |
+| **Gated NAHI** | Panel **dekhna**. Ek HR jo job post karne wala hai use is mahine ki allowance pata honi chahiye — chhupane ka matlab hota ki wo limit ko **refuse hone se** pata kare. Is liye menu row par koi PermissionCode nahi, aur 007 ka doosra guard **ulti disha** se assert karta hai: agar kisi ne row par permission laga di, build girta hai. |
+
+🔴 **Screen par wo control wajah ke saath GHAYAB hai, disabled nahi** (2.62).
+Disabled button "abhi nahi" kehta hai, jo **jhooth** hai — us aadmi ke liye wo
+kabhi kaam nahi karega. Kaam ki baat ye batana hai ki **kisse kahein**, aur wo
+ek baar likha hai, har card par nahi.
+
+#### 🔴 KOI PAY-NOW BUTTON NAHI, AUR USKA NA HONA DESIGN HAI
+
+Flow "**hum ne aapki request record kar li — NEFT/cheque/cash se bhejiye aur
+administrator confirm karega**" par khatam hoti hai, kyunki asal mein yehi hota
+hai. Ek "Pay online" control — enabled **ya** disabled — wo waada hota jo kisi
+ne kiya nahi: 2.62 ka "abhi nahi" **kab** batana maangta hai, aur koi date nahi
+hai. Suite uski **ghairhaazri** assert karti hai, bharosa nahi karti.
+
+⚠️ Mode ki list mein **ONLINE (1) nahi hai**, aur screen **kehti hai kyun** —
+chhoti list chhod dena imply karta ki plan exist karte hain par abhi available
+nahi.
+
+#### 🔴 MISMATCH SHABDON MEIN, SIGN WALE NUMBER MEIN NAHI
+
+Admin form `PriceQuoted` se pre-filled hota hai (common case ek click hai), aur
+jaise admin number badalta hai **"₹100.00 short"** ya **"₹100.00 overpaid"**
+likha jaata hai. Ek khaali `-100` theek ulta padha jaata hai, aur bill dispute
+wo jagah hai jahan ye farq sabse mehenga hai. Direction server ke `ShortBy` se
+**wahi** hai (6.5-B) — do screen ek hi farq ko ulta na batayein.
+
+🔴 Mismatch par **remark zaroori ho jaata hai aur Confirm disabled ho jaata
+hai**, par server bhi wahi rule enforce karta hai (400) — **client pehle
+poochhta hai, server ki jagah nahi leta.** Dono asserted: 7400 par short, 7600
+par overpaid, remark ke bina disabled, remark ke saath enabled.
+
+#### 🔒 LAPSED PLAN SCREEN PAR
+
+`EndsOn` = 00:00 IST aaj, aur abhi usi IST din mein baad mein. Screen kehti hai
+**"Your paid plan ended on 11 Oct 2026"**, phir ki account **free plan par chal
+raha hai aur neeche ki allowance free wali hai**, aur ki **kuch delete nahi
+hua**. Aur allowance sach mein free wali hai — `of 3`, paid wali `of 25`
+nahi. DB row `status 1, isActive 1` — **kuch sweep nahi hua** (6.5-C).
+
+⚠️ Cancelled/suspended ka **alag** banner hai aur usmein wo tasalli NAHI hai —
+kyunki wo sach nahi hoti: wo kisi ka faisla hai, waqt beetna nahi.
+
+#### ⚠️ EK DEBUGGING DETOUR JO LIKHNE LAYAK HAI
+
+Owner ka request button **ghayab** tha. `USP_GetUserClaims` `BILLING.MANAGE`
+theek return kar raha tha, grant row maujood tha, 007 ka closed-set guard pass
+ho raha tha — **stale cheez sirf ek cached JWT thi.** `lib/login.mjs` token
+bees minute cache karti hai (G34), permission token ke claims mein hoti hai, aur
+`/auth/me` token ke claims serve karta hai.
+
+Ye product bug **nahi** hai — permission change agle token par asar karti hai, ye
+ordinary JWT behaviour hai. Par **suite jiska nateeja is baat par depend kare ki
+cache kab bhara tha, wo suite galat wajah se pass ya fail hoti hai** — to ab wo
+in chaar account ke cached token **shuru mein hi phenk deti hai**.
+
+#### ⚠️ 375 KA CHECK KHAALI SCREEN NAAP RAHA THA
+
+Admin ka 375 check section 7 ke **baad** chal raha tha — jahan payment confirm
+ho chuka tha, queue **khaali** thi, aur **table hi nahi tha**. Table hi wo cheez
+hai jo 375 par page ko sideways le jaati hai, to check kuch saabit nahi kar raha
+tha. Wahi galti `invitation-screens` ne answered row naap kar ki thi.
+
+Ab 375 se pehle ek doosri request raise hoti hai (queue mein row aati hai), aur
+assertion **node count par nahi** — us cheez par hai jo overflow karti: school ka
+`.bill__current`, admin ka `.table tbody tr`. Node count khaali state se bhi
+satisfy ho jaata tha, aur yehi hua tha.
+
+#### ⚠️ COUNT GUARD JO ISI COMMIT MEIN HILE
+
+| Guard | Pehle | Ab | Kyun |
+|---|---|---|---|
+| `001_test_sso_procedures` catalogue | 24 | **25** | `BILLING.MANAGE` |
+| …SUPER_ADMIN ke granted | 24 | **24 of 25** | 🔴 **pehli permission jo SUPER_ADMIN ke paas NAHI hai** — admin payment *confirm* karta hai, kisi ke liye plan *request* nahi karta. Ye divergence jaan-boojh kar hai aur assertion ke naam mein likhi hai |
+| teacher ke permission | 2 | **3** | teacher khud account hai |
+| menus | 34 | **37** | teen row, 2.37 |
+| swagger | 113 | **113** | ⚠️ **nahi badla** — 6.5B ek bhi endpoint nahi jodta, sirf screens |
+
+---
+
 ## 3. SCOPE (Client spec ke against)
 
 ### IN SCOPE — MVP
@@ -8098,6 +8235,7 @@ naya Code, agla free Id, kuch renumber mat karo.
 | 2026-10-11 | 6C-2-0 | **G37 band — badge asli hua — 6C-2 ki ek bhi screen se pehle.** Screens badge teen jagah dikhati hain; aaj tak koi asli teacher use kama hi nahi sakta tha, to har dikhta badge seed-data ka jhooth hota. `031` (`VerifiedByUserId` — school ke paas 2F se hai, teacher ke paas do hi the kyunki badge kabhi set hi nahi hota tha), `022 USP_SetTeacherVerified` (badge + stamp + notification, **ek transaction**, idempotent), stub ki jagah asli call, type 13/14 seed **apne consumer ke saath** (029 ka guard har type ke liye procedure ka naam maangta hai), aur decline ka notification `ApprovalService` ki rejection branch se. 🔴 **Jo stub chaar phase chala:** "setting IsVerified requires t_app_teachers, which is Phase 3" — Phase 3 chaar phase pehle ship hua tha; admin approve kar sakta tha, trail likha jaata tha, badge kabhi nahi lagta, aur **koi error nahi** kyunki wo branch pehle se failure report karti thi. Bacha isliye ki **badge ke raaste par koi test kabhi chala hi nahi** — chaar badge wale teacher seed row hain, to badge ki har assertion aise data par pass hoti thi jo kisi ne kamaya nahi. 🔴 **Test wahi raasta chalta hai jo aadmi:** teacher submit (HTTP) → admin ka **queue** → action endpoint se approve → `orchestrationCompleted` **true** (yahi false aata tha) → badge + stamp + verifier **admin (40), teacher (147) nahi** → **`/teacher-search` ke asli result mein `isVerified true`** → `verifiedOnly` 4 se 5 → notification teacher tak, admin ka note us mein nahi par **trail par hai**. 🔴 **Decline badge chheenta nahi** — `@Approved` faisla hai, store karne wali value nahi (ek character chhota raasta pehle se verified teacher ka badge chup-chaap le leta). 🔴 **Decline ka notification gate ke peeche nahi** — orchestration approval par gated hai (Phase 2E ka bug) aur wo gate hilaya nahi gaya; batana provisioning nahi hai, aur peeche daalne ka matlab hota ki reject hua teacher hamesha intezaar kare. ⚠️ **Mera pehla build guard galat tha, pehle hi run mein pakda gaya** — usne maana ki seeded verified teacher ke paas `VerifiedOn` nahi hai; chaaron ke paas hai. Backfill karna ek na-hui approval gadhna hota, date se scope karna date check hota — to guard wahi assert karta hai jo har row par sach hai, aur "teenon column saath" wali baat suite mein gayi. ✅ **G35 band mechanism se:** `scripts/verify/run.mjs` — har run ka poora output file mein (G35), aur assertion count committed manifest se compare, **ghatna = failure** (6C-0 ka `team-contract`). Us 56/57 ka kaaran ab bhi pata nahi aur likha hua hai; band risk hua hai. 🔴 **Runner ne pehle hi pass par `team-contract` 48/48 pakdi** — uska fixture doosri suite ke leftover par conditional tha; ab apna campus naam, har baar banta hai (49 → 50). `teacher-verification.mjs` **33/33** · `notifications` 12 → 14 type (teen assertion wajah ke saath badli) · **25/25 suite clean, 334 s, bina kisi API restart** | ✅ Done |
 | 2026-10-11 | 6C-2 | **Search, invite, invitations inbox, offer ke dono taraf, notification centre — 6C-2 POORA.** `search-invite-screens` 31/31 · `invitation-screens` **31/31 (nayi)** · `offer-screens` 34/34 · `notification-screens` 21 → 33. 🔒 **Consent path 2 ab screen se saabit hai** — dialog email/phone/resume teeno naam leta hai, "no other school" kehta hai, aur accept par `fn_TeacherContactUnlocked` 0 → 1; **dekhna aur decline dono 0 par chhodte hain**. Accept hone par koi inaam nahi (na "unlocked", na 🎉 — warna consent transaction ban jaata). 🔴 **Devtools-forced negative dono jagah:** kisi doosre ka offer/invitation `fetch` se answer → **404, 403 nahi** (2.6), refusal mein kisi ka naam nahi, row chhui nahi gayi, aur **kisi ka contact nahi khula**. 🔴 **Jo sirf asli raasta chala kar mila (koi suite green hone se nahi):** Selected application par "Offer sent" button jo 400 `OFFER_ACTION_REQUIRED` deta tha (6A se live) · `<input type="time">` "09:00" deta hai par `TimeSpan` binder "09:00:00" maangta hai, to reporting time wala **har** offer refuse ho raha tha · viewer ko 403 par screen "No teacher matches those filters" keh rahi thi · `FullName` teeno layer mein khaali tha. ⚠️ **Teen test galat wajah se pass ho rahe the:** 375 ka check accept ke baad **answered** row (bina button) naap raha tha — ab accept se pehle, aur live row + uske button assert hote hain · "newest first" ek row par trivially sach tha — doosri application add ki, ab **title se** order assert hota hai kyunki din ek hi hai · **positional locator (`.first()`) mere hi chhode hue probe row par ACCEPT dabaa sakta tha** — suite ab sirf apni banayi row ko address karti hai. 🔴 **`run.mjs` manifest mein na hone wali suite skip kar deta tha** — is phase likhi suite bilkul na chalti aur `--update` uska count seekh hi nahi sakta tha; ab chalti hai, `NEW` dikhti hai, pin hone tak NOT CLEAN. 🔴 **`TEACHER_OFFERS` seed row (2.37), `PermissionCode` NULL, route usi commit mein** — teacher sidebar 8 → 9, aur `HOW_TO_RUN`/`local-accounts`/ye file **isi commit** mein; ⚠️ stale 32 par +1 kiya tha, asli 34 hai — **stale number par arithmetic rot confirm karta hai**. ⚠️ **/notifications ek hi shared component, dono portal usi par route** (G27), aur **fail hua read khaali inbox nahi** — request abort kar ke naapa gaya. **29/29 suite clean, 1105 assertion, 454 s · SQL 296 · backend 0/0 · paanchon frontend 0 warning · run_all ×2 byte-identical** | ✅ Done |
 | 2026-10-11 | 6.5A | **Billing — manual first. Design addendum PEHLE, phir backend.** `billing.mjs` **47/47**. 🔴 **Addendum ne code se pehle teen galtiyan pakdin:** (1) "ek procedure" **bana hi nahi sakta tha** — payment `jp_mdm`, subscription `jp_app`, cross query mana (2.2), distributed transaction nahi (2.48); seam **service** par hai aur handoff ka sach `activationCompleted` se bataya jaata hai. (2) **paid plan seed karna likhit mein mana hai** (`008_seed_plans.sql`: "jo number hum ship karte hain wo wapas quote kiya jaata hai") — premise check ki, aaj bhi sach hai (FAQ, Terms, site par ek bhi price nahi); to seed nahi badla, paid plan **suite ka fixture** hai aur **011 ka guard** priced public plan par build gira deta hai (chala kar dekha). (3) **`@ExpectedPlanId` ka comparison ULTA likha tha** — "effective plan se compare karo" build hua aur **verification ne pakda**: lapsed subscription par har consume `409 PLAN_CHANGED`, **hamesha** (2.64 ka retry ek par bounded). Guard ka kaam row badalne ka pata lagana hai; caller plan chunta hi nahi, `USP_ResolveEntitlement` **dono mapping ek query** mein deta hai. 🔴 **Quota plan ke saath chalta hai** — pehla build sirf fallback ka **id** bhejta tha, to 100-post plan ka lapsed account free par girta aur 100 post rakhta; kuch fail nahi hota. Naapa: paid 100, fallback 2 → remaining **1**, 99 nahi. 🔒 **Expiry DERIVED** — `fn_SubscriptionInForce` ek definition, build-time truth table (predicate toda → exit 1), **zero** SQL Agent job; lapsed account ab **marta nahi**, free baseline par chalta hai (pehle `SUBSCRIPTION_INACTIVE` — jo kabhi paid tha wo us se bura tha jo kabhi nahi tha). IST boundary par naapa: DB `status 1, inForce 0`, response `onFreeBaseline true`, consume `QUOTA_EXHAUSTED`. 🔴 **Recorded ≠ expected** — 4900 vs 5000 **record** hota hai, refuse nahi; mismatch par remark zaroori, **par wo rule API layer mein** kyunki gateway caller kisi se remark maang hi nahi sakta. 🔴 **Idempotent dono taraf**, do sach mein samanantar session (WAITFOR TIME): 1 receipt, 1 subscription, 1 ACTIVE per owner; ⚠️ pehle draft mein chaaron ke liye EK instant tha aur batch do — doosra batch **kal** ka intezaar karne laga, suite bina output das minute latki (`sys.dm_exec_requests` ne bataya). 🔴 **Ek bypass lagbhag ship ho gaya:** plan change ka request row hai, to admin use **generic approvals endpoint** se approve kar sakta tha — request APPROVED, payment PENDING, kuch activate nahi, aur "ek owner ek khula request" `PENDING` par key karta hai to school **doosra** request bana leta. Poochh kar mila, test se nahi. 🔒 **2.56 ka guard text se nahi, `sys.sql_expression_dependencies` se** — purana guard function ka naam dhoondta tha aur isi liye project ke apne grep mein **fail** hota tha (jo guard naam leta hai wo bhi naam lene wala code hai); grep scope 18 file, aur **scope khud assert hota hai**. ⚠️ **Count guard isi commit mein hile:** request types 4 → 5, permissions 23 → 24 (dono jagah), swagger 105 → **113**. 🔴 **Naya permission** (`PAYMENT.VERIFY`) jabki 2.5 ne reuse kiya tha — paisa confirm karna system setting nahi, operational act hai, aur dono alag logon ko milenge; 006 holders ka **closed set** assert karta hai (SCHOOL_OWNER ko grant → build exit 1). **30/30 suite clean, 1154 assertion · SQL 296 · backend 0/0 · run_all ×2 content-identical** | ✅ Done |
+| 2026-10-11 | 6.5B | **Billing screens — 6.5 POORA.** `billing-screens.mjs` **60/60**. 🔴 **Ek component, dono portal** (`UiBillingPageComponent` `jp-shared` mein, school aur teacher dono usi par route karte hain — wahi shape jo `/notifications` ka tha, G27); **admin ka screen alag**, kyunki "mera plan" aur "sabke pending payment" do kaam hain. 🔴 **Ek asli hole band hua jo 6.5A se khula tha:** `plan-change` par koi permission check nahi tha, to school ka **koi bhi** member — including read-only `SCHOOL_VIEWER` — apne account ko payment ke liye commit kar sakta tha. **Poochh kar mila ki naya menu row kisko dikhta hai**, kisi test ke fail hone se nahi. `BILLING.MANAGE` (SCHOOL_OWNER + TEACHER; 007 ka guard **closed set** assert karta hai, SCHOOL_VIEWER ko grant karte hi build exit 1). Reuse pehle dhoonda — `PROFILE.EDIT`/`USER.MANAGE`/`BRANCH.MANAGE` teeno aaj theek chalte, par koi bhi "paise ka zimmedaar" ka matlab nahi rakhta. 🔒 **Panel dekhna gated NAHI** — HR ko allowance pata honi chahiye, warna wo limit ko refuse hone se jaanta hai; 007 ka doosra guard **ulti disha** se assert karta hai ki row par permission na lage. 🔴 **Control wajah ke saath GHAYAB hai, disabled nahi** (2.62) — disabled "abhi nahi" kehta jo jhooth hai. 🔴 **Koi pay-now button nahi**, aur suite uski ghairhaazri assert karti hai; mode list mein ONLINE nahi aur screen **kehti hai kyun**. 🔴 **Mismatch shabdon mein** — "₹100.00 short" / "₹100.00 overpaid", server ke `ShortBy` ki wahi direction; remark zaroori hote hi Confirm disabled, par **server bhi wahi rule enforce karta hai** — client pehle poochhta hai, jagah nahi leta. 🔒 **Lapsed plan screen par naam se aata hai:** "paid plan ended on …", free plan par chal raha hai, allowance `of 3` (paid `of 25` nahi), kuch delete nahi hua, aur DB row `status 1, isActive 1` — kuch sweep nahi hua. **Teen forced negative:** viewer `plan-change` → **403**, school apna hi `verify` → **403** (payment PENDING, koi receipt nahi), teacher school plan id → **404 aur 403 nahi** (2.6). ⚠️ **Do apni galtiyan:** owner ka button ghayab tha aur stale cheez sirf ek **cached JWT** thi (claims mein permission hoti hai; suite ab cached token shuru mein phenk deti hai) · admin ka **375 check khaali queue naap raha tha** — table hi nahi tha, aur table hi 375 par overflow karta hai; ab pehle row banti hai aur assertion node count par nahi, us cheez par hai jo overflow karti. ⚠️ **Count guard isi commit mein hile:** permissions 24 → 25, SUPER_ADMIN **24 of 25** (pehli permission jo uske paas nahi), teacher 2 → 3, menus 34 → **37**, swagger **113 hi** (ek bhi endpoint nahi jura). **31/31 suite clean, 1214 assertion · SQL 296 · backend 0/0 · paanchon frontend 0 warning · run_all ×2 content-identical · 34 RoutePath, 0 dangling** | ✅ Done |
 
 ---
 
@@ -8205,7 +8343,7 @@ jp_app/00_create_database.sql      same
                                     PermissionId NULL = koi permission nahi chahiye.
                                     3 indexes, har ek apne guard ke saath
 01_tables/022_t_sso_role_menus.sql  Per-role override. Ab banaya, MVP mein NOT read
-03_seed/005_seed_menus.sql          34 menus (33 active, 2 group nodes) — 6C-2 tak.
+03_seed/005_seed_menus.sql          37 menus (36 active, 2 group nodes) — 6.5B tak.
                                     File khud apna count PRINT karti hai (hardcode
                                     nahi) — is liye yahan ka number hi purana ho
                                     sakta hai, file ka output kabhi nahi
@@ -8216,7 +8354,7 @@ jp_app/00_create_database.sql      same
 99_tests/003_test_menus.sql         31 assertions, all pass (6C-2 mein naapa)
 ```
 
-**Menu counts (`localhost\TARUN`, 2026-10-11, 6C-2 ke baad):** 34 rows · 33 active · 2 group nodes · **31 active RoutePaths, teeno portal mein declared (0 dangling)**. Bina menu row ke sirf `/auth/login` aur `/forbidden` — dono sahi, wo authenticated nav ka hissa nahi.
+**Menu counts (`localhost\TARUN`, 2026-10-11, 6.5B ke baad):** 37 rows · 36 active · 2 group nodes · **34 active RoutePaths, teeno portal mein declared (0 dangling)**. Bina menu row ke sirf `/auth/login` aur `/forbidden` — dono sahi, wo authenticated nav ka hissa nahi.
 
 > 🔴 **Pichhla number 2026-08-08 ka tha: 32 rows · 31 active · 29 routes.** 6C-2
 > ne EK row add kiya — `TEACHER_OFFERS` (2.37: menu data hai, is liye naya
@@ -8243,11 +8381,21 @@ jp_app/00_create_database.sql      same
 > aur sidebar 9 ek hi healthy state hai — kisi ek ko "theek" karne ki koshish
 > na kare.
 >
-> **Sidebar, 6C-2 ke end par browser mein naapa gaya:** superadmin 11 links + 2
-> group heading · principal 9 · hr.lead 5 · viewer 4 · teacher 9
-> (TEACHER_OFFERS se pehle 8). `HOW_TO_RUN.md` aur `local-accounts.md` isi
-> commit mein update hue — jo rule hai: count badle to uska statement usi
-> commit mein badlega, kaaran ke saath.
+> **Sidebar, 6.5B ke end par browser mein naapa gaya:** superadmin 12 links + 2
+> group heading · principal 10 · hr.lead 6 · viewer 5 · teacher 10.
+> `HOW_TO_RUN.md` aur `local-accounts.md` isi commit mein update hue — jo rule
+> hai: count badle to uska statement usi commit mein badlega, kaaran ke saath.
+>
+> 🔴 **6.5B ne teen row jodin:** `SCHOOL_BILLING`, `TEACHER_BILLING` (dono
+> **bina PermissionCode** — apna plan dekhna privilege nahi hai) aur
+> `ADMIN_PAYMENTS` (`PAYMENT.VERIFY` par gated). Is liye **viewer ko bhi**
+> billing dikhti hai: 5 links, jinmein ek screen aisi hai jise wo padh sakta hai
+> aur chhu nahi sakta — ye design hai, bhool nahi. Sirf *request* karna gated
+> hai (`BILLING.MANAGE`), aur screen par wo control **wajah ke saath ghayab**
+> hai, disabled nahi (2.62).
+>
+> ⚠️ 6C-2 ke baad ke number: superadmin 11 · principal 9 · hr.lead 5 · viewer 4
+> · teacher 9.
 
 ### Error log (decision 2.31)
 ```
@@ -9126,6 +9274,48 @@ thin; ab severity se naam hain.
 ⚠️ **Mere chaar test galat the**, aur pehla sabse mehnga: `applicationStatusId`
 bheja jabki DTO `toStatusId` maangta hai — **har call 200 deta aur kuch
 badalta nahi**, aur us ek chup no-op ke neeche atharah assertion fail hui.
+
+---
+
+## ✅ 6.5B COMPLETE — 2026-10-11 (BILLING SCREENS — PHASE 6.5 POORA)
+
+Details **2.80**. 6.5A ka backend ship ho chuka tha aur andar jaane ka koi
+raasta nahi tha; ye wo raasta hai.
+
+```
+billing-screens.mjs 60/60 · 31/31 suite clean, 1214 assertion, 569 s
+SQL 296 · backend 0/0 · 5 frontend 0 warning · run_all ×2 content-identical
+```
+
+🔴 **Ek component dono portal ke liye** (G27), aur admin ka alag — kyunki "mera
+plan" aur "sabke pending payment" ek jaise nahi hain.
+
+🔴 **Ek asli hole band hua jo 6.5A se khula tha:** plan-change par koi
+permission check nahi tha, to ek read-only viewer apne school ko payment ke liye
+commit kar sakta tha. **Ye poochh kar mila ki naya menu row kisko dikhta hai**,
+kisi test ke fail hone se nahi — saari suite green thi.
+
+🔒 **Panel sabko dikhta hai, request karna gated hai.** HR ko allowance pata
+honi chahiye warna wo limit ko refuse hone se jaanega; aur jo control wo nahi
+daba sakta wo **wajah ke saath ghayab** hai, disabled nahi (2.62).
+
+🔴 **Koi pay-now button nahi**, aur uski ghairhaazri assert hoti hai. Mode list
+mein ONLINE nahi, aur screen kehti hai kyun.
+
+🔒 **Lapsed plan screen par naam se aata hai**, allowance sach mein free wali
+hai, aur DB row chhui nahi gayi — 6.5-C browser se dikh gaya.
+
+⚠️ **Do apni galtiyan likhi hui hain:** ek cached JWT ne do ghante ka detour
+karaya (suite ab cached token phenkti hai), aur admin ka 375 check **khaali
+queue** naap raha tha — table hi nahi tha, jabki table hi 375 par overflow
+karta hai.
+
+⚠️ **Point 7 (interview/offer scope)** aur **§4 Q4 (billing MVP mein hai, uska
+likhit confirmation)** dono **ab bhi client ke paas** hain. Mechanism poora ship
+ho gaya; daam client ka data hai aur unka `INSERT` hai, deployment nahi (2.7).
+
+⚠️ **G38 khula hai** (`@FallbackPlanId` ka NULL default) — mitigation likha
+hua hai.
 
 ---
 

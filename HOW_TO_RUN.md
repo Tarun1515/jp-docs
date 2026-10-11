@@ -445,12 +445,12 @@ environment config, never hardcoded.
 
 | Email | Password | Type | Role | What it demonstrates |
 |---|---|---|---|---|
-| `superadmin@teacherportal.local` | see `local-accounts.md` | Admin | `SUPER_ADMIN` | Full admin sidebar — 13 entries: 11 links under the 2 nested group headings (Verification, Moderation). Approving a pending school |
-| `principal@greenwood.edu.in` | see `local-accounts.md` | School | `SCHOOL_OWNER` | The complete school sidebar (9 items) and every school screen: dashboard, profile, campuses, team, offers |
-| `hr.lead@greenwood.edu.in` | see `local-accounts.md` | School | `HR` | **Permission filtering.** Same organisation as the principal, but 5 menus instead of 9 — no School profile, no Campuses, no Offers, no Team. Sign in as both back to back; that difference is `USP_GetUserMenus` doing its job |
+| `superadmin@teacherportal.local` | see `local-accounts.md` | Admin | `SUPER_ADMIN` | Full admin sidebar — 14 entries: 12 links under the 2 nested group headings (Verification, Moderation), including the 6.5B payments queue. Approving a pending school |
+| `principal@greenwood.edu.in` | see `local-accounts.md` | School | `SCHOOL_OWNER` | The complete school sidebar (10 items) and every school screen: dashboard, profile, campuses, team, offers, billing |
+| `hr.lead@greenwood.edu.in` | see `local-accounts.md` | School | `HR` | **Permission filtering.** Same organisation as the principal, but 6 menus instead of 10 — no School profile, no Campuses, no Offers, no Team. Sign in as both back to back; that difference is `USP_GetUserMenus` doing its job |
 | `head@stmarys.edu.in` | see `local-accounts.md` | School | `SCHOOL_OWNER` | **Tenant isolation.** A second organisation, with its own school (St Mary's Convent, Bandra), its own head office and its own plan. Neither school can see the other's branches, users or applicants |
 | `viewer@greenwood.edu.in` | see `local-accounts.md` | School | `SCHOOL_VIEWER` | **Read-only rendering.** Same school as the principal, scoped to its campus, holding `JOB.VIEW` · `APPLICANT.VIEW` · `REPORT.VIEW` and nothing else. Opens `/jobs`, sees the rows, and sees **no** New job, Publish or Close — absent, not greyed |
-| `tarun@yopmail.com` | *(yours)* | Teacher | `TEACHER` | The teacher portal — 9 menus, no admin or school items |
+| `tarun@yopmail.com` | *(yours)* | Teacher | `TEACHER` | The teacher portal — 10 menus, no admin or school items |
 
 > ⚠️ **Two different counts, and both are right.** The numbers above are
 > **sidebar entries** — what a person actually sees. `GET /api/menus` returns
@@ -462,11 +462,25 @@ environment config, never hardcoded.
 > count of 11 and a sidebar of 9 are the same healthy state, and neither number
 > should be "corrected" to match the other.
 >
-> 🔴 **Measured at the end of 6C-2**, per account: superadmin 11 links under 2
-> group headings · principal 9 · hr.lead 5 · viewer 4 · teacher 9. The teacher
-> was 8 until 6C-2 added `TEACHER_OFFERS` to `005_seed_menus.sql` — a menu is
-> data (2.37), so a new screen means a new seeded row, and the counts written
+> 🔴 **Measured at the end of 6.5B**, per account: superadmin 12 links under 2
+> group headings · principal 10 · hr.lead 6 · viewer 5 · teacher 10. A menu is
+> data (2.37), so a new screen means a new seeded row and the counts written
 > here move in the same commit as that row.
+>
+> ⚠️ **6.5B added "Plan and billing" to EVERY account** (+1 each) and
+> "Payments" to the administrator (+1 more). The billing row carries **no
+> PermissionCode** deliberately — seeing which plan you are on is a property of
+> the account, not a privilege, and an HR about to post a job needs to know
+> this month's allowance rather than discovering the limit by being refused by
+> it. Only *requesting* a change is gated (`BILLING.MANAGE`, held by
+> SCHOOL_OWNER and TEACHER), and on screen that control is **absent with a
+> reason** rather than disabled (2.62).
+>
+> ⚠️ Which is why a **viewer** has it too: 5 links, one of which is a screen it
+> can read and cannot act on. That is the intended shape, not an oversight.
+>
+> 🔴 Before 6.5B the numbers were: superadmin 11 · principal 9 · hr.lead 5 ·
+> viewer 4 · teacher 9.
 
 > 🔴 **The Viewer is a real account, and it used to be a fixture.** Phase 4B had
 > no Viewer, so `jobs-screens.mjs` synthesised one by soft-deleting the HR
