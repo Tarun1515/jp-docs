@@ -1,7 +1,7 @@
 # TEACHER RECRUITMENT PORTAL — PROJECT MEMORY
 
 > **Ye file har kaam ke baad update hogi.** Har naye chat/session mein sabse pehle ye file padho.
-> Last updated: **2026-10-11** | Phase **3 COMPLETE** + **2.5 engine** + **4 jobs COMPLETE** + **2.67 swagger fix** + **PRE-5 (G26 band, 2.68/2.69)** + **PRE-5b (baseline green)** + **5A applications BACKEND (2.70, G28)** + **5B applications SCREENS COMPLETE — PHASE 5 POORA (2.71, G30)** + **6A-0 approval engine above level 1 (2.72, G14 BAND, G31)** + **6A Offer Lite BACKEND COMPLETE (2.73, G32)** + **6B TEACHER SEARCH + INVITES BACKEND COMPLETE — 🔒 CONSENT PATH 2 (2.74, G33, G34)** + **6C-0 verification ka bakaya: G33 aur G34 BAND (2.75, G35, G36)** + **6C-1 NOTIFICATIONS BACKEND + G27 BAND (2.76, G37)** + **6C-2-0 G37 BAND — badge asli hua, aur shared suite runner (2.77, G35 BAND)** | Next: **6C-2 jaari — notification centre + search/invite HO GAYE; bacha: invitations inbox, offer ke dono taraf, /notifications page**
+> Last updated: **2026-10-11** | Phase **3 COMPLETE** + **2.5 engine** + **4 jobs COMPLETE** + **2.67 swagger fix** + **PRE-5 (G26 band, 2.68/2.69)** + **PRE-5b (baseline green)** + **5A applications BACKEND (2.70, G28)** + **5B applications SCREENS COMPLETE — PHASE 5 POORA (2.71, G30)** + **6A-0 approval engine above level 1 (2.72, G14 BAND, G31)** + **6A Offer Lite BACKEND COMPLETE (2.73, G32)** + **6B TEACHER SEARCH + INVITES BACKEND COMPLETE — 🔒 CONSENT PATH 2 (2.74, G33, G34)** + **6C-0 verification ka bakaya: G33 aur G34 BAND (2.75, G35, G36)** + **6C-1 NOTIFICATIONS BACKEND + G27 BAND (2.76, G37)** + **6C-2-0 G37 BAND — badge asli hua, aur shared suite runner (2.77, G35 BAND)** + **6C-2 SCREENS COMPLETE — 🔒 consent path 2 screen se, devtools-forced negatives dono taraf (2.78)** | Next: **6C-3 / Phase 6 ka bacha hua — Point 7 (interview/offer scope) par client ka likha jawab abhi bhi pending hai**
 >
 > 🔴 **Ye do line har phase ke close-out mein update hongi.** File 3I tak
 > pahunch chuki thi aur ye header **Phase 0** par khada tha — saat phase purana,
@@ -7558,6 +7558,129 @@ runner hai.
 
 ---
 
+### 2.78 6C-2 SCREENS — SEARCH, INVITE, OFFER, NOTIFICATION CENTRE
+
+Phase 6 ka UI. Backend 6A/6B/6C-1 mein ship ho chuka tha; yahan wo screens bane
+jinse ek aadmi un raaston par chalta hai — aur **do baar wo raasta chala kar wo
+cheezein mili jo green suite kabhi nahi batati**.
+
+```
+search-invite-screens.mjs  31/31    teacher search + invite modal (🔒 contact kahin nahi)
+invitation-screens.mjs     31/31    NAYI — teacher ka inbox, consent path 2 screen se
+offer-screens.mjs          34/34    dono taraf + devtools-forced negative + 375
+notification-screens.mjs   33/33    21 se badhi — poora /notifications page + forced failure
+regression: 29/29 suite clean, 1105 assertion, 454 s
+SQL: branch 48 · teacher 45 · team 52 · approval 30 · sso 73 · error-log 17 · menus 31 = 296
+backend 0/0 (--no-incremental) · paanchon frontend 0 warning · run_all ×2 byte-identical
+```
+
+#### 🔒 CONSENT PATH 2, AB SCREEN SE
+
+`invites.mjs` procedure saabit karti hai; `invitation-screens.mjs` wo button
+saabit karti hai jise aadmi dabata hai. **Jo consent kisi ne samjha nahi, wo
+consent nahi hai** — to dialog teen cheezein naam leta hai (email, phone,
+resume), kehta hai **"no other school"**, aur kehta hai ki accept karne se
+apply karna zaroori nahi. Teeno assert hote hain.
+
+🔴 **Dekhne se kuch nahi khulta** — inbox render par status 2 ho jaata hai aur
+`fn_TeacherContactUnlocked` **phir bhi 0** deti hai. Decline par bhi 0. Yahi
+2.56 ka poora matlab hai, aur ab function par naapa gaya hai, neeyat par nahi.
+
+🔒 **Accept hone par koi inaam nahi** — na "unlocked", na 🎉. Teacher ne baat
+karne ki ijaazat di, ye batane wali baat hai, jeetne wali nahi; ek "unlocked!"
+state consent ko transaction bana deti.
+
+#### 🔴 DEVTOOLS-FORCED NEGATIVE — DONO JAGAH
+
+Disabled button hata dena kaafi nahi; server se poochna padta hai. Dono screens
+par kisi **doosre** ka offer/invitation `fetch` se answer kiya gaya:
+
+```
+forced ACCEPT  : HTTP 404 "That offer was not found."
+forced DECLINE : HTTP 404 "That offer was not found."
+forced ACCEPT  : HTTP 404 "That invitation was not found."
+forced IGNORE  : HTTP 404 "That invitation was not found."
+```
+
+404 aur **403 nahi** (2.6 — 403 maan leta ki cheez maujood hai), refusal mein
+kisi ka naam nahi, row **chhui nahi gayi**, aur sabse zaroori: **kisi ka contact
+nahi khula**. Agar khul jaata to consent path sirf ek id rakhne wale ke liye
+reachable hota.
+
+#### 🔴 JO SIRF ASLI RAASTA CHALA KAR MILA
+
+Ye chaar cheezein **ek bhi** suite ke green hone se nahi milti thi:
+
+1. **Selected application par "Offer sent" button** jo 400 `OFFER_ACTION_REQUIRED`
+   deta tha — 6A se live. Fix: stage ≥ 7 filter.
+2. **`<input type="time">` "09:00" deta hai, `TimeSpan` binder "09:00:00" maangta
+   hai** — reporting time wala har offer refuse ho raha tha. Tab tak invisible
+   jab tak ek test ne field bhari nahi.
+3. **Viewer ko 403 mila aur screen ne kaha "No teacher matches those filters"** —
+   "tumhe ijaazat nahi" aur "kuch nahi mila" do alag baatein hain. `canSearch`,
+   `refused`, aur summary `null`.
+4. **`FullName` end-to-end khaali tha** — service mein hardcoded `string.Empty`,
+   row type mein property hi nahi. SQL theek karne se nahi, **assertion likhne
+   se** mila.
+
+#### ⚠️ JO TEST GALAT WAJAH SE PASS HO RAHE THE
+
+🔴 **375 ka check answered row naap raha tha.** `invitation-screens` ka mobile
+section accept ke **baad** chal raha tha — aur answered row par koi button nahi
+hota, matlab aasaan case. Pass ho raha tha aur kuch saabit nahi kar raha tha. Ab
+accept se **pehle** chalta hai aur assert karta hai ki **live row aur uske do
+button** hi naape gaye.
+
+🔴 **"Newest first" ek row par trivially sach tha.** Ek hi notification thi, to
+descending check kuch nahi keh raha tha. Doosri application add ki — ab Physics
+(baad mein) Chemistry ke **upar** hona assert hota hai, **title se, date se
+nahi**, kyunki dono ka din ek hi hai.
+
+🔴 **Positional locator doosre ka invitation accept kar sakta tha.** Pehla draft
+`.first()`/`.last()` use karta tha. Mere hi haath se chhoda hua ek probe row
+(status APPLIED, uski application kab ki saaf) Rohit ke inbox mein baitha tha —
+aur wo locator **us par** ACCEPT dabaa deta. Ek suite jo bheja hua nahi, kisi aur
+ka invitation answer kar deti, aur mumkin hai kisi school ke liye contact khol
+deti. **Suite row ko position se address nahi karti; apni banayi row ko karti
+hai**, aur baaki database mein kya hai us se farq nahi padta.
+
+#### 🔴 EK NAYI SUITE CHUP-CHAAP CHALTI HI NAHI THI
+
+`run.mjs` manifest mein na hone wali suite ko **skip** kar deta tha aur bata
+deta tha. Galat aadha: is phase likhi suite bilkul na chalti, aur `--update`
+uska count kabhi seekh hi nahi sakta tha kyunki run hi nahi hua. Ab wo **chalti
+hai**, `NEW` dikhti hai, aur **pin hone tak NOT CLEAN** gini jaati hai.
+
+⚠️ Typo phir bhi pakda jaata hai — jis naam ki `.mjs` nahi, uski koi summary
+line nahi aati, wo `????`/nosummary ban kar NOT CLEAN mein aati hai aur exit 1.
+**Naapa gaya, maana nahi** (`run.mjs no-such-suite`).
+
+#### 🔴 MENU EK ROW HAI (2.37), AUR COUNT USI COMMIT MEIN
+
+`TEACHER_OFFERS` `005_seed_menus.sql` mein gaya — `PermissionCode` **NULL**,
+kyunki koi permission "apne offer dekh sakta hai" describe nahi kar sakti;
+server har read caller ke apne `UserUid` par match karta hai. Route **usi
+commit** mein. Teacher ka sidebar 8 → 9, aur `HOW_TO_RUN.md` /
+`local-accounts.md` / is file ke count **isi commit** mein badle, wajah ke saath.
+
+⚠️ **Stale number par +1 karna rot confirm karna hai.** Maine 32 par +1 kar ke
+33 likh diya tha bina ginne; asli count 34 hai. Dono jagah ab naapa gaya.
+
+#### ⚠️ /notifications EK HI COMPONENT, DONO PORTAL
+
+`UiNotificationListComponent` `jp-shared` mein hai aur **dono app usi par route
+karte hain**, wrap nahi karte — G27 ka sabaq yahi hai ki doosri copy wahin se
+do same screens alag hone lagti hain. Suite dono portal mein render karwati hai
+aur assert karti hai ki **ek portal mein doosre ki row nahi** aati.
+
+🔴 **Fail hua read khaali inbox nahi hai.** Template ye comment mein kehti thi;
+ab suite browser mein request **abort** kar ke naapti hai: "could not be loaded"
+aata hai, "nothing yet" **nahi**, `role="alert"` hai, aur ek bhi row render
+nahi hoti. "Tumhare paas kuch nahi" aur "hum pooch nahi paaye" do alag baatein
+hain, aur pehla dikhana wo tareeka hai jisse koi offer miss karta hai.
+
+---
+
 ## 3. SCOPE (Client spec ke against)
 
 ### IN SCOPE — MVP
@@ -7776,6 +7899,7 @@ naya Code, agla free Id, kuch renumber mat karo.
 | 2026-10-11 | 6C-0 | **Verification ka bakaya chukaya — 6C ka ek bhi line likhne se pehle.** `scripts/verify/lib/login.mjs` naya, **18 suite** us par. 🔴 **Jo poocha gaya tha wo aadha ilaaj tha:** backoff per-IP (5/60s) theek karta hai, par jo cheez 6B mein do baar suite todi wo per-identifier **10/3600s** hai — use run ke andar wait karke khola hi nahi ja sakta, 6B mein har baar `JP.Sso.Api` restart karna pada tha. Isliye **token cache** bhi, aur wahi gap band karta hai. Trade likh kar rakha (warm cache = suite `/auth/login` chhue bina pass ho sakti; `signin-check` asli form se chalti hai aur jaan-boojh kar helper par nahi — canary; har cached token `/auth/me` se validate, TTL 20 min). Khatra audit se nikla: role token ke **andar** hai, to 22 call site gine gaye — theek **ek** ko `{ fresh: true }` chahiye tha (`team-contract`, colleague ko nikaalne ke baad). **Proof bina restart:** per-IP jaan-boojh kar bhara (7 login → 429), phir `screens-3f` 27/27 (cache se) aur `teacher-profile` 33/33 (har run naya teacher — cache mumkin nahi, teen backoff output mein dikhte hain). **G33 band, 31/31** — `browse-contract` 3E ke baad pehli baar chali; SchoolId ab caller ke uid se (purana code naam se dhoondta tha aur doosre owner par ek school suspend karke doosre ko query karta — PASS jo kuch sabit na kare), aur 🔒 wo assertion aa gayi jiske liye gap bana tha: 403 message dono consent path naam leta hai aur **paisa teesra raasta nahi** offer karta. ⚠️ **Paanch cheezein jo dhoondhne nahi gaya tha:** (1) `npm run build` chalte `ng serve` ke saath dev server ko zehrila kar deta hai — `ngDevMode is not defined`, aur failure bilkul toote screen jaisi dikhti hai; (2) **saatvi contamination** — chaar crashed run ne 12 photo + 4 LIVE campus chhode, fixture ab banane se pehle saaf karta hai; (3) 🔴 **`team-contract` 49 se 48 check par aa gayi thi aur kuch bhi red nahi tha** — stray campus ki wajah se uska create-branch skip hua aur cleanup assertion chala hi nahi; chupchaap chhoti hui suite fail hone wali se bad-tar hai; (4) `browse-contract` ne ek-campus school ke liye "5 branch(es)" padha; (5) `screens-3h` mein 3H ke commit se ek NUL byte tha — `grep` poori file skip kar deta tha. 🔴 Form login ka discriminator **API** hai, screen ka message nahi — limiter bhar jaane par screen har submission par "Too many attempts" dikhati hai, galat password par bhi. **G35 open** (`offers.mjs` ek baar 56/57, output rakha nahi gaya, chaar run baad saaf — guess likhna band karne se bura hai) | ✅ Done |
 | 2026-10-11 | 6C-1 | **Notifications backend + G27 band.** `m_app_notification_type` (12 type, har ek ke liye **build-time guard** jo uska procedure naam se maangta hai — G32 ka sabak structural), `t_app_notifications`, gyaarah procedure, chaar route, email worker. 🔒 **Scope `RecipientUserUid` hai aur doosra raasta hai hi nahi** — table mein SchoolId/OrganizationUid **nahi** hai, aur wahi absence design hai: filter karne ko column na ho to "ek school ki saari notification" wali query likhi hi nahi ja sakti. School ka event fan out hota hai, har recipient ki apni read state. 🔴 **Creators event ki apni transaction mein** — ek hi DB, to atomic guarantee muft (2.48 cross-DB ke baare mein hai, ye nahi). 🔴 **Ek jaal jo chup-chaap kaam karta dikhta:** `EXEC` se bulaayi procedure apna result set **client** ko bhejti hai pehle, to creator ka Status/Code/Message/Id SELECT Dapper ko **notification ki row** de deta — apply "Notifications created." return karta, Id mein recipient count, aur **koi error nahi** (2.21 ne shape ek jaisa banaya hai). Isliye dono creator **OUTPUT-only** hain. 🔴 **Chuppiyan faisla hain:** 1 Applied, 4 Interviewed aur **5 Selected** par teacher ko kuch nahi — Selected school ka andar ka faisla hai, teacher tak **OFFER** jaata hai (2.73); suite Selected par count pehle=baad naapti hai. 🔴 **Do raaste ek move banate hain** — stage 2 dropdown se bhi aata hai aur application **kholne** se bhi, to faisla `USP_NotifyApplicationStatus` mein ek jagah hai aur dono usse call karti hain. 🔒 **Kisi notification mein contact ya private note nahi** — rejection ka Remarks, decline ka TeacherRemarks, withdraw ka Reason, salary, email/mobile/resume: paanchon bahar, chaaron caller ka list raw text mein checked. 🔒 Aur INVITE_ACCEPTED ki notification **delete karke** dikhaya ki unlock `IsConsent` row se aata hai, sentence se nahi. 🔴 **Fan-out ka negative positive se ahem:** `hr.lead` **usi organisation** ka hai par doosre school ka owner — OrganizationUid par likha fan-out use pakad leta aur baaki sab phir bhi pass hota. ⚠️ Email **poller** hai (worker 30 s), kyunki notification SQL likhta hai aur us waqt koi C# call stack mein nahi; type `SendEmail` tay karta hai, caller nahi. ⚠️ **Verification type 13/14 jaan-boojh kar seed NAHI** — unka consumer nahi hai, aur seeding G32 ka aakaar de deti. Us talash se **G37** nikla: `RunTeacherVerification` ab bhi "requires t_app_teachers, which is Phase 3" kehti hai aur **koi cheez `IsVerified` set nahi karti** — chaar verified teacher seed row hain. ✅ **G27 band:** `.tabs` + `.banner` system mein, **chhe copy se zero**, paanch ek-line margin opt-in bache (wajah ke saath); farak drift nahi tha (button vs link reset), aur margin par **minority sahi thi** (`.page` gap deta hai, `.note` par `margin: 0` likha hai). `--alert`/`--locked` → `--danger`/`--warning`, do suite locator usi commit mein. ⚠️ Mere chaar test galat the (`applicationStatusId` vs `toStatusId` — har call 200 aur kuch na badle, atharah assertion us ek chup no-op ke neeche; `branchId` chhoot gaya; "HR is one of them" jabki HR us school ka member hi nahi; aur email-stamp test **background worker se race** kar raha tha). `notifications.mjs` **74/74** · swagger floor 101 → **105** | ✅ Done |
 | 2026-10-11 | 6C-2-0 | **G37 band — badge asli hua — 6C-2 ki ek bhi screen se pehle.** Screens badge teen jagah dikhati hain; aaj tak koi asli teacher use kama hi nahi sakta tha, to har dikhta badge seed-data ka jhooth hota. `031` (`VerifiedByUserId` — school ke paas 2F se hai, teacher ke paas do hi the kyunki badge kabhi set hi nahi hota tha), `022 USP_SetTeacherVerified` (badge + stamp + notification, **ek transaction**, idempotent), stub ki jagah asli call, type 13/14 seed **apne consumer ke saath** (029 ka guard har type ke liye procedure ka naam maangta hai), aur decline ka notification `ApprovalService` ki rejection branch se. 🔴 **Jo stub chaar phase chala:** "setting IsVerified requires t_app_teachers, which is Phase 3" — Phase 3 chaar phase pehle ship hua tha; admin approve kar sakta tha, trail likha jaata tha, badge kabhi nahi lagta, aur **koi error nahi** kyunki wo branch pehle se failure report karti thi. Bacha isliye ki **badge ke raaste par koi test kabhi chala hi nahi** — chaar badge wale teacher seed row hain, to badge ki har assertion aise data par pass hoti thi jo kisi ne kamaya nahi. 🔴 **Test wahi raasta chalta hai jo aadmi:** teacher submit (HTTP) → admin ka **queue** → action endpoint se approve → `orchestrationCompleted` **true** (yahi false aata tha) → badge + stamp + verifier **admin (40), teacher (147) nahi** → **`/teacher-search` ke asli result mein `isVerified true`** → `verifiedOnly` 4 se 5 → notification teacher tak, admin ka note us mein nahi par **trail par hai**. 🔴 **Decline badge chheenta nahi** — `@Approved` faisla hai, store karne wali value nahi (ek character chhota raasta pehle se verified teacher ka badge chup-chaap le leta). 🔴 **Decline ka notification gate ke peeche nahi** — orchestration approval par gated hai (Phase 2E ka bug) aur wo gate hilaya nahi gaya; batana provisioning nahi hai, aur peeche daalne ka matlab hota ki reject hua teacher hamesha intezaar kare. ⚠️ **Mera pehla build guard galat tha, pehle hi run mein pakda gaya** — usne maana ki seeded verified teacher ke paas `VerifiedOn` nahi hai; chaaron ke paas hai. Backfill karna ek na-hui approval gadhna hota, date se scope karna date check hota — to guard wahi assert karta hai jo har row par sach hai, aur "teenon column saath" wali baat suite mein gayi. ✅ **G35 band mechanism se:** `scripts/verify/run.mjs` — har run ka poora output file mein (G35), aur assertion count committed manifest se compare, **ghatna = failure** (6C-0 ka `team-contract`). Us 56/57 ka kaaran ab bhi pata nahi aur likha hua hai; band risk hua hai. 🔴 **Runner ne pehle hi pass par `team-contract` 48/48 pakdi** — uska fixture doosri suite ke leftover par conditional tha; ab apna campus naam, har baar banta hai (49 → 50). `teacher-verification.mjs` **33/33** · `notifications` 12 → 14 type (teen assertion wajah ke saath badli) · **25/25 suite clean, 334 s, bina kisi API restart** | ✅ Done |
+| 2026-10-11 | 6C-2 | **Search, invite, invitations inbox, offer ke dono taraf, notification centre — 6C-2 POORA.** `search-invite-screens` 31/31 · `invitation-screens` **31/31 (nayi)** · `offer-screens` 34/34 · `notification-screens` 21 → 33. 🔒 **Consent path 2 ab screen se saabit hai** — dialog email/phone/resume teeno naam leta hai, "no other school" kehta hai, aur accept par `fn_TeacherContactUnlocked` 0 → 1; **dekhna aur decline dono 0 par chhodte hain**. Accept hone par koi inaam nahi (na "unlocked", na 🎉 — warna consent transaction ban jaata). 🔴 **Devtools-forced negative dono jagah:** kisi doosre ka offer/invitation `fetch` se answer → **404, 403 nahi** (2.6), refusal mein kisi ka naam nahi, row chhui nahi gayi, aur **kisi ka contact nahi khula**. 🔴 **Jo sirf asli raasta chala kar mila (koi suite green hone se nahi):** Selected application par "Offer sent" button jo 400 `OFFER_ACTION_REQUIRED` deta tha (6A se live) · `<input type="time">` "09:00" deta hai par `TimeSpan` binder "09:00:00" maangta hai, to reporting time wala **har** offer refuse ho raha tha · viewer ko 403 par screen "No teacher matches those filters" keh rahi thi · `FullName` teeno layer mein khaali tha. ⚠️ **Teen test galat wajah se pass ho rahe the:** 375 ka check accept ke baad **answered** row (bina button) naap raha tha — ab accept se pehle, aur live row + uske button assert hote hain · "newest first" ek row par trivially sach tha — doosri application add ki, ab **title se** order assert hota hai kyunki din ek hi hai · **positional locator (`.first()`) mere hi chhode hue probe row par ACCEPT dabaa sakta tha** — suite ab sirf apni banayi row ko address karti hai. 🔴 **`run.mjs` manifest mein na hone wali suite skip kar deta tha** — is phase likhi suite bilkul na chalti aur `--update` uska count seekh hi nahi sakta tha; ab chalti hai, `NEW` dikhti hai, pin hone tak NOT CLEAN. 🔴 **`TEACHER_OFFERS` seed row (2.37), `PermissionCode` NULL, route usi commit mein** — teacher sidebar 8 → 9, aur `HOW_TO_RUN`/`local-accounts`/ye file **isi commit** mein; ⚠️ stale 32 par +1 kiya tha, asli 34 hai — **stale number par arithmetic rot confirm karta hai**. ⚠️ **/notifications ek hi shared component, dono portal usi par route** (G27), aur **fail hua read khaali inbox nahi** — request abort kar ke naapa gaya. **29/29 suite clean, 1105 assertion, 454 s · SQL 296 · backend 0/0 · paanchon frontend 0 warning · run_all ×2 byte-identical** | ✅ Done |
 
 ---
 
@@ -7883,15 +8007,49 @@ jp_app/00_create_database.sql      same
                                     PermissionId NULL = koi permission nahi chahiye.
                                     3 indexes, har ek apne guard ke saath
 01_tables/022_t_sso_role_menus.sql  Per-role override. Ab banaya, MVP mein NOT read
-03_seed/005_seed_menus.sql          32 menus (31 active, 2 group nodes).
+03_seed/005_seed_menus.sql          34 menus (33 active, 2 group nodes) — 6C-2 tak.
+                                    File khud apna count PRINT karti hai (hardcode
+                                    nahi) — is liye yahan ka number hi purana ho
+                                    sakta hai, file ka output kabhi nahi
                                     RoutePath app.routes.ts se derive; PermissionCode
                                     resolve na ho to seed ABORT (typo = sabko dikh jaata)
 04_procedures/008_menus.sql         USP_GetUserMenus — flat list, recursive CTE nahi.
                                     Parent tabhi bachta hai jab child bacha ho
-99_tests/003_test_menus.sql         30 assertions, all pass
+99_tests/003_test_menus.sql         31 assertions, all pass (6C-2 mein naapa)
 ```
 
-**Menu counts (`localhost\TARUN`, 2026-08-08):** 32 rows · 31 active · 2 group nodes · 29 active RoutePaths, sab `app.routes.ts` mein maujood (0 dangling). Bina menu row ke sirf `/auth/login` aur `/forbidden` — dono sahi, wo authenticated nav ka hissa nahi.
+**Menu counts (`localhost\TARUN`, 2026-10-11, 6C-2 ke baad):** 34 rows · 33 active · 2 group nodes · **31 active RoutePaths, teeno portal mein declared (0 dangling)**. Bina menu row ke sirf `/auth/login` aur `/forbidden` — dono sahi, wo authenticated nav ka hissa nahi.
+
+> 🔴 **Pichhla number 2026-08-08 ka tha: 32 rows · 31 active · 29 routes.** 6C-2
+> ne EK row add kiya — `TEACHER_OFFERS` (2.37: menu data hai, is liye naya
+> screen = naya seeded row) — matlab phase shuru hone par count 33 tha, 32
+> nahi. Dusra row August ke baad kisi phase mein aaya.
+>
+> ⚠️ **Yahi galti bachne layak hai:** maine pehle stale 32 par +1 kar ke 33
+> likh diya tha, bina ginne. Jawab galat nahi dikhta — bas galat hai.
+> **Stale number par arithmetic karna rot ko confirm karna hai, theek karna
+> nahi.** Ab 34/33/2/31 naapa gaya hai, aur 0-dangling bhi naapa gaya
+> (pehla checker do asli admin route ko dangling bata raha tha kyunki wo
+> `path: 'settings/plans'` ek hi string mein declared hain — checker theek
+> kiya, phir naapa).
+>
+> 🔴 **Notification menu rows naye NAHI hain** — `SCHOOL_NOTIFICATIONS` aur
+> `TEACHER_NOTIFICATIONS` initial commit se maujood thin, `comingSoon` par
+> point karti hui. 6C-2 ne row nahi banaya, usne un rows ko asli screen diya.
+>
+> ⚠️ **Sidebar ka number alag hai, aur dono sahi hain.** `GET /api/menus` har
+> account ko do extra row deta hai — `ACCOUNT_STATUS` aur
+> `ACCOUNT_DOCUMENTS`, `IsMenuVisible = 0` ke saath, jinhe shell ka
+> `navigationTree` filter kar deta hai. Route asli hai (suspended school
+> wahin land karta hai), par sidebar se koi wahan nahi jaata. Is liye API 11
+> aur sidebar 9 ek hi healthy state hai — kisi ek ko "theek" karne ki koshish
+> na kare.
+>
+> **Sidebar, 6C-2 ke end par browser mein naapa gaya:** superadmin 11 links + 2
+> group heading · principal 9 · hr.lead 5 · viewer 4 · teacher 9
+> (TEACHER_OFFERS se pehle 8). `HOW_TO_RUN.md` aur `local-accounts.md` isi
+> commit mein update hue — jo rule hai: count badle to uska statement usi
+> commit mein badlega, kaaran ke saath.
 
 ### Error log (decision 2.31)
 ```
@@ -8770,6 +8928,55 @@ thin; ab severity se naam hain.
 ⚠️ **Mere chaar test galat the**, aur pehla sabse mehnga: `applicationStatusId`
 bheja jabki DTO `toStatusId` maangta hai — **har call 200 deta aur kuch
 badalta nahi**, aur us ek chup no-op ke neeche atharah assertion fail hui.
+
+---
+
+## ✅ 6C-2 COMPLETE — 2026-10-11 (SCREENS: SEARCH, INVITE, OFFER, NOTIFICATIONS)
+
+Details **2.78**. Phase 6 ka UI — backend 6A/6B/6C-1 mein tha, yahan wo screens
+bane jinse ek aadmi un raaston par chalta hai.
+
+```
+search-invite 31/31 · invitation 31/31 (nayi) · offer 34/34 · notification 33/33
+29/29 suite clean, 1105 assertion, 454 s · SQL 296 · backend 0/0 · 5 frontend 0 warning
+```
+
+🔒 **Consent path 2 ab screen se saabit hai.** Dialog email, phone aur resume
+teeno naam leta hai, "no other school" kehta hai, aur ye bhi ki accept karne se
+apply karna zaroori nahi. Accept par `fn_TeacherContactUnlocked` 0 → 1;
+**dekhna aur decline dono 0 par chhodte hain** — 2.56 ke do raaste, function par
+naape gaye.
+
+🔒 **Accept hone par koi inaam nahi** — na "unlocked", na 🎉. Ijaazat dena batane
+wali baat hai, jeetne wali nahi.
+
+🔴 **Devtools-forced negative dono taraf:** kisi doosre ka offer/invitation
+`fetch` se answer → **404, 403 nahi**; refusal mein kisi ka naam nahi; row chhui
+nahi gayi; **kisi ka contact nahi khula**.
+
+🔴 **Chaar cheezein sirf asli raasta chala kar milin** — Selected par "Offer
+sent" button (6A se live, 400 deta tha), `type="time"` ka "09:00" vs `TimeSpan`
+ka "09:00:00" (reporting time wala har offer refuse), viewer ke 403 par "no
+teacher matches", aur teeno layer mein khaali `FullName`. **Green suite inme se
+ek bhi nahi batati thi.**
+
+⚠️ **Teen test galat wajah se pass ho rahe the**, aur teeno theek hue: 375 ka
+check answered row (bina button) naap raha tha; "newest first" ek row par
+trivially sach tha; aur **positional locator mere hi chhode hue probe row par
+ACCEPT dabaa sakta tha** — wo sabse bura tha, kyunki chup-chaap kisi aur ka
+invitation accept karna mumkin tha.
+
+🔴 **`run.mjs` nayi suite ko skip kar deta tha.** Is phase likhi suite bilkul na
+chalti; ab chalti hai, `NEW` dikhti hai, aur pin hone tak NOT CLEAN gini jaati
+hai.
+
+🔴 **`TEACHER_OFFERS` ek seed row hai (2.37)**, route usi commit mein, aur
+teacher ka sidebar 8 → 9 — `HOW_TO_RUN`, `local-accounts` aur is file ke count
+**isi commit** mein badle. ⚠️ Maine pehle stale 32 par +1 kiya tha; asli 34 hai.
+
+⚠️ **Point 7 (interview/offer scope) par client ka likha jawab abhi bhi pending
+hai.** Offer Lite waise hi bana hai jaise schema kehti hai. Jawab aaye to
+**rukna hai aur batana hai**, kuch badalne se pehle.
 
 ---
 

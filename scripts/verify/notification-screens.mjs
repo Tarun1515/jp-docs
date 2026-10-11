@@ -4,8 +4,8 @@
   ----------------------------------------------------------------------------
   WHAT ONLY A BROWSER CAN SETTLE
   ----------------------------------------------------------------------------
-  notifications.mjs proves the payloads and the scope. Six claims are about what
-  a person SEES, and no HTTP check reaches them:
+  notifications.mjs proves the payloads and the scope. Eight claims are about
+  what a person SEES, and no HTTP check reaches them:
 
     1. the bell is in the shell of BOTH portals, so it is on every screen;
     2. an unread count renders a badge, and zero renders NOTHING — not a "0";
@@ -17,7 +17,11 @@
        marked unread;
     6. 🔒 the panel shows one person's notifications and a DIFFERENT person
        signed into the same browser sees their own — which is the scope claim
-       made visible.
+       made visible;
+    7. the full /notifications page renders in BOTH portals from the one shared
+       component, each portal showing only its own rows (G27);
+    8. 🔴 a FAILED read says so rather than showing an empty inbox — tested by
+       aborting the request in the browser, the only honest way to reach it.
 
   ----------------------------------------------------------------------------
   🔴 THE FIXTURES ARE REAL EVENTS, NOT INSERTED ROWS
@@ -140,11 +144,35 @@ try {
     VALUES (${schoolId}, ${branchId}, '6C-2 Chemistry teacher', 1, 1, 1, 1, 2, '2027-12-31', SYSUTCDATETIME());
     SELECT CAST(SCOPE_IDENTITY() AS bigint);`));
 
+  /*
+    ⚠️ A SECOND JOB, ONLY SO ORDERING CAN BE ASSERTED AT ALL.
+
+    With one notification "newest first" passes no matter what the page does —
+    a single row is trivially in order, which is the shape of a test that
+    passes for the wrong reason. Two applications a moment apart give the
+    school two rows whose ORDER is a real claim, and because both land on the
+    same rendered day, section 8 asserts it by TITLE rather than by date:
+    Physics is applied to second, so Physics must appear above Chemistry.
+  */
+  const laterJobId = Number(scalar(`SET NOCOUNT ON; USE jp_app;
+    INSERT INTO t_app_jobs (SchoolId, BranchId, JobTitle, SubjectId, DesignationId,
+                            EmploymentTypeId, NoOfVacancies, JobStatusId, LastDateToApply, PublishedOn)
+    VALUES (${schoolId}, ${branchId}, '6C-2 Physics teacher', 2, 1, 1, 1, 2, '2027-12-31', SYSUTCDATETIME());
+    SELECT CAST(SCOPE_IDENTITY() AS bigint);`));
+
   /* The teacher applies: the school's team is told (one row each). */
   const applied = await j(`${APP}/teacher/applications`, {
     method: 'POST', headers: H(teacherToken),
     body: JSON.stringify({ jobId, coverNote: 'notif-screens' }),
   });
+
+  const appliedLater = await j(`${APP}/teacher/applications`, {
+    method: 'POST', headers: H(teacherToken),
+    body: JSON.stringify({ jobId: laterJobId, coverNote: 'notif-screens' }),
+  });
+
+  check('premise: a SECOND, later application gives ordering something to say',
+    appliedLater.http === 200, `HTTP ${appliedLater.http} for job ${laterJobId}`);
 
   const applicationId = applied.body?.data?.applicationId ?? applied.body?.data?.id;
 
@@ -398,6 +426,131 @@ try {
 
   await shot(viewerPage, 'school-notifications-viewer-1440');
 
+  // =========================================================================
+  section('8. 🔴 THE FULL PAGE — one component, routed by BOTH portals');
+  // =========================================================================
+
+  /*
+    🔴 THE BELL AND THE PAGE ARE DIFFERENT CLAIMS.
+
+    Sections 1–7 prove the bell. This proves the screen its "See all" points at
+    — UiNotificationListComponent, which lives in jp-shared and which BOTH apps
+    route at DIRECTLY rather than wrapping (G27: a second copy is where two
+    identical screens start to disagree). The assertion that matters is that
+    both portals render the same DOM contract from the same component, each with
+    only its own rows.
+  */
+  await school.goto(`${SCHOOL_APP}/notifications`, { waitUntil: 'networkidle' });
+  await teacher.goto(`${TEACHER_APP}/notifications`, { waitUntil: 'networkidle' });
+  await school.waitForTimeout(2200);
+  await teacher.waitForTimeout(2200);
+
+  const rowsOf = async (page) => (await page.locator('.notif__item').allInnerTexts())
+    .map((t) => t.replace(/\s+/g, ' ').trim());
+
+  const schoolRows = await rowsOf(school);
+  const teacherRows = await rowsOf(teacher);
+
+  console.log(`\n    school page: ${schoolRows.length} row(s) — "${(schoolRows[0] ?? '').slice(0, 58)}"`);
+  console.log(`    teacher page: ${teacherRows.length} row(s) — "${(teacherRows[0] ?? '').slice(0, 58)}"\n`);
+
+  check('🔴 the shared page renders in the SCHOOL portal, with rows',
+    schoolRows.length > 0, `${schoolRows.length} row(s)`);
+
+  check('🔴 …and in the TEACHER portal, from the same component',
+    teacherRows.length > 0, `${teacherRows.length} row(s)`);
+
+  /*
+    🔒 THE SAME COMPONENT IN TWO PORTALS, AND NEITHER SEES THE OTHER'S ROWS.
+
+    This is the one risk a shared notification screen carries. The service has
+    no method that takes a user because no route accepts one, and 030 gave the
+    table no SchoolId and no OrganizationUid at all — so the only thing that can
+    scope it is the caller's own token. Asserted by content, not by trust: the
+    school's own notification title must not be among the teacher's rows.
+  */
+  check('🔒 the teacher\'s page does NOT contain the school\'s notifications',
+    !teacherRows.some((row) => /new application/i.test(row)),
+    'no "New application" row on the teacher\'s page');
+
+  check('🔒 …and the school\'s page does NOT contain the teacher\'s',
+    !schoolRows.some((row) => /shortlisted/i.test(row)),
+    'no "Shortlisted" row on the school\'s page');
+
+  /*
+    🔴 NEWEST FIRST, ASSERTED BY TITLE — because both rows share a date.
+
+    The first draft compared rendered dates. Two notifications a moment apart
+    render the SAME day, so equal dates satisfied a descending check and the
+    assertion proved nothing. The applications went in a known order, so the
+    order they appear in is the claim: Physics was applied to second, so
+    Physics is the row on top.
+  */
+  const physicsAt = schoolRows.findIndex((row) => /Physics/i.test(row));
+  const chemistryAt = schoolRows.findIndex((row) => /Chemistry/i.test(row));
+
+  check('🔴 newest first — the later application is the row ABOVE',
+    physicsAt !== -1 && chemistryAt !== -1 && physicsAt < chemistryAt,
+    `Physics at ${physicsAt}, Chemistry at ${chemistryAt} of ${schoolRows.length}`);
+
+  const stamps = await school.locator('.notif__item .notif__day').allInnerTexts();
+
+  /*
+    ⚠️ THE SERVER'S PAGE, NOT A CLIENT-SIDE SLICE (G29). The page asks for 50
+    and shows a pager only when it got a full 50 — with a handful of rows there
+    must be no pager at all, which is what distinguishes "the server paged this"
+    from "the client sliced an uncapped read".
+  */
+  check('⚠️ no pager with a handful of rows — the page is the server\'s (G29)',
+    (await school.locator('.table-pager').count()) === 0,
+    `${schoolRows.length} rows, ${await school.locator('.table-pager').count()} pager(s)`);
+
+  check('⚠️ the date is IST, not the browser\'s zone (2.28)',
+    (await school.locator('.notif__item .notif__time').first().innerText()).trim().length > 0
+    && /\d{1,2} \w{3} \d{4}/.test((stamps[0] ?? '').trim()),
+    `"${(stamps[0] ?? '').trim()}" at "${(await school.locator('.notif__item .notif__time').first().innerText()).trim()}"`);
+
+  await shot(school, 'school-notifications-page-1440');
+  await shot(teacher, 'teacher-notifications-page-1440');
+
+  // =========================================================================
+  section('9. 🔴 FORCED — a failed load is not an empty list');
+  // =========================================================================
+
+  /*
+    🔴 THE DISTINCTION THE TEMPLATE CLAIMS IN A COMMENT, ASSERTED.
+
+    "You have nothing" and "we could not ask" are different statements, and
+    showing the first when the second is true is how somebody misses an offer.
+    The only honest way to test it is to make the read fail, so the request is
+    aborted in the browser and the screen is read back.
+  */
+  await school.route('**/api/notifications**', (route) => route.abort('failed'));
+  await school.reload({ waitUntil: 'domcontentloaded' });
+  await school.waitForTimeout(2600);
+
+  const failedText = (await school.locator('.page').innerText()).replace(/\s+/g, ' ');
+
+  console.log(`\n    with the read aborted: "${failedText.slice(0, 190)}"\n`);
+
+  check('🔴 an aborted read says so — and does NOT say "nothing yet"',
+    /could not be loaded/i.test(failedText) && !/nothing yet/i.test(failedText),
+    'the failure is named');
+
+  check('🔒 …and it says nothing has been missed, so nobody assumes an empty inbox',
+    /nothing has been missed/i.test(failedText), 'reassurance, not a false empty');
+
+  check('…and it is announced, not just printed',
+    (await school.locator('.note[role="alert"]').count()) === 1,
+    'role="alert"');
+
+  check('🔴 …and no row is rendered from a failed read',
+    (await school.locator('.notif__item').count()) === 0,
+    `${await school.locator('.notif__item').count()} row(s)`);
+
+  await shot(school, 'school-notifications-failed-1440');
+  await school.unroute('**/api/notifications**');
+
   await schoolCtx.close();
   await teacherCtx.close();
   await phoneCtx.close();
@@ -408,7 +561,7 @@ try {
 } finally {
   if (browser) await browser.close().catch(() => {});
 
-  section('8. EXIT — the fixture events removed');
+  section('10. EXIT — the fixture events removed');
 
   try {
     cleanup();

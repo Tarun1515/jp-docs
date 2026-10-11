@@ -445,12 +445,28 @@ environment config, never hardcoded.
 
 | Email | Password | Type | Role | What it demonstrates |
 |---|---|---|---|---|
-| `superadmin@teacherportal.local` | see `local-accounts.md` | Admin | `SUPER_ADMIN` | Full admin sidebar — 12 menus including both nested groups (Verification, Moderation). Approving a pending school |
-| `principal@greenwood.edu.in` | see `local-accounts.md` | School | `SCHOOL_OWNER` | The complete school sidebar (8 items) and every school screen: dashboard, profile, campuses, team |
-| `hr.lead@greenwood.edu.in` | see `local-accounts.md` | School | `HR` | **Permission filtering.** Same organisation as the principal, but fewer menus — no Campuses, no Team. Sign in as both back to back; that difference is `USP_GetUserMenus` doing its job |
+| `superadmin@teacherportal.local` | see `local-accounts.md` | Admin | `SUPER_ADMIN` | Full admin sidebar — 13 entries: 11 links under the 2 nested group headings (Verification, Moderation). Approving a pending school |
+| `principal@greenwood.edu.in` | see `local-accounts.md` | School | `SCHOOL_OWNER` | The complete school sidebar (9 items) and every school screen: dashboard, profile, campuses, team, offers |
+| `hr.lead@greenwood.edu.in` | see `local-accounts.md` | School | `HR` | **Permission filtering.** Same organisation as the principal, but 5 menus instead of 9 — no School profile, no Campuses, no Offers, no Team. Sign in as both back to back; that difference is `USP_GetUserMenus` doing its job |
 | `head@stmarys.edu.in` | see `local-accounts.md` | School | `SCHOOL_OWNER` | **Tenant isolation.** A second organisation, with its own school (St Mary's Convent, Bandra), its own head office and its own plan. Neither school can see the other's branches, users or applicants |
 | `viewer@greenwood.edu.in` | see `local-accounts.md` | School | `SCHOOL_VIEWER` | **Read-only rendering.** Same school as the principal, scoped to its campus, holding `JOB.VIEW` · `APPLICANT.VIEW` · `REPORT.VIEW` and nothing else. Opens `/jobs`, sees the rows, and sees **no** New job, Publish or Close — absent, not greyed |
-| `tarun@yopmail.com` | *(yours)* | Teacher | `TEACHER` | The teacher portal — 8 menus, no admin or school items |
+| `tarun@yopmail.com` | *(yours)* | Teacher | `TEACHER` | The teacher portal — 9 menus, no admin or school items |
+
+> ⚠️ **Two different counts, and both are right.** The numbers above are
+> **sidebar entries** — what a person actually sees. `GET /api/menus` returns
+> **two more rows** for every account: `ACCOUNT_STATUS` and
+> `ACCOUNT_DOCUMENTS`, which carry `IsMenuVisible = 0` and are filtered by
+> the shell's `navigationTree`. They are returned because the routes are real
+> and reachable — the account-status screen is where a suspended school lands —
+> and hidden because nobody navigates to them from a sidebar. So an API row
+> count of 11 and a sidebar of 9 are the same healthy state, and neither number
+> should be "corrected" to match the other.
+>
+> 🔴 **Measured at the end of 6C-2**, per account: superadmin 11 links under 2
+> group headings · principal 9 · hr.lead 5 · viewer 4 · teacher 9. The teacher
+> was 8 until 6C-2 added `TEACHER_OFFERS` to `005_seed_menus.sql` — a menu is
+> data (2.37), so a new screen means a new seeded row, and the counts written
+> here move in the same commit as that row.
 
 > 🔴 **The Viewer is a real account, and it used to be a fixture.** Phase 4B had
 > no Viewer, so `jobs-screens.mjs` synthesised one by soft-deleting the HR

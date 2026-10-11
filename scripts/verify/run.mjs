@@ -97,11 +97,22 @@ console.log(`\n  ${suites.length} suite(s), sequentially. Output kept in ${LOGS}
 for (const name of suites) {
   const expected = manifest.suites[name];
 
-  if (expected === undefined) {
-    console.log(`  ?    ${name.padEnd(24)} not in the manifest — add it, or check the spelling`);
-    results.push({ name, state: 'unknown' });
-    continue;
-  }
+  /*
+    🔴 A SUITE WITH NO MANIFEST ENTRY STILL RUNS.
+
+    The first version SKIPPED it and said so. That is the wrong half of the
+    behaviour to get right: a suite written this phase and not yet pinned would
+    quietly not run at all, which is precisely the silence this runner exists to
+    break — and --update could never learn its count, because there was never a
+    run to learn from. So it runs, its assertions can fail the whole run like
+    anybody's, and the only thing it cannot do is be compared to a number that
+    does not exist yet.
+
+    ⚠️ A TYPO IS STILL CAUGHT, just further down: a name with no .mjs file
+    produces no summary line, which lands as ???? / nosummary in NOT CLEAN and
+    exits 1. Measured, not assumed — `run.mjs no-such-suite` does exactly that.
+  */
+  const unpinned = expected === undefined;
 
   const file = join(HERE, `${name}.mjs`);
   const log = join(LOGS, `${name}.log`);
@@ -150,13 +161,23 @@ for (const name of suites) {
       branch taken, a loop that found nothing, a section that returned early.
       team-contract did exactly this and stayed green.
     */
-    if (counts.total < expected) {
+    if (!unpinned && counts.total < expected) {
       state = state === 'pass' ? 'shrank' : state;
       notes.push(`🔴 ${expected - counts.total} assertion(s) DID NOT RUN (manifest says ${expected})`);
     }
 
-    if (counts.total > expected && !update) {
+    if (!unpinned && counts.total > expected && !update) {
       notes.push(`${counts.total - expected} new assertion(s) — run --update when that is deliberate`);
+    }
+
+    /*
+      ⚠️ A green unpinned suite is NOT clean. It ran and it passed, but nothing
+      is yet watching its count — so it is reported every run until somebody
+      pins it, rather than blending in with the suites that are protected.
+    */
+    if (unpinned && state === 'pass' && !update) {
+      state = 'unpinned';
+      notes.push(`${counts.total} assertion(s), not in the manifest — run --update to pin it`);
     }
   }
 
@@ -165,7 +186,9 @@ for (const name of suites) {
     notes.push(`exited ${code} while reporting all green`);
   }
 
-  const badge = { pass: ' ok ', fail: 'FAIL', shrank: 'SHRK', nosummary: '????', exit: 'EXIT' }[state] ?? '    ';
+  const badge = {
+    pass: ' ok ', fail: 'FAIL', shrank: 'SHRK', nosummary: '????', exit: 'EXIT', unpinned: 'NEW ',
+  }[state] ?? '    ';
 
   console.log(`  ${badge} ${name.padEnd(24)} ${counts ? `${counts.passed}/${counts.total}`.padEnd(8) : '—'.padEnd(8)}${notes.join(' · ')}`);
 
