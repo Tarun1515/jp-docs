@@ -1,5 +1,5 @@
 /*
-  PHASE 5A — 🔴 THE CONSENT BOUNDARY, END TO END.
+  🔒 THE CONSENT BOUNDARY, END TO END — BOTH PATHS. (5A + 6B)
 
   ----------------------------------------------------------------------------
   WHAT THIS PROVES, AND WHY IT IS THE PHASE'S MOST IMPORTANT SCRIPT
@@ -9,9 +9,16 @@
   Until this phase NEITHER could happen, because fn_TeacherContactUnlocked
   returned a hard 0 and said "Phase 5 replaces this".
 
-  Phase 5 made path 1 real. That makes this the first moment in the product's
-  life where a contact detail can legitimately flow, so it is verified as a
-  BOUNDARY rather than as a feature:
+  Phase 5A made path 1 real; Phase 6B made path 2 real. 2.56 is LOCKED at two,
+  so this file is now the WHOLE rule, and it runs both in one pass:
+
+  ⚠️ AND THE SECOND HALF IS ALSO A REGRESSION OF THE FIRST. 6B changed
+  fn_TeacherContactUnlocked — one EXISTS became two, joined by UNION ALL. A
+  function that decides every contact disclosure in the product cannot be
+  edited and have path 1 assumed still to work. Sections 1-6 below are that
+  re-proof: they are unchanged, and they run against the changed function.
+
+  It is verified as a BOUNDARY rather than as a feature:
 
     1. BEFORE   the contact field is ABSENT FROM THE JSON ITSELF — asserted
                 against the raw response TEXT, not against a parsed property
@@ -30,6 +37,16 @@
     6. THE LIST SHAPE. The school's applicant LIST carries no contact columns
                 at all, even though every row on it has consented. Contact is
                 a deliberate act on one person — the detail endpoint.
+
+    7. 🔒 PATH 2 — a teacher who has applied to NOBODY is invited, and the
+                four invite states are walked one at a time:
+                  SENT     asking is not consent     -> locked
+                  VIEWED   reading is not answering  -> locked
+                  ACCEPTED the teacher's own act     -> UNLOCKED
+                and a second school still gets nothing.
+
+    8. 🔒 IGNORED unlocks nothing, on a third teacher — because "no" has to be
+                provably different from "not yet answered".
 
   Both the FUNCTION OUTPUT and the API JSON are printed at every step, because
   a green assertion on a value nobody looked at is how 2.5 shipped a balance
@@ -126,17 +143,26 @@ const otherSchool = Number(scalar(`SET NOCOUNT ON; USE jp_app;
 
 const teacher = sql(`SET NOCOUNT ON; USE jp_app;
   SELECT CAST(t.TeacherId AS varchar(20)) + '|' + CAST(t.TeacherUid AS varchar(40)) + '|'
-       + u.Email + '|' + ISNULL(u.Mobile, '(none)')
+       + u.Email + '|' + ISNULL(u.Mobile, '(none)') + '|' + t.FullName
   FROM t_app_teachers t JOIN jp_sso.dbo.t_sso_users u ON u.UserUid = t.UserUid
   WHERE u.Email = '${TEACHER.id}';`)[0].split('|').map((s) => s.trim());
 
-const [teacherId, teacherUid, teacherEmail, teacherMobile] = teacher;
+const [teacherId, teacherUid, teacherEmail, teacherMobile, teacherName] = teacher;
 
 /** fn_TeacherContactUnlocked, straight from the database. */
-const unlocked = (schoolId) => scalar(`SET NOCOUNT ON; USE jp_app;
-  SELECT CAST(dbo.fn_TeacherContactUnlocked(${teacherId}, ${schoolId}) AS varchar(2));`);
+/*
+  ⚠️ 6B: takes a teacher id now. It was hard-wired to the one teacher this file
+  used, and path 2 needs a different one — somebody who has applied to nobody,
+  so that an invitation is the only thing that could unlock them.
+*/
+const unlocked = (schoolId, whichTeacher = null) => scalar(`SET NOCOUNT ON; USE jp_app;
+  SELECT CAST(dbo.fn_TeacherContactUnlocked(${whichTeacher ?? teacherId}, ${schoolId}) AS varchar(2));`);
 
 const cleanup = () => sql(`SET NOCOUNT ON; USE jp_app;
+  -- 🔒 6B: the invites this suite sends are consent rows. Leaving one behind
+  -- would leave a school able to see a teacher's number, which is the single
+  -- worst thing a fixture in this file could do.
+  DELETE FROM t_app_teacher_invites WHERE Message LIKE 'consent-suite%';
   DELETE FROM t_app_application_status_history
   WHERE ApplicationId IN (SELECT ApplicationId FROM t_app_applications WHERE SchoolId IN (${ownerSchool}, ${otherSchool}));
   DELETE FROM t_app_applications WHERE SchoolId IN (${ownerSchool}, ${otherSchool});
@@ -298,6 +324,21 @@ try {
     (contactAfter.body?.data?.contactMobile ?? '') === (teacherMobile === '(none)' ? '' : teacherMobile),
     `${contactAfter.body?.data?.contactMobile}`);
 
+  /*
+    🔴 THE FIELD THAT WAS ALWAYS THERE AND ALWAYS EMPTY.
+
+    TeacherContactDto has declared FullName since 3E and the procedure never
+    projected one, so this endpoint returned an empty string for three phases.
+    Nothing failed, because nothing asked.
+
+    ⚠️ It was found by READING this response body during 6B, not by an
+    assertion — so the fix gets the assertion it should always have had, and
+    002_test_teacher.sql holds the other half: NULL while the contact is locked.
+  */
+  check('🔴 …and the NAME is populated, not the empty string the DTO merely declared',
+    (contactAfter.body?.data?.fullName ?? '') === teacherName,
+    `"${contactAfter.body?.data?.fullName}" === "${teacherName}"`);
+
   const contactOther = await j(`${APP}/teachers/${teacherUid}/contact`, { headers: HX });
 
   console.log(`    GET /api/teachers/{uid}/contact as school ${otherSchool}  HTTP ${contactOther.http} · code ${contactOther.body?.code}`);
@@ -364,6 +405,210 @@ try {
     contactAfterSave.http === 403, `HTTP ${contactAfterSave.http}, code ${contactAfterSave.body?.code}`);
   check('…and the school cannot see the save at all — its applicant list is empty',
     (await j(`${APP}/applicants`, { headers: HX })).body?.data?.length === 0, '0 applicants');
+
+  // =========================================================================
+  console.log('\n=== 7. 🔒 CONSENT PATH 2 — AN INVITATION, ONE STATE AT A TIME ===');
+  // =========================================================================
+
+  /*
+    🔒 A DIFFERENT TEACHER, AND THAT IS NOT INCIDENTAL.
+
+    By this point the teacher above has applied to the owner's school, so path 1
+    already unlocks them — any path-2 assertion using them would pass whatever
+    the invite code did. This section needs somebody who has applied to NOBODY,
+    so the only thing that can unlock them is the invitation.
+  */
+  const INVITEE = { id: 'anita.deshmukh21338@yopmail.com', pw: 'Seeded#Teacher2026!' };
+  const IGNORER = { id: 'imran.qureshi.86007@yopmail.com', pw: 'Seeded#Teacher2026!' };
+
+  const inviteeToken = await login(INVITEE.id, INVITEE.pw);
+  const ignorerToken = await login(IGNORER.id, IGNORER.pw);
+
+  const HI = { authorization: `Bearer ${inviteeToken}`, 'content-type': 'application/json' };
+  const HG = { authorization: `Bearer ${ignorerToken}`, 'content-type': 'application/json' };
+
+  const inviteeRow = sql(`SET NOCOUNT ON; USE jp_app;
+    SELECT CAST(t.TeacherId AS varchar(20)) + '|' + CAST(t.TeacherUid AS varchar(40)) + '|' + u.Email
+    FROM t_app_teachers t INNER JOIN jp_sso.dbo.t_sso_users u ON u.UserUid = t.UserUid
+    WHERE u.Email = '${INVITEE.id}';`)[0].split('|');
+
+  const [inviteeId, inviteeUid, inviteeEmail] = inviteeRow;
+
+  const ignorerRow = sql(`SET NOCOUNT ON; USE jp_app;
+    SELECT CAST(t.TeacherId AS varchar(20)) + '|' + CAST(t.TeacherUid AS varchar(40))
+    FROM t_app_teachers t INNER JOIN jp_sso.dbo.t_sso_users u ON u.UserUid = t.UserUid
+    WHERE u.Email = '${IGNORER.id}';`)[0].split('|');
+
+  const [ignorerId, ignorerUid] = ignorerRow;
+
+  const inviteeApplications = scalar(`SET NOCOUNT ON; USE jp_app;
+    SELECT COUNT(*) FROM t_app_applications WHERE TeacherId = ${inviteeId};`);
+
+  check('premise: the invitee has applied to NOBODY — so only an invite can unlock them',
+    inviteeApplications === '0' && unlocked(ownerSchool, inviteeId) === '0',
+    `${inviteeApplications} applications, unlocked ${unlocked(ownerSchool, inviteeId)}`);
+
+  /*
+    ⚠️ HR HOLDS TEACHER_SEARCH.VIEW AND NOT .INVITE — so this is the permission
+    negative, and it runs FIRST: if sending were open to anybody who can search,
+    the rest of this section would prove nothing about who may create consent.
+  */
+  const hrInvite = await j(`${APP}/teacher-search/invites`, {
+    method: 'POST', headers: HX,
+    body: JSON.stringify({ teacherUid: inviteeUid, branchId: otherBranch, message: 'consent-suite hr' }),
+  });
+
+  check('🔴 an HR lead cannot SEND an invitation — searching and inviting are different permissions',
+    hrInvite.http === 403, `HTTP ${hrInvite.http} ${hrInvite.body?.code ?? ''}`);
+
+  // ---- SENT ---------------------------------------------------------------
+  const sent = await j(`${APP}/teacher-search/invites`, {
+    method: 'POST', headers: HO,
+    body: JSON.stringify({
+      teacherUid: inviteeUid, branchId: ownerBranch,
+      message: 'consent-suite: we would like to talk to you',
+    }),
+  });
+
+  const inviteId = sent.body?.data?.inviteId;
+
+  console.log(`    POST /api/teacher-search/invites  HTTP ${sent.http}  inviteId ${inviteId}`);
+  console.log(`    fn_TeacherContactUnlocked(${inviteeId}, ${ownerSchool}) = ${unlocked(ownerSchool, inviteeId)}   <- after SENT\n`);
+
+  check('the invitation is sent',
+    sent.http === 200 && inviteId > 0, `inviteId ${inviteId}`);
+
+  check('🔒 SENT UNLOCKS NOTHING — asking is not consent',
+    unlocked(ownerSchool, inviteeId) === '0', `${unlocked(ownerSchool, inviteeId)}`);
+
+  const contactAfterSent = await j(`${APP}/teachers/${inviteeUid}/contact`, { headers: HO });
+
+  check('🔒 …and the contact endpoint refuses, with nothing of theirs in the bytes',
+    contactAfterSent.http === 403
+    && !contactAfterSent.text.toLowerCase().includes(inviteeEmail.toLowerCase()),
+    `HTTP ${contactAfterSent.http}`);
+
+  // ---- VIEWED -------------------------------------------------------------
+  const viewed = await j(`${APP}/teacher/invites/${inviteId}/viewed`, { method: 'POST', headers: HI });
+
+  const viewedStatus = scalar(`SET NOCOUNT ON; USE jp_app;
+    SELECT CAST(InviteStatusId AS varchar(3)) FROM t_app_teacher_invites WHERE InviteId = ${inviteId};`);
+
+  console.log(`    POST /api/teacher/invites/${inviteId}/viewed  HTTP ${viewed.http}  status now ${viewedStatus}`);
+  console.log(`    fn_TeacherContactUnlocked(${inviteeId}, ${ownerSchool}) = ${unlocked(ownerSchool, inviteeId)}   <- after VIEWED\n`);
+
+  check('the teacher opens it, and the status moves to Viewed',
+    viewed.http === 200 && viewedStatus === '2', `status ${viewedStatus}`);
+
+  check('🔒 VIEWED UNLOCKS NOTHING — reading a message is not answering it',
+    unlocked(ownerSchool, inviteeId) === '0', `${unlocked(ownerSchool, inviteeId)}`);
+
+  check('🔒 …and the contact endpoint still refuses',
+    (await j(`${APP}/teachers/${inviteeUid}/contact`, { headers: HO })).http === 403, 'HTTP 403');
+
+  // ---- ACCEPTED -----------------------------------------------------------
+  const accepted = await j(`${APP}/teacher/invites/${inviteId}/respond`, {
+    method: 'POST', headers: HI,
+    body: JSON.stringify({ accept: true, teacherRemarks: 'Happy to talk.' }),
+  });
+
+  const unlockAfterAccept = unlocked(ownerSchool, inviteeId);
+  const contactAfterAccept = await j(`${APP}/teachers/${inviteeUid}/contact`, { headers: HO });
+
+  console.log(`    POST …/respond {accept:true}  HTTP ${accepted.http}`);
+  console.log(`    fn_TeacherContactUnlocked(${inviteeId}, ${ownerSchool}) = ${unlockAfterAccept}   <- after ACCEPTED`);
+  console.log(`    GET /api/teachers/{uid}/contact  HTTP ${contactAfterAccept.http}`);
+  console.log(`    body: ${contactAfterAccept.text.slice(0, 160)}\n`);
+
+  check('🔒 ACCEPTED UNLOCKS — this is consent path 2, the second and final one (2.56)',
+    accepted.http === 200 && unlockAfterAccept === '1', `unlocked ${unlockAfterAccept}`);
+
+  check('🔒 …and the SAME call that refused twice now returns the email',
+    contactAfterAccept.http === 200
+    && contactAfterAccept.text.toLowerCase().includes(inviteeEmail.toLowerCase()),
+    `HTTP ${contactAfterAccept.http}`);
+
+  check('🔒 …for the invited school ONLY — the other school still gets nothing',
+    unlocked(otherSchool, inviteeId) === '0'
+    && (await j(`${APP}/teachers/${inviteeUid}/contact`, { headers: HX })).http === 403,
+    `other school unlocked ${unlocked(otherSchool, inviteeId)}`);
+
+  /*
+    🔒 AND THE SEARCH RESULT STILL CARRIES NOTHING, even now that this teacher
+    HAS consented. That is the shape rule holding where the privacy rule no
+    longer needs it to: a browse surface never carries contact, consented or
+    not, because it ends up in a screenshot or an export.
+  */
+  const searchAfterAccept = await j(`${APP}/teacher-search?pageSize=100`, { headers: HO });
+
+  check('🔒 …and the SEARCH result carries no contact even for a teacher who consented',
+    searchAfterAccept.http === 200
+    && !searchAfterAccept.text.toLowerCase().includes(inviteeEmail.toLowerCase())
+    && !CONTACT_KEYS.some((k) => searchAfterAccept.text.toLowerCase().includes(k.toLowerCase())),
+    'no contact keys, no address — the shape rule, not the privacy rule');
+
+  // =========================================================================
+  console.log('\n=== 8. 🔒 IGNORED UNLOCKS NOTHING ===');
+  // =========================================================================
+
+  /*
+    ⚠️ "No" has to be provably different from "not yet answered". Without this
+    section, an implementation that unlocked on ANY answered invite would pass
+    everything above.
+  */
+  const toIgnore = await j(`${APP}/teacher-search/invites`, {
+    method: 'POST', headers: HO,
+    body: JSON.stringify({
+      teacherUid: ignorerUid, branchId: ownerBranch,
+      message: 'consent-suite: ignored path',
+    }),
+  });
+
+  const ignoreId = toIgnore.body?.data?.inviteId;
+
+  const ignored = await j(`${APP}/teacher/invites/${ignoreId}/respond`, {
+    method: 'POST', headers: HG,
+    body: JSON.stringify({ accept: false, teacherRemarks: 'Not looking right now.' }),
+  });
+
+  const ignoredStatus = scalar(`SET NOCOUNT ON; USE jp_app;
+    SELECT CAST(InviteStatusId AS varchar(3)) FROM t_app_teacher_invites WHERE InviteId = ${ignoreId};`);
+
+  console.log(`    invite ${ignoreId} answered with accept:false  HTTP ${ignored.http}  status ${ignoredStatus}`);
+  console.log(`    fn_TeacherContactUnlocked(${ignorerId}, ${ownerSchool}) = ${unlocked(ownerSchool, ignorerId)}\n`);
+
+  check('an explicit pass is RECORDED, not left as silence',
+    ignored.http === 200 && ignoredStatus === '5', `status ${ignoredStatus} (5 = Ignored)`);
+
+  check('🔒 IGNORED UNLOCKS NOTHING — "no" is not "not yet"',
+    unlocked(ownerSchool, ignorerId) === '0', `${unlocked(ownerSchool, ignorerId)}`);
+
+  check('🔒 …and the contact endpoint refuses for them too',
+    (await j(`${APP}/teachers/${ignorerUid}/contact`, { headers: HO })).http === 403, 'HTTP 403');
+
+  /*
+    🔒 THE WHOLE RULE, IN ONE READ. The function must bind to exactly two
+    tables — the two consent paths and nothing else. A third would be a third
+    path nobody decided on, and 2.56 is LOCKED at two.
+  */
+  const binds = sql(`SET NOCOUNT ON; USE jp_app;
+    SELECT d.referenced_entity_name
+    FROM sys.sql_expression_dependencies d
+      INNER JOIN sys.objects o ON o.object_id = d.referencing_id
+    WHERE o.name = 'fn_TeacherContactUnlocked'
+    ORDER BY d.referenced_entity_name;`);
+
+  console.log(`    fn_TeacherContactUnlocked binds to: ${binds.join(', ')}\n`);
+
+  check('🔒 the function binds to EXACTLY the two consent tables — no third path (2.56, LOCKED)',
+    binds.length === 2
+    && binds[0] === 't_app_applications'
+    && binds[1] === 't_app_teacher_invites',
+    binds.join(', '));
+
+  check('🔒 …and nothing about subscriptions, plans or saved jobs is in it',
+    !binds.some((b) => /subscription|plan|saved/i.test(b)),
+    'no payment, no interest — only the teacher\'s own acts');
 } finally {
   // =========================================================================
   console.log('\n=== TEARDOWN ===');

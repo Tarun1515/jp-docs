@@ -469,10 +469,52 @@ try {
     contactTouchingEngine.length === 0,
     contactTouchingEngine.length ? contactTouchingEngine.join(', ') : 'zero hits — the prohibition holds both ways');
 
+  /*
+    ---- 2.56, direction C: SEARCH AND INVITE (6B) -------------------------
+
+    🔒 The brief's words were "the 2.56 grep extends to the search procs", and
+    this is that extension. Search and invite are the two surfaces a school
+    reaches a stranger through, and neither of them has any business naming a
+    contact column or the unlock function.
+
+    ⚠️ Note which way the arrow runs. fn_TeacherContactUnlocked READS the
+    invites table — that is consent path 2 and it is correct (2.74). What must
+    never happen is the reverse: the search or invite code reading contact, or
+    deciding for itself whether it is unlocked. The unlock has exactly one
+    author, and these files are not it.
+  */
+  const reachPaths = files.filter((f) =>
+    /019_teacher_search|020_invites|027_invite_masters|028_t_app_teacher_invites|Invite(Service|Repository)|TeacherSearch(Controller|Contracts)|Invites[\\/]/i.test(f));
+
+  const reachTouchingContact = reachPaths.filter((f) => {
+    const body = readFileSync(f, 'utf8');
+    const code = body.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*(\/\/\/?|--).*$/gm, '');
+
+    return /fn_TeacherContactUnlocked|ContactUnlocked|ContactEmail|ContactMobile|MobileNumber|ResumePath|u\.Email|u\.Mobile/i.test(code);
+  });
+
+  console.log(`    search/invite files scanned: ${reachPaths.length}`);
+  reachPaths.forEach((f) => console.log(`      ${f.replace(root + '\\', '')}`));
+
+  check('🔒 2.56 C — no search or invite file names a contact column or the unlock (6B)',
+    reachPaths.length >= 6 && reachTouchingContact.length === 0,
+    reachTouchingContact.length
+      ? reachTouchingContact.join(', ')
+      : `${reachPaths.length} files, zero hits`);
+
   // ---- the cache prohibition ---------------------------------------------
+  /*
+    ⚠️ EXTENDED IN 6B. TEACHER_SEARCH is the engine's first Boolean consumer and
+    TEACHER_INVITE its newest metered one, so the invite service is now ON the
+    consume path and inherits the prohibition: a gating read through
+    IMasterService would sit behind an hour-deep cache, and a kill switch that
+    takes an hour to land is not a switch (2.64).
+  */
   const consumePathFiles = [
     'JP.Infrastructure/Repositories/EntitlementRepository.cs',
     'JP.Infrastructure/Services/EntitlementService.cs',
+    'JP.Infrastructure/Repositories/InviteRepository.cs',
+    'JP.Infrastructure/Services/InviteService.cs',
   ].map((p) => join(root, p));
 
   const touchingMaster = consumePathFiles.filter((f) => {

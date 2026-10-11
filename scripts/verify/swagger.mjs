@@ -65,8 +65,13 @@ const APIS = [
       (`/api/applicants/{id}/offers` GET and POST, `/api/offers/{id}/withdraw`,
       `/api/applicants/{id}/hire`) and two teacher-side (`/api/teacher/offers`,
       `/api/teacher/offers/{id}/respond`).
+
+      🔴 RAISED TO 101 ON 2026-09-19 (PHASE 6B — teacher search and invites).
+      Three school-side (`/api/teacher-search`, and `/api/teacher-search/invites`
+      GET and POST) and three teacher-side (`/api/teacher/invites`, plus
+      `{id}/viewed` and `{id}/respond`).
     */
-    minOperations: 95,
+    minOperations: 101,
   },
 ];
 
@@ -180,6 +185,25 @@ try {
     !!respond, respond ? 'present' : 'MISSING');
   check('…and confirm-hire, which OFFER.APPROVE gates separately from sending',
     !!hire, hire ? 'present' : 'MISSING');
+
+  /*
+    🔒 Phase 6B's two, and the second one is the phase.
+
+    Search is where a school meets the whole teacher base; accepting an
+    invitation is CONSENT PATH 2 — the second and final way a school ever
+    reaches a teacher's contact details (2.56, LOCKED). A count alone would
+    pass if either vanished.
+  */
+  const search = doc?.paths?.['/api/teacher-search']?.get;
+  const sendInvite = doc?.paths?.['/api/teacher-search/invites']?.post;
+  const respondInvite = doc?.paths?.['/api/teacher/invites/{inviteId}/respond']?.post;
+
+  check('the teacher-search operation is documented (Phase 6B)',
+    !!search, search ? 'present' : 'MISSING');
+  check('…and sending an invitation — the metered half',
+    !!sendInvite, sendInvite ? 'present' : 'MISSING');
+  check('🔒 …and the teacher\'s response, which IS consent path 2',
+    !!respondInvite, respondInvite ? 'present' : 'MISSING');
   check('…and the apply operation — consent path 1 (2.56)',
     !!apply, apply ? 'present' : 'MISSING');
   check('…and the resume snapshot fetch, which RESUME.DOWNLOAD gates',

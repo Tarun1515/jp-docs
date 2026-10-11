@@ -1,7 +1,7 @@
 # TEACHER RECRUITMENT PORTAL — PROJECT MEMORY
 
 > **Ye file har kaam ke baad update hogi.** Har naye chat/session mein sabse pehle ye file padho.
-> Last updated: **2026-09-19** | Phase **3 COMPLETE** + **2.5 engine** + **4 jobs COMPLETE** + **2.67 swagger fix** + **PRE-5 (G26 band, 2.68/2.69)** + **PRE-5b (baseline green)** + **5A applications BACKEND (2.70, G28)** + **5B applications SCREENS COMPLETE — PHASE 5 POORA (2.71, G30)** + **6A-0 approval engine above level 1 (2.72, G14 BAND, G31)** + **6A Offer Lite BACKEND COMPLETE (2.73, G32)** | Next: **Phase 6B — Teacher search + invites (consent path 2)**
+> Last updated: **2026-10-11** | Phase **3 COMPLETE** + **2.5 engine** + **4 jobs COMPLETE** + **2.67 swagger fix** + **PRE-5 (G26 band, 2.68/2.69)** + **PRE-5b (baseline green)** + **5A applications BACKEND (2.70, G28)** + **5B applications SCREENS COMPLETE — PHASE 5 POORA (2.71, G30)** + **6A-0 approval engine above level 1 (2.72, G14 BAND, G31)** + **6A Offer Lite BACKEND COMPLETE (2.73, G32)** + **6B TEACHER SEARCH + INVITES BACKEND COMPLETE — 🔒 CONSENT PATH 2 (2.74, G33, G34)** | Next: **Phase 6C — Notifications + saare screens**
 >
 > 🔴 **Ye do line har phase ke close-out mein update hongi.** File 3I tak
 > pahunch chuki thi aur ye header **Phase 0** par khada tha — saat phase purana,
@@ -2190,6 +2190,47 @@ request complete ho jaaye. Trigger: client ka point 7 ka jawaab (jo abhi tak
 nahi aaya), ya koi school do-level sign-off maange. 6A-0 ne sabit kar diya ki
 engine do level chal leta hai, to kaam sirf do procedure jodne ka hai — engine
 ka nahi.
+
+### G33. `browse-contract.mjs` 3E se chal hi nahi rahi — 🟡 OPEN (6B, 2026-10-11)
+
+Suite `head.711429@brightfield.edu.in` se login karti hai aur us account ka
+password sirf us waqt ke `JP_PW` env var mein tha. `local-accounts.md` mein wo
+account hai hi nahi, to **ye file 3E ke baad ek baar bhi nahi chali.**
+
+🔴 **6B ne isliye number diya ki ab ye khaali bakaya nahi hai.** Jo wo dekhti
+hai — `/teachers/{uid}/contact` ka 403 kehta hai ki use kya kholega — 6B mein
+badal gaya: us message mein pehle se "accept an invitation" likha tha, jabki
+wo raasta maujood hi nahi tha. Teen phase tak wo line ek aise kaam ka vaada kar
+rahi thi jo nahi ho sakta tha, aur jo suite use padhti hai wo chal nahi rahi
+thi.
+
+⚠️ 6B mein wo claim **haath se** verify ki gayi (403, message mein "appl" aur
+"invit" dono, aur `fn_TeacherContactUnlocked` = 0) — par haath se verify karna
+assertion nahi hai.
+
+**Band kaise hoga:** suite ko `local-accounts.md` ke account par khada karo
+(principal@greenwood), aur Brightfield-specific hisse (suspend/unverify wala
+404 test) ko caller ke **apne** `schoolUid` se derive karo, naam se nahi.
+Section 7 ka full-set sync ek aise teacher par chahiye jiske subject pehle se
+hon. ⚠️ Fixture overlap dhyaan se — aath doosri suite inhi accounts par khadi
+hain.
+
+### G34. Purani verification suites mein 429 retry nahi hai — 🟡 OPEN (6B, 2026-10-11)
+
+Login rate limit 5/min per IP aur 10/hr per identifier hai. Nayi suites
+(`invites`, `teacher-search`, `applications-*`) 429 par wait-and-retry karti
+hain; purani (`screens-3f`, `teacher-profile` ka ek raasta) seedha
+`body.data.accessToken` padh leti hain.
+
+🔴 **Aur ye FALSE RED deta hai, jo sabse mehnga kism ka test failure hai.** 6B
+ke regression pass mein `screens-3f` `TypeError: Cannot read properties of
+null` par mari — screen mein koi kharabi nahi thi, limiter bhara hua tha.
+Limiter clear karke wahi suite 25/25 nikli. Jo log is file ko padh kar regression
+chalaate hain, unke liye ye "6B ne screens-3f tod di" jaisa dikhta hai.
+
+**Band kaise hoga:** `login()` helper ek shared module mein nikaalo (retry +
+backoff andar), aur saari suites usse login karein. Tab tak: regression ke
+beech-beech `JP.Sso.Api` restart kar do — limiter in-memory hai.
 
 ### 2.45 `jp_mdm` — PHASE 2A BUILD NOTES
 
@@ -6742,6 +6783,150 @@ OFFER_APPROVAL ki koi request banti nahi, to config inert hai: **G32**.
 
 ---
 
+### 2.74 TEACHER SEARCH + INVITES — PHASE 6B (BACKEND)
+
+`m_app_invite_status`, `t_app_teacher_invites`, server-side search, paanch
+invite procedure, chhe route — aur 🔒 **consent ka doosra aur AAKHIRI raasta.**
+
+```
+teacher-search.mjs    33/33   (search · 🔒 kabhi leak nahi · Boolean gate admin screen se)
+invites.mjs           39/39   (meter · idempotency · machine · APPLIED · race · scope · exit)
+applications-consent  49/49   (31 -> 49: dono consent path ek hi run mein)
+swagger               19/19   (floor 95 -> 101, chhe naye route)
+regression: approval-levels 31 · offers 57 · race 28 · lifecycle 75 ·
+            screens 87 · jobs-consume 23 · jobs-lifecycle 34 · jobs-screens 56 ·
+            entitlement 34 + 35 (2.56 direction C naya) · dashboards 28 ·
+            screens-3i 17 · screens-3h 21 ·
+            screens-3f 25 · screens-25 19 · team 49 · profile-branches 37 ·
+            teacher-profile 33 · SQL: approval 30 · branch 48 · teacher 45 ·
+            team 52 · sso 73 · error-log 17
+backend 0/0 · paanchon frontend warnings=0 · run_all ×2 → 0 naye objects
+```
+
+#### 🔒 DOOSRA EXISTS — USI FUNCTION MEIN, DOOSRI JAGAH NAHI
+
+```sql
+RETURN CASE WHEN EXISTS (
+    SELECT 1 FROM dbo.t_app_applications a          -- 1. apply kiya (5A)
+    WHERE a.TeacherId = @TeacherId AND a.SchoolId = @ViewerSchoolId AND a.Is_Deleted = 0
+    UNION ALL
+    SELECT 1 FROM dbo.t_app_teacher_invites i       -- 2. invite ACCEPT kiya (6B)
+    WHERE i.TeacherId = @TeacherId AND i.SchoolId = @ViewerSchoolId
+      AND i.InviteStatusId = 3                      -- 🔒 ACCEPTED, sirf ACCEPTED
+      AND i.Is_Deleted = 0
+) THEN 1 ELSE 0 END;
+```
+
+Aur ye **closed set** hai, "contains" nahi. `sys.sql_expression_dependencies`
+se poocha jaata hai ki function kis-kis table se **bind** karta hai, aur jawaab
+theek do hona chahiye — teesra naam aane ka matlab teesra consent path aa gaya,
+aur 2.56 kehta hai do hi hain. ⚠️ Text grep se nahi poocha jaa sakta: function ke
+apne header mein un tables ka naam **prose mein** likha hai.
+
+#### ⚠️ SCHEMA MEIN ACCEPTED HI NAHI THA
+
+Locked 2.56 note ne theek yahi warning di thi. Schema ke paas Sent / Viewed /
+Applied / Ignored the — **koi ACCEPTED nahi.** Bina use jode "invite accept
+karna" ka koi state hi nahi hota, aur consent path 2 chup-chaap path 1 mein
+dhal jaata (invite ke baad teacher ko apply karna padta, matlab path 1).
+
+Isliye master mein **build-time structural guard** hai (2.36), comment nahi:
+
+```sql
+IF (SELECT COUNT(*) FROM dbo.m_app_invite_status WHERE IsConsent = 1 AND Is_Deleted = 0) <> 1
+    RAISERROR(N'🔒 2.56 VIOLATION: … EXACTLY ONE IsConsent row …', 16, 1);
+IF (SELECT Code FROM dbo.m_app_invite_status WHERE IsConsent = 1 AND Is_Deleted = 0) <> 'ACCEPTED'
+    RAISERROR(N'🔒 2.56 VIOLATION: the IsConsent row must be ACCEPTED.', 16, 1);
+```
+
+Do `IsConsent` row seed karne ki koshish **build tod degi**, review par nahi
+chhodi gayi.
+
+#### 🔒 CONTACT SEARCH RESULT MEIN KABHI NAHI — aur ye teen jagah se roka hai
+
+| Kahan | Kya |
+|---|---|
+| `USP_SearchTeachers` | projection mein contact ka ek column nahi; grep extended |
+| `TeacherSearchResultDto` / `SchoolInviteDto` | **sealed**, aur `ContactLeakGuard` teenon type par reflect karta hai |
+| `teacher-search.mjs` | response **raw text** mein padha jaata hai, FREE/Boolean-included/Boolean-excluded/Metered × Owner/Viewer |
+| `entitlement-http.mjs` | **2.56 direction C** — nau search/invite file ke CODE mein contact ka naam nahi (comment chhod kar) |
+
+🔴 **Direction C ko chala kar dekha gaya hai.** `InviteService.cs` mein ek line
+`ContactEmail` wali daali gayi — guard fail hui aur usi file ka naam diya; line
+hataane par 35/35. Jo guard kabhi chala nahi, wo guard nahi, maan-lena hai (3C).
+
+⚠️ `TeacherSearchRow` ko DTO se **derive nahi** kiya ja saka, kyunki DTO sealed
+hai — aur wo sealed jaan-boojh kar hai, taaki guard us par bharosa kar sake.
+Mapping field-by-field likhi hai; ek field bhool jaana compile time par nahi
+dikhega, par leak **ulti disha** mein hoti hai, to ye trade theek hai.
+
+#### 🔴 INSERT PEHLE, METER BAAD MEIN
+
+`USP_SendInvite` ek transaction mein pehle row daalti hai, **phir** consume
+karti hai. Filtered unique index `(SchoolId, TeacherId) WHERE InviteStatusId IN
+(1,2)` sasta guard hai, to double-click ki dusri koshish index par marti hai aur
+meter tak pahunchti hi nahi.
+
+⚠️ Ulta kiya hota to Uid row banne se **pehle** mint karna padta, aur refuse hua
+insert ek aisi invitation ka charge chhod jaata jo kisi ko mili hi nahi.
+`invites.mjs` section 5 isi order ko asli race mein sabit karti hai —
+**gate gap 0 ms, do alag spid, ek invitation, ek ALREADY_INVITED, ledger mein
+kuch dohra nahi.**
+
+#### 🔴 BOOLEAN KA PEHLA ASLI CONSUMER — ledger mein kuch nahi likhta (2.64)
+
+`TEACHER_SEARCH` Boolean hai, `TEACHER_INVITE` Metered. 2.5 ka design
+assertion ab ek consumer ke against chala: `teacher-search.mjs` gating mode
+**admin screen se** (Playwright, `.matrix__mode` → 2) badalti hai, agli hi
+search `403 PLAN_LACKS_FEATURE` par rukti hai, aur ledger entry se exit tak
+**0 -> 0** rehta hai.
+
+⚠️ Saare gating read `IEntitlementRepository` se hain, `IMasterService` se
+kabhi nahi — 1 ghante ka master cache kill switch ko bekaar kar deta. Cache
+prohibition ka scan **do se chaar file** par badha: `InviteRepository` aur
+`InviteService` ab consume path par hain.
+
+#### 🔴 APPLY KARNA OPEN INVITATION BAND KARTA HAI — usi transaction mein
+
+`USP_ApplyToJob` ab open invitation (1 Sent / 2 Viewed) ko **4 APPLIED** par le
+jaati hai. Do wajah: school ko "wait kar rahe hain" dikhna band ho, aur teacher
+ko wo invitation dobara na dikhe.
+
+🔒 Aur unlock **application se** aata hai, invite row se nahi — APPLIED
+`IsConsent` row nahi hai. Suite application delete karke dikhati hai ki unlock
+**wapas band** ho jaata hai jabki invitation APPLIED par khadi rehti hai. Agar
+wo assertion fail hoti, matlab invite row chupke se teesra consent path ban gaya.
+
+#### ⚠️ EK FIELD JO TEEN PHASE SE KHAALI JA RAHI THI
+
+`TeacherContactDto.FullName` 3E se declare hui thi. Procedure use project nahi
+karti thi, row type ke paas property nahi thi, aur service mapping mein
+**`FullName = string.Empty`** likha hua tha — literal, missing field nahi.
+
+🔴 **Ye assertion se nahi mili — response body PADHNE se mili.** Koi test fail
+nahi hua kyunki kisi ne poocha hi nahi tha. Aur pehli koshish mein maine sirf
+SQL theek ki; assertion likhne par pata chala ki wo DTO tak pahunchi hi nahi —
+teen jagah thi, teenon theek ki gayin.
+
+⚠️ **Mapping mein hardcoded `string.Empty` ko dekh kar shaq karna chahiye.** Wo
+us value se alag nahi dikhta jo abhi aayi hi nahi — theek isi tarah ye bacha
+raha. Ab dono taraf guard hai: unlocked par naam **populated** (`applications-consent`),
+locked par **NULL** (`002_test_teacher.sql`).
+
+#### ⚠️ Jo suite jaan-boojh kar badli — usi commit mein, wajah ke saath
+
+`applications-screens.mjs` assert karti thi ki `fn_TeacherContactUnlocked`
+**ek** table se bind karta hai. 6B ne wo shipped state badla, to guard saath
+badla — par **closed set hi raha** (do naam, join se compare), "contains" nahi
+bana. Aur `002_test_teacher.sql` ka `@contact` table variable 7 column ka tha;
+projection 8 ka ho gaya, to `INSERT … EXEC` Msg 213 par mari.
+
+🔴 Ye **theek wahi galti hai** jo is file ke aakhir mein "dobara mat karna" wali
+list mein #1 par likhi hai (`USP_CreatePasswordResetToken` + `#ResetTok`). Is
+baar test ne use pehle pakad liya — isiliye wo test wahan hai.
+
+---
+
 ## 3. SCOPE (Client spec ke against)
 
 ### IN SCOPE — MVP
@@ -6956,6 +7141,7 @@ naya Code, agla free Id, kuch renumber mat karo.
 | 2026-09-19 | 5B | **Applications — screens. PHASE 5 POORA.** Teacher: job browse, job detail + apply, my applications (+ detail), saved jobs. School: applicants list, applicant detail + status actions. Dono dashboard ke area asli count par. 🔴 **1D ka applicants mockup DELETE** — `_design-reference/` poora gaya, uska design asli screen mein hai, aur suite check karti hai ki uska koi fixture naam screen par ya kisi built chunk mein nahi aa sakta. 🔴 **`APPLICATION_STATUS` master serve hi nahi hota tha** — table 5A mein bana, whitelist mein nahi tha, to school ka stage filter hardcode hota (2.7); ab **sirf 6 reachable** rows jaati hain. 🔴 **`AllowedTransitions` server se aata hai** — wahi `fn_ApplicationTransitionAllowed` jo illegal move refuse karta hai; component ke paas map ki koi copy nahi, aur Rejected par khaali list matlab **koi button hi nahi** (absent, disabled nahi). 🔴 Ek shipped bug mila: `ui-empty-state` par `actionLink` **input tha hi nahi** — 4B se plain attribute ki tarah likha ja raha tha, to "Post a job" **kuch nahi karta tha**, aur type error bhi nahi aata tha. Ab input hai aur `<a>` render hota hai. ⚠️ Ek purana tootá guard bhi mila jo 5B ka nahi: `screens-3h` ka `#section-experience .empty` 3H se hi galat tha — wo assertion kabhi chali hi nahi. ⚠️ CHAUTHI fixture contamination (suite ne Imran ka resume chhod diya tha) — ab snapshot normalise ke baad lete hain aur `finally` mein restore. Teen suite ki assertion **jaan-boojh kar** badli (`dashboards-3i`, `jobs-screens`, `screens-3i`) kyunki shipped state badla. screens 86/86, swagger 13/13 (floor 89 waise ka waisa — koi naya route nahi), saari purani suites green, backend 0/0, paanchon frontend warnings=0, `run_all` ×2 → 0 objects | ✅ Done |
 | 2026-09-19 | 6A-0 | **G14 ka bakaya chukaya — offer ka ek bhi line likhne se pehle.** `approval-levels.mjs` 31/31: level-2 reject (poori request rejected, level 2 par rukta hai), level-2 resubmit (ResubmitRequired level 2 par, par applicant ke resubmit par **level 1 reset** — dono level dobara), per-level role scoping (dono taraf FORBIDDEN), aur level-2 concurrency (gate instants, gap 0 ms, ek jeeta ek CONCURRENCY_CONFLICT). 🔴 **Ek asli defect mila:** procedure `t_mdm_request_levels` ko **do baar** padhta tha aur dono read "org override" ka matlab alag samajhte the — `IsFinal` org row ko preference deta tha, permission check dono rows par ek saath chalta tha, to override ne role **joda** banisbat badle ke. Jis organisation ne apni approval narrow ki, wahi ek case chup-chaap kaam nahi karta tha — aur dikhta nahi tha kyunki koi override hai hi nahi. Ab effective row **ek baar** resolve hota hai aur dono faisle usse padhte hain. ⚠️ Mere do test galat the (trail submission se shuru hota hai; override wala test galat level par pooch raha tha) — dono theek. **G14 CLOSED**, **G31 open** (engine normal concurrency conflict ko error-log karta hai — 5A ke ulta). Purani SQL suite 30/30 unchanged, `run_all` ×2 → 0 objects | ✅ Done |
 | 2026-09-19 | 6A | **Offer Lite — backend.** `t_app_offers`, `m_app_offer_status`, chaar write + do read procedure, chhe route, API. 🔴 **Do machine, ek nahi:** offer (Sent/Accepted/Declined/Withdrawn) aur application (5 → 7 → 8 → 10) — ek transaction, alag sawaal. 🔴 **Map ne 7..10 le liye aur har edge faisla hai:** 5→7 hi (offer faisle ke baad aata hai), 7→5 withdrawal ka landing (re-offer special case nahi, pehla case dobara), **9→7 decline ke baad dusra offer ALLOWED** (mol-bhaav product ke andar rahe; poora trail bachta hai), 8→10 alag step (accept karna aa jaana nahi). 🔴 **Generic status endpoint ab bhi 7..10 refuse karta hai** — wo stages sirf offer actions se bante hain, warna school application ko OfferSent par set kar deta bina offer ke. `OFFER_STAGE_UNAVAILABLE` **retire**, naya `OFFER_ACTION_REQUIRED`. 🔴 **`ALREADY_OFFERED` sirf race se milta hai** (map `7→7` ko INSERT se pehle rok deta hai) — 3C wala aakaar, to suite do session ek hi instant par arm karti hai (**gap 0–2 ms**) aur ek doosra index bana kar sabit karti hai ki CATCH *kaun sa* index dekhta hai. 🔴 **Do permission:** OFFER.CREATE bhejta, OFFER.APPROVE hire confirm karta (SENIOR_HR ke paas pehla hi hai). 🔴 **Ek offer accept karne se baaki applications ko kuch nahi hota** — faisla, teen wajah ke saath, aur teesri 2.56 hai. OFFER_APPROVAL ka level ADMIN se **SCHOOL_OWNER** par theek hua (2C ki galti), par uska koi consumer nahi: **G32**. ⚠️ Mere do test galat the (3C negative ka premise khud banana pada — chhathi fixture contamination; aur scope negative ke liye aisa actor chahiye tha jiske paas permission HO). ⚠️ `applications-race` ki overlap assertion flake hui — proof se evidence par utari. offers 57/57, swagger floor 89→95, Phase 5 ki do suite usi commit mein update, saari purani suites green, `run_all` ×2 → 0 objects | ✅ Done |
+| 2026-10-11 | 6B | **Teacher search + invites — backend.** `m_app_invite_status` (ACCEPTED ke saath, jo schema mein **tha hi nahi**), `t_app_teacher_invites`, `USP_SearchTeachers` (server-side paging/filtering pehle din se, pageSize 100 par clamp, suspended bahar), paanch invite procedure, chhe route. 🔒 **Consent path 2 — doosra aur aakhiri:** `fn_TeacherContactUnlocked` ko doosra EXISTS mila, **usi function mein**, aur guard `sys.sql_expression_dependencies` se poochta hai (closed set — theek do table, "contains" nahi). Invite dekhna kuch nahi kholta, ignore karna kuch nahi kholta, payment status kuch nahi kholta. 🔴 **Boolean ka pehla asli consumer** — mode admin screen se badla, agli search `403 PLAN_LACKS_FEATURE`, ledger `0 -> 0` (2.64). 🔴 **Insert pehle, meter baad mein** — index sasta guard hai; race (gate gap 0 ms, do spid) se sabit. 🔴 **Apply karna open invitation APPLIED par le jaata hai** usi transaction mein, aur unlock application se aata hai — application hataane par unlock band, invitation APPLIED par khadi. 🔴 **Ek field jo 3E se khaali ja rahi thi:** `TeacherContactDto.FullName` — proc project nahi karti thi, row type mein property nahi thi, service mein `= string.Empty` hardcoded tha; **response body padhne se mili, kisi assertion se nahi.** Teenon theek, dono taraf guard. ⚠️ Mere chaar test galat the (envelope ka `code` padha DTO ka nahi; section 4 ka teacher bina resume ka tha — RESUME_REQUIRED sahi tha; cleanup invitation se pehle job delete kar rahi thi — FK; `USP_ConsumeFeature` ko `@FeatureCode` bheja). `teacher-search` 33/33 · `invites` 39/39 · `applications-consent` 31 → **49/49** (dono path ek run mein) · swagger floor 95 → **101**. **G33** (browse-contract 3E se chal hi nahi rahi) aur **G34** (purani suites mein 429 retry nahi — false red) open | ✅ Done |
 
 ---
 
@@ -7787,46 +7973,93 @@ badla, guard ke saath wajah likhi gayi (5B ka rule).
 
 ---
 
-## ▶️ NEXT: PHASE 6B — TEACHER SEARCH + INVITES (🔒 CONSENT PATH 2)
+## ✅ PHASE 6B COMPLETE — 2026-10-11 (TEACHER SEARCH + INVITES, BACKEND)
 
-6A ke baad agla boundary. Brief ne teen workstream fixed order mein diye the —
-6A (engine debt + Offer Lite), **6B** (search + invites), 6C (notifications +
-saare screens) — aur kabhi aadha nahi.
+Details **2.74**. 🔒 **Consent ka doosra aur AAKHIRI raasta ship ho gaya** — ab
+2.56 ke dono path live hain aur ek hi run mein sabit hote hain.
 
-- **Search (jp-school)** — subject, city/state, experience range
-  (`m_mdm_experience_range` — whitelist mein daalna hoga), qualification,
-  class level. 🔴 **SERVER-side paging aur filtering, pehle din se** (G29 ka
-  sabak, aur yahan volume asli hogi). Suspended teachers bahar.
-  🔒 **Contact search results mein KABHI nahi** — kisi plan, kisi flag, kisi
-  role ke liye nahi. 2.56 ka grep search procs tak badhega.
-- **Gating** — `TEACHER_SEARCH` engine ka **pehla Boolean consumer**;
-  `TEACHER_INVITE` Metered (reference = InviteUid). Dono FREE seed hongi.
-  🔴 Boolean ledger mein **kuch nahi likhta** (2.64) — 2.5 ka design assertion,
-  ab ek asli consumer ke against. Saare entitlement read
-  `IEntitlementRepository` se (direct), **kabhi `IMasterService` se nahi** —
-  isolation grep badhega.
-- **Invites** — 🔒 **consent path 2, doosra aur AAKHIRI.**
-  `fn_TeacherContactUnlocked` ko apna doosra EXISTS milega — **usi function
-  mein, doosri jagah nahi.**
-  ⚠️ **Schema mein `InviteStatus` ka koi ACCEPTED value HI NAHI hai**
-  (Sent/Viewed/Applied/Ignored). Locked 2.56 note theek yahi kehta hai: **add
-  karo, warna consent path 2 chup-chaap path 1 mein dhal jaayega.**
-  Invite dekhna kuch nahi kholta; ignore karna kuch nahi kholta; school ka
-  payment status kuch nahi kholta — kabhi.
-- **Path 1 ka REGRESSION** — function badlega, to apply-unlocks **dobara sabit**
-  karna hoga, maan kar nahi chhodna. Consent suite dono path ek hi run mein.
+```
+teacher-search.mjs 33/33   invites.mjs 39/39   applications-consent 31 -> 49/49
+swagger 19/19 (floor 101)
+```
 
-### 🔴 6B shuru karne se pehle padho
+🔒 **Doosra EXISTS usi function mein, aur guard closed set hai.** Function kis
+table se bind karta hai ye `sys.sql_expression_dependencies` se poocha jaata
+hai — theek do naam. Teesra naam = teesra consent path, aur 2.56 kehta hai do
+hi hain.
 
-- **🔒 2.56** — doosra EXISTS **usi function** mein. Kisi aur jagah likhna hi wo
-  bug hai jisse 2.56 bacha raha hai.
-- **2.64** — Boolean ledger mein kuch nahi likhta. Suite ko ledger count entry
-  aur exit par barabar maangna hoga.
-- **2.68 / G26** — naya jp_app master whitelist mein **usi commit** mein
-  (APPLICATION_STATUS ka sabak: 5A mein table bani, 5B tak serve nahi hui).
-- **G29** — search par paging server-side, pehle din se.
-- **2.73** — offer ki do-machine wali seema, taaki invite usse na uljhe.
+⚠️ **Schema mein ACCEPTED hai hi nahi tha**, jaisa locked note ne kaha tha. Add
+kiya, aur master mein do build-time `RAISERROR` guard hain: `IsConsent` row
+**theek ek** ho, aur uska code **ACCEPTED** ho.
 
+🔴 **Contact search result mein kabhi nahi** — proc mein column nahi, DTO sealed
++ `ContactLeakGuard` teenon type par, aur suite response **raw text** mein
+padhti hai chaaron gating state × do role ke liye.
+
+🔴 **Boolean ka pehla asli consumer, aur ledger 0 -> 0** (2.64). Gating mode
+**admin screen se** badla gaya (Playwright), agli hi search `403
+PLAN_LACKS_FEATURE`.
+
+🔴 **Insert pehle, meter baad mein** — aur asli race (gate gap **0 ms**, do alag
+spid) ne order sabit kiya: ek invitation, ek `ALREADY_INVITED`, charge ek.
+
+🔴 **Ek field jo teen phase se khaali ja rahi thi.** `TeacherContactDto.FullName`
+3E se declare thi; proc project nahi karti thi, row type mein property nahi thi,
+service mein `= string.Empty` **hardcoded** tha. **Response body padhne se
+mili, kisi assertion se nahi** — aur pehli koshish mein sirf SQL theek ki,
+assertion likhne par pata chala ki wo DTO tak pahunchi hi nahi. Teenon jagah
+theek, aur ab dono taraf guard: unlocked par populated, locked par NULL.
+
+⚠️ **Do guard usi commit mein badle, wajah ke saath** (5B ka rule):
+`applications-screens` ka binding guard (ek table → do, par closed set hi), aur
+`002_test_teacher.sql` ka `@contact` shape (Msg 213 — **theek wahi galti** jo is
+file ke aakhir mein #1 par likhi hai; is baar test ne pakdi).
+
+⚠️ **Mere chaar test galat the:** envelope ka `code` padha DTO ka nahi; section
+4 ka teacher bina resume ka tha (RESUME_REQUIRED sahi tha, suite galat aadmi se
+pooch rahi thi); cleanup invitation se pehle job delete kar rahi thi (FK, apne
+hi exit section mein mari); aur `USP_ConsumeFeature` ko `@FeatureCode` bheja —
+signature khud bata rahi thi ki gating read API layer mein hai (2.64).
+
+🟡 **Do naye gap:** **G33** — `browse-contract.mjs` 3E se ek baar bhi nahi chali
+(undocumented account), aur jo wo dekhti hai wahi 6B mein badla; **G34** —
+purani suites mein 429 retry nahi hai, aur `screens-3f` isi wajah se **false
+red** di (limiter clear karke 25/25).
+
+⚠️ **Point 7 ka client jawaab abhi bhi nahi aaya**, aur 6B ne uska intezaar
+nahi kiya — invite offer se alag machine hai (2.73 ki do-machine seema isi liye
+pehle padhni thi).
+
+---
+
+## ▶️ NEXT: PHASE 6C — NOTIFICATIONS + SAARE SCREENS
+
+6B ke baad aakhri boundary. Brief ke teen workstream mein se do band
+(6A, 6B) — **6C** bacha hai, aur wo sabse bada hai.
+
+- **Notifications** — in-portal + email. 🔴 **Scope: `RecipientUserUid` only** —
+  ek user theek apni row padhta hai, kisi aur ki id par 404-class behaviour
+  (2.6). Koi "sab dekh lo" raasta nahi.
+- **Screens** — search + invite (jp-school), invitations (jp-teacher), offer ke
+  dono taraf, notification centre. 🔴 **G27 pehle padho** — `.tabs` aur
+  `.banner` teen-teen jagah hand-rolled hain, aur 6C unhe chauthi baar likhne
+  ka sabse bada mauka hai.
+- **🔒 Contact display** `fn_TeacherContactUnlocked` se hi, aur kahin se nahi.
+  Search screen par contact ka koi column nahi — kisi plan, kisi role ke liye
+  nahi.
+- **2.62** — "abhi nahi" (disabled + kab) vs "allowed nahi" (control hatao,
+  samjhao). Invite screen par dono case hain: quota khatam (abhi nahi) aur
+  permission nahi (allowed nahi).
+
+### 🔴 6C shuru karne se pehle padho
+
+- **2.74** — invite machine aur uske refusal code, taaki screen message text par
+  branch na kare (2.21).
+- **G27** — teesri copy pehle se debt hai; chauthi likhne se pehle component
+  banao.
+- **G34** — regression chalane se pehle `JP.Sso.Api` restart, warna purani
+  suites 429 par false red dengi.
+- **2.68 / G26** — naya jp_app master whitelist mein **usi commit** mein.
 
 ## Uske baad
 

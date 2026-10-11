@@ -1072,9 +1072,25 @@ try {
 
   console.log(`\n    fn_TeacherContactUnlocked binds to: ${unlockReads.join(', ') || '(nothing)'}\n`);
 
-  check('🔒 fn_TeacherContactUnlocked binds to t_app_applications AND NOTHING ELSE (2.56)',
-    unlockReads.length === 1 && unlockReads[0] === 't_app_applications',
-    unlockReads.join(', ') || '(nothing)');
+  /*
+    🔒 UPDATED IN 6B, AND THE REASON IS A CHANGE TO SHIPPED STATE.
+
+    Until 6B this read "length === 1" — one consent path, the application. 6B
+    adds the second and FINAL path: a teacher who ACCEPTS an invitation
+    (m_app_invite_status.IsConsent, which 027 structurally pins to exactly one
+    row named ACCEPTED). So the function now binds to two tables and this guard
+    had to move with it.
+
+    ⚠️ The guard is still a CLOSED SET, which is the whole point — it did not
+    become "contains t_app_applications". A third table appearing here means a
+    third consent path appeared, and 2.56 says there are exactly two. The list
+    is sorted by the query, so the comparison is a join, not a set test.
+  */
+  const EXPECTED_UNLOCK_READS = 't_app_applications, t_app_teacher_invites';
+
+  check('🔒 fn_TeacherContactUnlocked binds to EXACTLY the two consent tables, nothing else (2.56)',
+    unlockReads.join(', ') === EXPECTED_UNLOCK_READS,
+    `${unlockReads.join(', ') || '(nothing)'}${unlockReads.join(', ') === EXPECTED_UNLOCK_READS ? '' : ` — expected ${EXPECTED_UNLOCK_READS}`}`);
 
   check('🔒 …so a saved job is stored and cannot possibly unlock anything',
     savedRows === '1' && !unlockReads.includes('t_app_saved_jobs'),
