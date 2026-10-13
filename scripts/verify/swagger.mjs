@@ -104,8 +104,32 @@ const APIS = [
       IS the seam a gateway callback will later enter through
       (MONETIZATION_DESIGN 6.5-A). A stub "pay now" endpoint would be the
       mockup-era failure this project exists to avoid.
+
+      🔴 RAISED TO 119 ON 2026-10-14 (PHASE 7A — the public face), in the same
+      change that added the routes. Six, and they are the first on this API
+      that NOBODY authenticates to reach:
+
+        GET  /api/public/jobs              the listing, server-paged
+        GET  /api/public/jobs/filters      reachable filter values + counts
+        GET  /api/public/jobs/{jobUid}     one job, or 404
+        GET  /api/public/faqs              admin-editable copy (2.81)
+        GET  /api/public/content-blocks    admin-editable copy (2.81)
+        POST /api/public/contact           the ONLY anonymous WRITE
+
+      ⚠️ 119 WAS MEASURED, NOT CALCULATED. Adding six to a remembered 113 would
+      agree with the measurement only by luck — earlier in this project a menu
+      count was "fixed" by adding one to a stale 32 when the real figure was
+      34, which confirmed the rot instead of correcting it. Both were computed
+      this time, and they agreed.
+
+      🔴 A GREP FOR "public" FINDS SEVEN, AND THE SEVENTH IS NOT ONE OF THESE.
+      /api/schools/{uid}/public is a Phase 3 route that REQUIRES a token: it
+      serves a school's public-facing profile to a signed-in teacher. Anyone
+      auditing the anonymous surface by path name will find it and must not
+      count it — what defines that surface is the absence of [Authorize] on
+      PublicController, not the word in the URL.
     */
-    minOperations: 113,
+    minOperations: 119,
   },
 ];
 
@@ -294,6 +318,93 @@ try {
   check('🔒 …and none takes one as a query parameter either',
     recipientParams.length === 0,
     recipientParams.length ? `LEAKED: ${recipientParams.join(', ')}` : 'none');
+  /*
+    ------------------------------------------------------------------------
+    PHASE 7A — THE PUBLIC SURFACE
+    ------------------------------------------------------------------------
+    The first operations on this API that nobody authenticates to reach.
+  */
+  const publicJobs = doc?.paths?.['/api/public/jobs']?.get;
+  const publicFilters = doc?.paths?.['/api/public/jobs/filters']?.get;
+  const publicJob = doc?.paths?.['/api/public/jobs/{jobUid}']?.get;
+  const publicFaqs = doc?.paths?.['/api/public/faqs']?.get;
+  const publicBlocks = doc?.paths?.['/api/public/content-blocks']?.get;
+  const publicContact = doc?.paths?.['/api/public/contact']?.post;
+
+  check('the public job listing is documented (Phase 7A)',
+    !!publicJobs, publicJobs ? 'present' : 'MISSING');
+  check('…and the filter values, which the listing UI needs to render controls',
+    !!publicFilters, publicFilters ? 'present' : 'MISSING');
+  check('…and one public job, the route the 404 wall defends',
+    !!publicJob, publicJob ? 'present' : 'MISSING');
+  check('…and the FAQ copy, served from the database (2.81)',
+    !!publicFaqs, publicFaqs ? 'present' : 'MISSING');
+  check('…and the designated content blocks',
+    !!publicBlocks, publicBlocks ? 'present' : 'MISSING');
+  check('…and the contact form — the only anonymous WRITE in the system',
+    !!publicContact, publicContact ? 'present' : 'MISSING');
+
+  /*
+    🔴 A CEILING, NOT A FLOOR — AND THIS IS THE ONLY PLACE IN THIS FILE THAT
+    WANTS ONE.
+
+    minOperations above asks "did anything VANISH", because everywhere else the
+    failure is a route silently disappearing. On the anonymous surface the
+    danger runs the other way: the failure is a route silently APPEARING. A
+    seventh endpoint under /api/public is an endpoint somebody can call with no
+    token and no account, and "I put it under public because it needed no auth"
+    is exactly how it would arrive.
+
+    So this asserts the set is EXACTLY these six. When a seventh is genuinely
+    wanted, this number moves in the same commit, with the reason — which is
+    the conversation the assertion exists to force.
+  */
+  const anonymousPaths = Object.keys(doc?.paths ?? {}).filter((p) => p.startsWith('/api/public'));
+
+  const anonymousOps = anonymousPaths.flatMap((p) =>
+    Object.keys(doc.paths[p] ?? {})
+      .filter((verb) => ['get', 'post', 'put', 'patch', 'delete'].includes(verb))
+      .map((verb) => `${verb.toUpperCase()} ${p}`));
+
+  check('🔴 the anonymous surface is EXACTLY six operations — a 7th is a new front door',
+    anonymousOps.length === 6,
+    anonymousOps.length === 6
+      ? '6, unchanged'
+      : `${anonymousOps.length}: ${anonymousOps.join(', ')}`);
+
+  /*
+    ⚠️ /api/schools/{uid}/public matches a path grep for "public" and is NOT
+    part of that set — it is a Phase 3 route behind [Authorize]. The filter
+    above is anchored with startsWith('/api/public') precisely so the two never
+    get confused; this assertion states it so the next reader does not have to
+    rediscover it.
+  */
+  check('…and the Phase 3 /api/schools/{uid}/public route is NOT in that set',
+    !anonymousPaths.some((p) => p.includes('/schools/')),
+    'authenticated despite its name — counted nowhere near the anonymous six');
+
+  /*
+    🔒 AND WHAT MUST NOT BE THERE: anything that names a person.
+
+    A public endpoint taking a teacher or user identity would be a lookup of a
+    private individual by anyone on the internet — the single worst thing this
+    surface could grow. Checked in the path and in the query, the same shape
+    030's notification check uses.
+  */
+  const publicWithIdentity = anonymousPaths.filter((p) => /teacher|user|recipient|applicant/i.test(p));
+
+  check('🔒 no public route names a teacher, user or applicant in its path',
+    publicWithIdentity.length === 0,
+    publicWithIdentity.length ? `LEAKED: ${publicWithIdentity.join(', ')}` : `${anonymousPaths.length} paths, none of them`);
+
+  const publicIdentityParams = anonymousPaths.flatMap((p) =>
+    Object.values(doc.paths[p] ?? {}).flatMap((op) => (op?.parameters ?? [])
+      .filter((q) => /teacher|userUid|userId|recipient|applicant|email|mobile/i.test(q?.name ?? ''))
+      .map((q) => `${p} ?${q.name}`)));
+
+  check('🔒 …and none takes one as a query parameter either',
+    publicIdentityParams.length === 0,
+    publicIdentityParams.length ? `LEAKED: ${publicIdentityParams.join(', ')}` : 'none');
 } catch (error) {
   check('the entitlement matrix operation is documented', false, error.message);
 }

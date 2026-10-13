@@ -37,6 +37,8 @@ npx playwright install chromium
 | `final-verify.mjs` | Federation: which barrels are fetched from `:4999`, how many copies of `@angular/core` the page loaded, and the singleton proof (`JP_APP_IDENTITY instanceof ng.InjectionToken`) | all three hosts + `jp-shared` |
 | `shoot-site.mjs` | Screenshots every public page at 1440 and 375 into `design-screens/`, and reports horizontal scroll | `jp-public` |
 | `check-scss-depth.mjs` | Finds the deepest component stylesheet using the shared partials per app and confirms it compiled — the build-time SCSS path that broke after the repo split | nothing (reads source and `dist/`) |
+| `public-contract.mjs` | Phase 7A. The anonymous surface over HTTP: the 404 wall (draft/expired-at-the-IST-boundary/closed/deleted), the raw-bytes sweep plus a key allowlist, byte-identical responses with and without a token, the honeypot, the read and contact rate limits, and the batched view counter | `JP.App.Api`, `JP.Sso.Api` — **restart the App API first**, see above |
+| `public-screens.mjs` | Phase 7A. The public site in a browser: the listing with **JavaScript disabled** (the only test that tells server rendering from hydration), filters in the URL, no Authorization header on any request, the job title from the response, the wall through the UI, and the contact form's payload and states by interception | `jp-public`, `JP.App.Api`, `JP.Sso.Api` |
 
 Run them with the dev servers already up:
 
@@ -44,6 +46,33 @@ Run them with the dev servers already up:
 node scripts/verify/site-audit.mjs
 node scripts/verify/check-scss-depth.mjs ../jp-admin ../jp-school ../jp-teacher
 ```
+
+## 🔴 A full regression needs a freshly started JP.App.Api
+
+`public-contract.mjs` proves the contact form's rate limit, which is **three
+submissions per hour per IP**. Proving it costs all three. The limiter is
+in-memory and per process (2.35), so the reset is a **restart**, not a wait:
+
+```bash
+taskkill //F //IM JP.App.Api.exe      # Git Bash; pkill does not match it on Windows
+dotnet run --project JP.App.Api       # from jp-backend
+node scripts/verify/run.mjs
+```
+
+Run it twice inside the hour without restarting and `public-contract` fails on
+its own PRECONDITION check, which says exactly this. That is the check doing its
+job — an exhausted bucket otherwise reads as a broken honeypot, and costs
+twenty minutes in the wrong file.
+
+⚠️ `public-screens.mjs` spends **no** budget — every contact test there
+intercepts — so it can be run repeatedly in any order. The split is deliberate:
+the contract suite owns the server's behaviour, the screens suite owns the
+screen's.
+
+⚠️ And `public-contract` hands the **read** budget back before it exits (it
+polls for a 200). It used to leave the per-IP read bucket empty, and the next
+suite's server-rendered pages came back 429 — reported as "the job listing is
+not server-rendered", which was false and pointed at the wrong file.
 
 ## Two traps these scripts already account for
 

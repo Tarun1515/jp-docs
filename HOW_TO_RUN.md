@@ -273,15 +273,38 @@ dev server is memory and one more thing to have left running by mistake.
 | **Admin screens** | `jp-shared` :4999 · `JP.Sso.Api` :5199 · `jp-admin` :4200 |
 | **Teacher screens** | `jp-shared` :4999 · `JP.Sso.Api` :5199 · `jp-teacher` :4400 |
 | **A shared component** | `jp-shared` :4999 + **any one** app to look at it in |
-| **The public site** — home, how it works, about, FAQ, contact, legal | `jp-public` :4500 — **nothing else**. No remote, no API |
+| **The public site** — home, how it works, about, legal | `jp-public` :4500 — no remote, no API |
+| **The public site's DATA pages** — `/jobs`, `/jobs/:slug`, `/faq`, `/contact` | `jp-public` :4500 **plus `JP.App.Api` :5299** — see the note below |
 | **The `/continue` chooser flow** | `jp-public` :4500 **plus whichever target app you are checking** — `jp-school` :4300 or `jp-teacher` :4400, and `jp-shared` :4999 for that app to render |
 | **Master data / business endpoints** (Phase 2+) | the above **plus** `JP.App.Api` :5299 |
 | **Database or SP work** | none of them — `sqlcmd` only |
 
-> The chooser row is the one exception to "jp-public needs nothing else". The
-> page itself renders standalone, but following a card into `/auth/login` or
-> `/auth/register` crosses into another app — and that app needs the remote.
-> This is a legitimate reason to have `jp-public` running during Phase 1 work.
+> 🔴 **PHASE 7A CHANGED THIS, AND THE OLD LINE HERE WAS "jp-public needs
+> nothing else. No remote, no API".** That was true for five phases and is now
+> only half true.
+>
+> `/jobs`, `/jobs/:slug`, `/faq` and `/contact` read and write `JP.App.Api` — they
+> are the first pages on the public site that talk to a backend at all. They are
+> also `RenderMode.Server`, so the **Node SSR process** makes that call while
+> rendering: without the API, `/jobs` serves a page that says it could not load
+> the jobs, and `/faq` one that says it could not load the questions. They say so
+> honestly rather than rendering empty, but they are not standalone any more.
+>
+> ⚠️ `jp-public` still needs **no remote**. It is not federated and never
+> contacts :4999 — that part of the old line stands.
+>
+> ⚠️ **FIVE** pages are still fully standalone: home, how it works, about, terms
+> and privacy. They are prerendered at build time and hold no data.
+>
+> ⚠️ `npm run build` prints "Prerendered 6 static routes", and the sixth is
+> `/contact` — which is **prerendered and still needs the API**. Those two are not
+> the same question: prerendering is about how the page is BUILT, and the form
+> POSTs when somebody presses the button. So contact renders fine with nothing
+> running and fails on submit, which is the one combination that is easy to miss.
+>
+> The chooser is the other exception: the page renders standalone, but following
+> a card into `/auth/login` or `/auth/register` crosses into another app — and
+> that app needs the remote.
 
 Two things follow from that table:
 
@@ -385,19 +408,65 @@ in exchange for nothing, while complicating the SSR pipeline that its SEO
 depends on. Its 404 page is its own rather than `jp-shared/pages` for exactly
 that reason.
 
-All seven static pages are **prerendered** at build time; only `/continue` is
-server-rendered, because it varies by query parameter. Each route carries its
-own title, meta description, Open Graph tags and canonical URL, and
-`robots.txt` and `sitemap.xml` ship with the build. Lighthouse scores SEO 100
-and accessibility 100 on every page — keep it that way.
+**Six** pages are **prerendered** at build time — home, how it works, about,
+contact, terms, privacy — and `npm run build` prints exactly that ("Prerendered 6
+static routes"), which is the quickest way to check nothing has slipped into the
+wrong mode.
 
-⚠️ Job search and job detail are **not** built. They need Phase 4 data, and the
-homepage carries a marked placeholder where they will go rather than mock job
-cards. "Find jobs" is deliberately absent from the header for the same reason.
+**Four** are server-rendered: `/continue` (varies by query parameter), and from
+Phase 7A `/jobs`, `/jobs/:slug` and `/faq` (they read live data). 🔴 Those three
+MUST stay listed in `app.routes.server.ts`: the `**` catch-all is
+`RenderMode.Prerender` and would otherwise render `/jobs` ONCE at build time —
+against a build machine with no jobs — and serve that empty page for ever, with
+no error and no warning.
 
-⚠️ The contact form validates but has **no endpoint** until Phase 7. It tells
-the visitor so and offers a prefilled `mailto:`. Do not replace that with a
-success message before there is somewhere for the submission to go.
+Each route carries its own title, meta description, Open Graph tags and canonical
+URL, and `robots.txt` and `sitemap.xml` ship with the build. ⚠️ A job detail
+page's title comes from the JOB, not from route data, so it is set from the
+response — and the title is capped at 65 characters because `site-audit.mjs` fails
+above that. Lighthouse scores SEO 100 and accessibility 100 on all **nine**
+pages (the seven static ones plus `/jobs` and one job detail) — keep it that way.
+
+✅ **Job search and job detail ARE built (Phase 7A).** `/jobs` is a
+server-rendered listing with search, subject/state/class-level filters and
+server paging; `/jobs/:slug` is one job with the school's public profile.
+"Find jobs" is back in the header, first in the nav.
+
+The line here used to read "not built… they need Phase 4 data… 'Find jobs' is
+deliberately absent from the header for the same reason", and that rule is why
+they waited: the link was removed because it would have 404ed, and it is back
+because the page now exists. Restored by the same rule that removed it.
+
+🔒 Only **effective-ACTIVE** jobs exist publicly. A draft, expired, closed,
+deleted or (from 7B) moderation-pulled job returns **404 on the public route**,
+enforced in the procedure's WHERE clause — and the refusal never says which,
+because on a page anyone can load "this job has expired" confirms the id is real.
+
+⚠️ The city filter renders no control, because `m_mdm_city` is unseeded (G40).
+It will appear by itself the day the master is seeded — the UI is driven by what
+the server says is reachable.
+
+⚠️ Featured jobs and featured schools are **still** not built. They are Phase 7B,
+and the "do not build it against mock data" argument still applies to them.
+
+✅ **The contact form posts for real (Phase 7A)** — `POST /api/public/contact`
+into `t_app_contact_enquiries`, which 7B's admin queue reads. It is the only
+anonymous WRITE in the system.
+
+⚠️ The prefilled `mailto:` did NOT go away; it moved to the failure path. A form
+that cannot submit and offers no alternative loses the enquiry, which is what the
+old note here was protecting against — so on a failed send the page says so, the
+message stays in the box, and the mailto: button is offered. `public-screens.mjs`
+forces a 500 and asserts all three.
+
+🔒 **It carries a honeypot.** A `website` field is hidden from people (off-screen,
+`tabindex="-1"`, `aria-hidden`) and sent untouched. A bot that fills it gets **200
+and the same thank-you a person gets, and no row is written** — telling it that
+it was caught teaches whoever wrote it to stop filling the field. Nothing is
+checked in the browser; the server decides, silently.
+
+⚠️ **Three submissions per hour per IP.** The limit is per process and in memory,
+so a restart resets it — which matters when running the verification suites.
 
 🔴 `/terms` and `/privacy` have real structure and **placeholder body copy that
 has not been through legal review**. Both carry a visible draft notice. They
@@ -717,6 +786,13 @@ Design and rationale: `MONETIZATION_DESIGN.md`.
 
 Every one of these has been exercised end to end against running APIs — see
 `scripts/verify/` for the checks and `screenshots/` for what they look like.
+
+> 🔴 **A full `run.mjs` needs a freshly started `JP.App.Api`.** `public-contract.mjs`
+> proves the contact form's rate limit — three submissions per hour per IP — and
+> proving it costs all three. The limiter is in-memory and per process (2.35), so
+> the reset is a **restart**, not a wait. Run it twice inside the hour without
+> restarting and that suite fails on its own PRECONDITION check, which says
+> exactly this. Details in `scripts/verify/README.md`.
 
 ### 🟡 Real page, presentational data
 

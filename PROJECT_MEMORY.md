@@ -1,7 +1,7 @@
 # TEACHER RECRUITMENT PORTAL — PROJECT MEMORY
 
 > **Ye file har kaam ke baad update hogi.** Har naye chat/session mein sabse pehle ye file padho.
-> Last updated: **2026-10-11** | Phase **3 COMPLETE** + **2.5 engine** + **4 jobs COMPLETE** + **2.67 swagger fix** + **PRE-5 (G26 band, 2.68/2.69)** + **PRE-5b (baseline green)** + **5A applications BACKEND (2.70, G28)** + **5B applications SCREENS COMPLETE — PHASE 5 POORA (2.71, G30)** + **6A-0 approval engine above level 1 (2.72, G14 BAND, G31)** + **6A Offer Lite BACKEND COMPLETE (2.73, G32)** + **6B TEACHER SEARCH + INVITES BACKEND COMPLETE — 🔒 CONSENT PATH 2 (2.74, G33, G34)** + **6C-0 verification ka bakaya: G33 aur G34 BAND (2.75, G35, G36)** + **6C-1 NOTIFICATIONS BACKEND + G27 BAND (2.76, G37)** + **6C-2-0 G37 BAND — badge asli hua, aur shared suite runner (2.77, G35 BAND)** + **6C-2 SCREENS COMPLETE — 🔒 consent path 2 screen se, devtools-forced negatives dono taraf (2.78)** + **6.5A BILLING BACKEND COMPLETE — manual first, seam service par, expiry derived (2.79, G38)** + **6.5B BILLING SCREENS COMPLETE — PHASE 6.5 POORA (2.80)** | Next: **Phase 7 / client ke jawab** — ⚠️ Point 7 (interview/offer scope) aur §4 Q4 (billing MVP ka likhit confirmation) dono pending hain
+> Last updated: **2026-10-14** | Phase **3 COMPLETE** + **2.5 engine** + **4 jobs COMPLETE** + **2.67 swagger fix** + **PRE-5 (G26 band, 2.68/2.69)** + **PRE-5b (baseline green)** + **5A applications BACKEND (2.70, G28)** + **5B applications SCREENS COMPLETE — PHASE 5 POORA (2.71, G30)** + **6A-0 approval engine above level 1 (2.72, G14 BAND, G31)** + **6A Offer Lite BACKEND COMPLETE (2.73, G32)** + **6B TEACHER SEARCH + INVITES BACKEND COMPLETE — 🔒 CONSENT PATH 2 (2.74, G33, G34)** + **6C-0 verification ka bakaya: G33 aur G34 BAND (2.75, G35, G36)** + **6C-1 NOTIFICATIONS BACKEND + G27 BAND (2.76, G37)** + **6C-2-0 G37 BAND — badge asli hua, aur shared suite runner (2.77, G35 BAND)** + **6C-2 SCREENS COMPLETE — 🔒 consent path 2 screen se, devtools-forced negatives dono taraf (2.78)** + **6.5A BILLING BACKEND COMPLETE — manual first, seam service par, expiry derived (2.79, G38)** + **6.5B BILLING SCREENS COMPLETE — PHASE 6.5 POORA (2.80)** + **7A-0 PUBLIC SURFACE KE TEEN FAISLE, CODE SE PEHLE (2.81, G39, G40)** + **7A PUBLIC JOB PAGES + CONTACT FORM COMPLETE — 🔒 pehli ANONYMOUS surface, SSR JS band kar ke saabit (2.82, G41)** | Next: **7B — admin ka operations desk** (moderation, reports, featured, CMS, enquiry queue) — ⚠️ Point 7 (interview/offer scope) aur §4 Q4 (billing MVP ka likhit confirmation) dono ab bhi client ke paas hain
 >
 > 🔴 **Ye do line har phase ke close-out mein update hongi.** File 3I tak
 > pahunch chuki thi aur ye header **Phase 0** par khada tha — saat phase purana,
@@ -2080,6 +2080,139 @@ expire ho gaya.** Us comment mein likha tha ".tabs system mein nahi hai (G27)" �
 ab hai. Baaki wajah apne paon par khadi hai: har option apna **count** carry
 karti hai, jiske liye tab strip mein jagah nahi. Comment theek kar diya — toota
 hua reason likha chhod dena usi class ki galti hai jo G27 thi.
+
+### G41. Apply CTA job ko saath nahi le ja sakti — jp-teacher ke teen tukde missing — 🟡 OPEN (7A, 2026-10-14)
+
+2.43 aur 7A-0.0 dono kehte hain: job detail par **"Apply" seedha teacher signup
+par jaaye, job uske redirect target ke saath**. Pehla aadha chalta hai. Dusra
+aadha **chal hi nahi sakta**, aur ye naapa gaya hai, maana nahi gaya.
+
+`portal-links.ts` mein 2.44 ne pehle se likh rakha tha:
+
+```ts
+export function applyToJobUrl(jobSlug: string): string {
+  return signUpUrl('teacher', `/jobs/${jobSlug}/apply`);
+}
+```
+
+Use **kisi ne kabhi call nahi kiya** (7A pehla caller hota). Jab 7A ne call
+karne ki koshish ki, to uske doosri taraf **teen cheezein gayab** nikli:
+
+| # | Kya chahiye | jp-teacher mein aaj | Naapa kaise |
+|---|---|---|---|
+| 1 | `?redirect=` padhne wala koi | **koi nahi** — poore app mein sirf `reset-password` query param (`token`) padhta hai | `grep -rn "redirect" src` → 4 hits, saare `redirectTo:` route config |
+| 2 | `jobs/:id/apply` route | **nahi hai** — apply job **detail page par** hota hai | `app.routes.ts`: sirf `jobs` aur `jobs/:jobId` |
+| 3 | uid se job kholne ka raasta | `jobs/:jobId` `Number(params.get('jobId'))` karta hai — **integer** | `job-detail.component.ts:93` |
+
+Teesra sabse gehra hai: public surface **jaan-boojh kar** sirf `jobUid` deta
+hai, aur `public-contract.mjs` ka allowlist ek `"jobId"` key par **fail** hota
+hai (2.47 — uid contract hai, integer id nahi). To public site job ko us naam
+se bula hi nahi sakti jo teacher app samajhta hai.
+
+**🔴 7A ka faisla: parameter hata diya, chhupaya nahi.**
+`applyToJobUrl(slug)` ab `applyAsTeacherUrl()` hai aur koi redirect nahi
+bhejta. Jo parameter koi padhta hi nahi, usse bhejna **na bhejne se bura** hai:
+agla banda "Apply resume kyun nahi karta" debug karte waqt maan lega ki link
+theek hai aur galat jagah dhoondhega. Argument na lena bhi isi liye — ek unused
+`jobUid` parameter aisa padhta hai jaise job ja rahi ho.
+
+⚠️ **Aaj visitor ke liye kya hota hai:** Apply dabao → teacher signup khulta
+hai → account banao → dashboard. Job khud nahi aati; usse `/jobs` par dobara
+dhoondhna padta hai. Kaam karta hai, par ek extra step hai.
+
+**Band kaise hoga** (teeno ek saath, warna aadha kaam):
+1. jp-teacher ke `login`/`register` mein `?redirect=` padhna — **sirf
+   app-relative path**, warna open redirect (`portal-links.ts` ka comment ye
+   pehle se likhta hai).
+2. `jobs/:jobUid` ko uid se kholna — iske liye backend par uid se job dene
+   wala raasta chahiye, ya maujooda proc ka uid overload.
+3. Phir `applyAsTeacherUrl()` ko job wapas di jaaye, aur `public-screens.mjs`
+   mein assert kiya jaaye ki Apply ka href usme job ka uid rakhta hai.
+
+🔴 Ye **teacher-side apply flow ka boundary** hai, 7A ka nahi. 7A public pages
+aur contact form hai; dusre repo ke auth mein redirect support jodna apna
+security surface (open redirect validation) aur apne test maangta hai. "Clean
+boundary → stop and report; never half of one."
+
+---
+
+### G40. City search ka data nahi hai — `m_mdm_district` aur `m_mdm_city` khaali — 🟡 OPEN (7A, 2026-10-14)
+
+Phase 7A ka brief public search maangta hai *"(subject, city/state, class level)"*.
+Teen me se **do** ke paas data hai:
+
+```
+m_mdm_state        36 rows   ✅ filter chalta hai
+m_mdm_subject      34 rows   ✅
+m_mdm_class_level   5 rows   ✅
+m_mdm_district      0 rows   ❌
+m_mdm_city          0 rows   ❌  <- city filter kabhi match nahi kar sakta
+```
+
+`003_seed_geography.sql` sirf **country aur state** seed karta hai. City ka
+`DistrictId` NOT NULL hai aur uska FK `m_mdm_district` par hai, to city seed
+karne se pehle district seed karna padega.
+
+**Aaj ka behaviour, aur wo jaan-boojh kar hai:**
+`USP_GetPublicJobFilters` **reachable rows only** deta hai (app-master
+whitelist wali discipline) — to city list **khaali** aati hai aur UI city ka
+control **dikhata hi nahi**. Ek dropdown jisme chaalees option hon aur
+unatalees khaali page dein, usse behtar hai ki control na ho. Job card par
+**state** dikhta hai, jo seeded hai.
+
+⚠️ **Koi dangling data nahi hai** — naapa gaya: aaj ek bhi job/branch aisi
+CityId nahi rakhti jo master mein na ho. Ye gap sirf "master khaali hai" hai,
+data corruption nahi.
+
+🔴 **Khud se city list banana jaan-boojh kar NAHI kiya.** Ye reference data ka
+faisla hai: aadhi list (sirf metros) se Pune ka visitor khaali page dekh kar
+samjhega platform par Pune ki job hi nahi hai — jo poori list ke na hone se
+**zyada** galat message hai. Aur poori Indian city list client/ek accepted
+dataset se aani chahiye, humari yaad se nahi (wahi argument jo 008_seed_plans
+prices ke liye deta hai).
+
+**Band kaise hoga:** client se district+city dataset (ya ek named public
+dataset par unki haan), phir `003_seed_geography.sql` ka extension. Code ka
+koi badlaav nahi chahiye — filter proc, DTO aur UI teeno us din apne aap kaam
+karne lagenge, kyunki wo pehle se "jo reachable hai wahi dikhao" par bane hain.
+
+---
+
+### G39. Admin Settings ka scope client ke paas hai — 🟡 OPEN (7A-0, 2026-10-14)
+
+Spec **point 3** "Admin Settings" maangta hai aur uske aage **koi detail nahi**
+hai. Phase 7 ka brief isi liye use scope se bahar rakhta hai, aur ye row usi
+baat ka record hai.
+
+**Jo aaj maujood hai** aur jise "settings" samjha ja sakta hai:
+
+| Screen | Permission | Phase |
+|---|---|---|
+| `/masters` — master data | `SETTINGS.MANAGE` | 2F |
+| `/settings/plans` — plan × feature matrix, gating modes, kill switch | `SETTINGS.MANAGE` | 2.5 |
+| `/settings` | — | ⬜ `comingSoon` route, koi row nahi |
+
+**Jo pata nahi:** "Admin Settings" se client ka matlab kya hai. Teen mumkin
+matlab, teeno ka kaam alag:
+
+1. **Platform configuration** — rate limits, token lifetimes, email templates.
+   ⚠️ Inmein se kai aaj `appsettings` mein hain (2.35, 2.7), aur unhe DB mein
+   laane ka matlab hai ek live-editable config surface — apna hi risk.
+2. **Branding / tenancy** — logo, colours, domain. MVP single-tenant hai.
+3. **Admin ka apna account** — password, 2FA. Ye "settings" ka sabse aam matlab
+   hai aur sabse chhota kaam.
+
+🔴 **Andaaza laga kar banane se ye gap behtar hai.** Teen me se galat chun kar
+banane ka matlab hai ek screen jo client ki zarurat poori nahi karti, aur jo
+us zarurat ke aane par **hatani** padegi — mockup-era failure jiske khilaaf ye
+project likha gaya hai.
+
+**Kya chahiye band hone ke liye:** client se ek vaakya ki "Admin Settings" se
+kya chalaana hai. `/settings` ka `comingSoon` route aur uski menu row
+(`Is_Active`) tab tak waise hi rahenge — route maujood hai, row maujood hai,
+aur screen sach bolti hai.
+
+---
 
 ### G38. `@FallbackPlanId` NULL default se lapsed account ka cliff wapas aa sakta hai — 🟡 OPEN (6.5A, 2026-10-11)
 
@@ -8015,6 +8148,459 @@ satisfy ho jaata tha, aur yehi hua tha.
 
 ---
 
+### 2.81 PUBLIC SURFACE — THE THREE DECISIONS, WRITTEN BEFORE THE CODE (7A-0)
+
+6.5A-0 ka sabaq: jo design doc build ke baad aata hai wo build ko document
+karta hai, decision nahi leta. Phase 7 ka pehla UNAUTHENTICATED surface hai —
+business data par, bina token. To teen decision pehle, har ek ke saath wo
+raasta jo **chhoda** gaya.
+
+⚠️ **Ye section build ke dauraan amend hoga** (6.5A-0 ki tarah, jahan teen
+galtiyan likhne mein hi mili thीं). Jo badle, wo yahin, wajah ke saath.
+
+---
+
+#### 🔴 7A-0.0 — PEHLE EK TAKRAAR: APPLY CTA KAHAN JAATI HAI
+
+Brief kehta hai: *"Apply CTA → /continue audience chooser (2.43)"*. Par **2.43
+apni table mein uska ULTA likhta hai**:
+
+| Entry point | 2.43 kehta hai |
+|---|---|
+| Header Sign in / Sign up | `/continue?mode=…` |
+| Footer "Register your school" | **seedha** app par |
+| **Job detail "Apply"** | **seedha teacher signup par, job redirect target ke saath** |
+
+2.43 ki wajah bhi likhi hui hai: *"Jisne pehle hi bata diya ki wo kaun hai, use
+chooser dikhana sirf ek extra click hai."* Aur ek teaching job par "Apply"
+dabaane wala banda **bata chuka hai** ki wo teacher hai.
+
+🔴 **Main 2.43 ke saath ja raha hoon** — kyunki brief khud 2.43 ko apni authority
+bataata hai, aur 2.43 ulta kehta hai; to citation shayad parchi hai. Apply
+seedha teacher signup par jaayegi, job uske redirect target ke saath.
+
+⚠️ **Agar iraada chooser hi tha**, to ye ek line ka badlaav hai
+(`portal-links.ts` mein target) aur main turant badal doonga — par chup-chaap
+chooser lagana 2.43 ko bina likhe palat dena hota, jo isi file ke hone ka
+matlab khatm kar deta.
+
+---
+
+#### 🔴 7A-0.1 — CMS vs PRERENDER
+
+**Direction maan li, aur usse THEEK kiya.** 2.44 ne static pages jaan-boojh kar
+prerender kiye (`RenderMode.Prerender`, `**` catch-all) aur 2.43 ne
+`/continue` ko akela `RenderMode.Server` rakha. CMS tables DB_TABLE_STRUCTURE
+mein hain. Dono ko milana:
+
+| Page | Render | CMS-editable? |
+|---|---|---|
+| `/`, `/how-it-works`, `/about` | **Prerender** (jaise hai) | ❌ |
+| `/terms`, `/privacy` | **Prerender** (jaise hai) | ❌ **kabhi nahi** — neeche |
+| `/faq` | **Server** (badlega) | ✅ `t_app_faqs` |
+| `/jobs`, `/jobs/:slug` | **Server** (naya) | — data hai |
+
+**🔒 LEGAL PAGES CMS SE BAAHAR HAIN, AUR YE SABSE ZAROORI LINE HAI.**
+
+2.44 saaf likhta hai: *"Kisi lawyer ne na likha hai na check kiya hai… Client ko
+final wording deni ya approve karni hogi launch se pehle. Client ki taraf se
+enforceable terms invent karna hamara kaam nahi hai."*
+
+Terms ko CMS-editable banane ka matlab hota ki **koi admin enforceable terms
+badal sakta hai, bina legal review ke** — theek wo cheez jisse 2.44 bachata hai.
+Legal copy **launch blocker** hai, admin ka rozmarra ka edit nahi. Wo
+prerendered rehti hai, aur badalne ka raasta ek commit + review hai, ek textarea
+nahi.
+
+**Rejected — sab kuch CMS se, "content content hai".** Ek hi editor, ek hi
+pipeline, admin kuch bhi theek kar sakta — aur yehi uski kharabi hai: FAQ ki
+typo aur privacy policy ka clause ek hi button ke peeche aa jaate, aur dono ka
+blast radius bilkul alag hai.
+
+**🔴 `t_app_cms_pages` is phase mein NAHI banega**, aur ye jaan-boojh kar hai.
+Project ke paas dono precedent hain:
+
+- **2.37** ne `t_sso_role_menus` khaali banayi: *"khaali table ka koi cost nahi"*
+  — kyunki baad mein retrofit karna **live DB par migration + proc rewrite**
+  maangta.
+- **029** ka consumer guard ulta kehta hai: jo row apne consumer ke bina aaye,
+  wo aadha feature hai.
+
+Farq **retrofit ki keemat** hai. `cms_pages` ko baad mein jodna ek naya table
+hai — koi data migrate nahi hota, koi proc nahi badalta. To 2.37 ka argument
+ispar lagta hi nahi, aur 029 ka lagta hai. `t_app_faqs` aur
+`t_app_cms_content_blocks` banenge **kyunki unka consumer isi phase mein hai**;
+`cms_pages` tab banega jab koi page sach mein CMS se aayega.
+
+**🔴 EK TRAP JO LIKHNA ZAROORI HAI:** `app.routes.server.ts` ka `**`
+catch-all **PRERENDER** hai. `/jobs` ko `app.routes.ts` mein daal dena aur
+server route na likhna matlab — Angular use **build time par prerender** kar
+dega, bina data, aur **har visitor ko ek hi khaali listing** milegi. Koi error
+nahi aayega. Is liye `jobs` aur `jobs/:slug` ko explicit `RenderMode.Server`
+chahiye, aur 7A ki verification uska **pehla byte** padhegi.
+
+⚠️ **Homepage ka featured band (7B) prerendered hi rahega.** Featured jobs ko
+hydration ke baad client-side laaya jaayega. Wajah: homepage sabse zyada hit
+hone wala page hai, featured jobs SEO-critical nahi hain (listing hai), aur
+usey Server banane ka matlab hota har hit par server render — sabse busy page
+par, sabse kam faayde ke liye.
+
+---
+
+#### 🔴 7A-0.2 — ViewCount: STORED, AUR KYUN YE THEEK HAI
+
+Is system mein **har doosra count derived hai**, aur 014 ka apna header wajah
+likhta hai:
+
+> *"t_app_jobs.ApplicationCount **jaan-boojh kar kabhi likha nahi jaata** — ek
+> maintained counter doosra source of truth hai jo drift karta hai, aur drift
+> **CHUP** hoti hai. Screen ka number neeche ki list se match karna band kar
+> deta hai aur kuch error nahi hota."*
+
+ViewCount us rule ka apwaad hai. Wajah ye NAHI hai ki "views zyada hain" —
+
+**🔴 ASLI FARQ: ApplicationCount ke paas DERIVE karne ke liye rows hain, ViewCount
+ke paas nahi.** Application ek row hai (`t_app_applications`). View ek row nahi
+hai, aur banane ka matlab hota **per-view hit log** — ek table jo bina seema
+badhta hai, ek aise number ke liye jispar koi kaam nahi karta.
+
+**🔴 DOOSRA FARQ, JO ASAL MEIN ISE QABOOL-E-QUBOOL BANATA HAI: ViewCount par kuch
+BRANCH nahi karta.** Wo kisi cheez ko gate nahi karta, price nahi karta, order
+nahi karta (featured ordering **dates se** derive hoti hai, views se nahi). Aur
+**koi doosri jagah wahi fact nahi dikhati** jo isse takra sake.
+ApplicationCount ki drift ek **dikhne wala virodhabhaas** thi — number apni hi
+list se match nahi karta tha. ViewCount ki drift invisible aur be-asar hai.
+
+⚠️ **To qubooliyat ki ek seema hai, aur wo ek RULE hai:** ViewCount kabhi kisi
+`WHERE`, `ORDER BY` ya business decision mein nahi aayega. Ye **guard se
+enforce hoga**, yaad rakhne se nahi — build guard assert karega ki koi
+procedure ViewCount par filter ya order nahi karta. Jis din koi usse sort karna
+chahe, pehle use derive karna padega.
+
+**Write path — `Channel<long>` + ek `BackgroundService`, batched.**
+
+```
+public detail read  →  channel.Writer.TryWrite(jobId)   (read PURE rehti hai)
+BackgroundService   →  har 10s: drain, JobId se group, EK batched UPDATE
+```
+
+- **Rejected — read path par per-request `UPDATE`.** Sabse simple, aur teen
+  cheezein kharab karta hai: ek hot job par lock contention, har public read ek
+  write ban jaata hai, aur read **pure nahi rehti** — jo 7A-0.3 ki caching aur
+  "detail proc sirf padhta hai" dono ko tod deta hai.
+- **Rejected — `_ = Task.Run(...)` fire-and-forget.** "Batched" jaisa dikhta hai
+  aur hai nahi: DI scope chala jaata hai, shutdown par kaam gayab, aur exception
+  kahin nahi jaata.
+- **Qubool ki hui keemat:** restart par **ek interval tak** ke views kho jaate
+  hain. Ek vanity number par das second, jiske upar kuch branch nahi karta.
+  Ledger ke ulta — 2.64 ne wahan har count derived aur exact rakha kyunki wo
+  faisla karta hai ki koi job post kar sakta hai ya nahi.
+
+⚠️ **ViewCount public response mein NAHI jaata.** 2 views wali job "koi nahi
+chahta" padhti hai, aur wo number school ke apne screen ka hai. Raw-bytes sweep
+(verification #2) ispar bhi chalegi.
+
+---
+
+#### 🔴 7A-0.3 — PUBLIC READ CACHING, ENDPOINT CLASS KE HISAAB SE
+
+| Endpoint class | Header | Wajah |
+|---|---|---|
+| Job **detail** | `no-store` | Moderation **turant** asar kare. Verification #3 isi par khadi hai: pull hone ke baad public 404 **usi second** mein |
+| Job **listing / search** | `no-store` (MVP) | Neeche dekho — ye ek jaan-boojh kar li gayi "abhi nahi" hai |
+| Filter **masters** (subject, city, state, class level) | `public, max-age=3600` | Saal mein kuch baar admin badalta hai; purani filter list ki keemat zero |
+| **FAQ / content blocks** | `public, max-age=300` | Admin-editable; paanch minute ka lag aisa hai jo admin ko bataya ja sakta hai |
+| Contact **POST** | `no-store` | Wo write hai |
+
+**🔴 LISTING PAR CACHE KYUN NAHI, JABKI WAHI SABSE ZYADA HIT HOGI.**
+
+Ek pulled job cached listing mein **card ban kar** reh jaata — aur us card par
+click karne se 404 milta. Wo "content serve karna" se behtar hai (detail
+`no-store` hai) par phir bhi **galat page** hai, aur MVP traffic par bachat
+**zero** hai. To header abhi `no-store` hai, aur **pehli cheez jo on karni hai**
+wo `public, max-age=30` hai — jab traffic use justify kare, aur us din ye
+trade-off likha hua milega.
+
+⚠️ **Angular 22 ka `provideClientHydration()` HTTP transfer cache default on
+rakhta hai** — SSR ka fetch HTML mein serialise hota hai aur browser dobara
+nahi maangta. To SSR page ke liye "do request" ki fikr nahi; ye decision
+*server se bahar* ke cache ki hai.
+
+**🔒 ENTITLEMENT DATA IS SAB SE BILKUL ACHHOOTI HAI.** Public pages par koi plan,
+koi quota, koi entitlement **nahi** dikhta — to koi cache use serve hi nahi kar
+sakta. Entitlement read per-consume aur direct hai (2.64: cache se kabhi nahi),
+aur is phase ka koi object us raaste ko chhuta nahi. Raw-bytes sweep
+(verification #2) har public endpoint par yahi assert karti hai.
+
+---
+
+### 2.82 7A — PUBLIC SURFACE BAN GAYI, AUR JO CHEEZEIN BANATE WAQT PAKDI GAYIN
+
+2.81 ne teen faisle code se pehle likhe. Ye unka **build** hai — aur isme chaar
+asli bug mile, jinme se **teen suite ne pakde, review ne nahi**.
+
+---
+
+#### 🔴 2.82.1 — 404 KI DEEWAR, AUR WO LAMHA JAB BOUNDARY SACH MEIN FARQ KARTI HAI
+
+Public route par ek job **sirf** tab dikhti hai jab wo har tarah se live ho.
+Draft, expired, closed, soft-deleted — **chaaron 404**, aur refusal **kaaran
+nahi batati**. "This job has expired" keh dena confirm kar deta hai ki id asli
+hai, jo ek anonymous endpoint par **enumeration oracle** hai (2.6 ka argument,
+bina kisi caller ke).
+
+Deewar ka doosra aadha bhi assert hota hai: **wahi paanch id school ki apni
+authenticated list par maujood hain**. Warna ek toota endpoint bhi saare 404
+assertions pass kar deta.
+
+🔒 **IST boundary wale lamhe par chali:**
+
+```
+IST now 2026-10-14T03:05:02  ·  UTC now 2026-10-13T21:22:29
+IST date 2026-10-14 · UTC date 2026-10-13 · they DIFFER — the trap is live right now
+```
+
+Yahi baat hai: **jis din IST aur UTC ki date alag thi, usi waqt** test chala. Ek
+UTC comparison us lamhe par har job ko **5.5 ghante pehle** expire kar deta.
+`fn_EffectiveJobStatusId` `fn_IstToday()` se compare karta hai, aur **last date
+AAJ ho to job khuli hai** (aakhiri din bhi apply kar sakte ho).
+
+⚠️ Pichhle session ki galti dohrai nahi gayi: tab maine "expired" fixture ki
+last date **aaj** rakh di thi aur sahi function ko leak samajh liya tha. Ab
+fixture mein **dono** hain — kal (expired) aur aaj (last day) — kyunki **jodi
+hi assertion hai**.
+
+---
+
+#### 🔴 2.82.2 — SABSE BADA BUG: FILE SAHI THI, DATABASE PURANA THA
+
+`/api/public/jobs/filters` ne ye diya:
+
+```json
+{"subjects":[{"id":0,"name":"","jobCount":1},{"id":0,"name":"","jobCount":1}]}
+```
+
+**Count sahi, id aur name khaali.** Wajah: `024_public_reads.sql` **disk par**
+`AS Id, AS Name` project karti thi, par **deployed procedure** mein purana
+`AS SubjectName` khada tha — file edit hone ke baad **dobara deploy nahi hui**.
+
+🔴 **Do sabak, dono mehnge:**
+
+1. **Disk par ki file database nahi hai.** "Procedure jo compile ho gayi, chali
+   nahi" (deferred name resolution) ka ye bhai hai: *procedure jo likhi gayi,
+   deploy nahi hui*. SQL-layer probe deployed version par chali thi aur C# ka
+   mapper loop mein tha hi nahi, to kuch dikha nahi.
+2. **Schema assertion data assertion nahi hai.** `public-contract.mjs` ke
+   dono raw-bytes sweep **PASS** hue is response par — forbidden list mein kuch
+   tha nahi, allowlist se bahar koi key nahi. **Shape perfect, content khaali.**
+
+Isliye ek naya check joda: *har filter option ka id AUR name bhara hona
+chahiye*. Use **jaan-boojh kar tod kar dekha** — purana alias dobara daal kar:
+
+```
+PASS  🔒 filters: no forbidden field anywhere in the bytes  — clean across 215 bytes
+PASS  🔒 filters: every key is on the public allowlist      — no unknown key
+FAIL  🔴 every filter option has a real id AND a real name  — EMPTY: subjects: id=0 name=""
+```
+
+Dono purane check **pass**, naya **fail**, aur usne sirf `subjects` ka naam liya,
+`states` ka nahi. Guard discriminate karta hai.
+
+---
+
+#### 🔴 2.82.3 — SIRF EK ANONYMOUS WRITE HAI, AUR USPAR VALIDATION HI NAHI THI
+
+Suite ne contact endpoint par khaali body `{}` bheji. Jawab: **HTTP 200 aur ek
+row** — Name '', Email '', Subject '', Message ''.
+
+DTO ke `= string.Empty` initialisers ki wajah se har field ki ek "valid" default
+thi, model bind ho gaya, insert chal gaya. Brief ne is form par **validation
+maangi thi**; honeypot aur rate limit ban gaye the, **sabse seedhi cheez reh
+gayi thi**.
+
+⚠️ **JP.App.Api ke paas ek bhi validator nahi tha** — aur zaroorat bhi nahi thi:
+ab tak har endpoint token maangta tha aur har write apni procedure mein khud
+check karti thi. 7A ne **pehla anonymous write** joda, aur gan̄it badal gayi:
+naam lene wala koi nahi, revoke karne ko kuch nahi, aur jo aata hai wo ek
+**insaan ki queue** mein girta hai.
+
+To `JP.App.Api/Validators/PublicValidators.cs` bana (FluentValidation, SSO ka
+hi pattern) aur `FluentValidationFilter` + `AddValidatorsFromAssembly` wire hue.
+Har maximum **apne column ke barabar** hai (Name 100, Email 256, Subject 200,
+Message 2000) — validator jo column se zyada allow karta hai wo saaf 400 ko
+500 bana deta hai, anonymous endpoint par.
+
+🔒 **Website (honeypot) par koi rule NAHI hai**, aur ye jaan-boojh kar hai. Ek
+rule "Website must be empty" wahi jumla us bande ko wapas de deta jisne bot
+likha hai — aur agle din trap kaam karna band kar deti.
+
+```
+{"status":0,"code":"VALIDATION_FAILED","message":"One or more fields are invalid.",
+ "errors":{"Name":["Please tell us your name."],
+           "Email":["An email address is required — it is how we reply."],
+           "Subject":["Please give your message a subject."],
+           "Message":["Please write your message."]}}
+```
+
+Website ka zikr kahin nahi — trap chhupi rehti hai.
+
+---
+
+#### 🔴 2.82.4 — APPLY CTA JOB SAATH NAHI LE JA SAKTI (G41)
+
+2.43 aur 7A-0.0 dono kehte hain: Apply **seedha teacher signup**, job uske
+redirect target ke saath. Pehla aadha chalta hai. Doosra **chal hi nahi sakta** —
+jp-teacher mein `?redirect=` koi padhta nahi, `jobs/:id/apply` route hai nahi,
+aur `jobs/:jobId` **integer** leta hai jo public surface kabhi deta nahi (2.47).
+
+To parameter **hata diya**, chhupaya nahi. Poora record G41 mein.
+
+---
+
+#### 🔴 2.82.5 — SSR SAABIT HUA, MAANA NAHI GAYA
+
+`**` catch-all `RenderMode.Prerender` hai. Agar `/jobs` use list na kiya jaata,
+to wo **build time par ek baar** render hoti — jab koi job nahi hoti — aur wahi
+khaali page hamesha ke liye serve hota. **Koi error nahi, koi warning nahi.**
+
+Isliye proof **JavaScript band kar ke** liya gaya — ek hi test jo server render
+aur hydration mein farq kar sakta hai:
+
+```
+with JS disabled, the page mentions the fixture 3 time(s)
+PASS  🔴 the job listing is SERVER-RENDERED — the jobs are there with JS off
+PASS  🔴 …and so is the result count  — Showing 1–3 of 3 jobs
+```
+
+---
+
+#### ⚠️ 2.82.6 — TITLE 66 AKSHAR KA NIKLA, AUR AUDIT NE PEHLI HI JOB PAR PAKDA
+
+Detail page ka title `${jobTitle} at ${schoolName}` tha. `site-audit.mjs` 65 se
+upar fail karta hai, aur **pehli asli job par hi** 66 aa gaya. Dono aadhe user
+data hain jinki lambai is project ke haath mein nahi hai.
+
+`fitTitle()` teen seedhi utarti hai, aur teeno **chal kar dekhi gayi**:
+
+| Job title | Rendered | Kya hua |
+|---|---|---|
+| 14 akshar | 53 | "at <school>" raha |
+| 35 akshar | 53 | school **poora gira**, ellipsis nahi |
+| 50 / 93 akshar | 65 / 65 | title **ellipsis ke saath** kata |
+
+🔒 **School ka naam beech se kabhi nahi katta.** "Senior Teacher at Delhi Publi…"
+ek aise school ke baare mein padhta hai jise koi pehchaan nahi sakta — school ka
+naam **na lena** usse behtar hai.
+
+⚠️ Budget `seo.service.ts` **export** karta hai (`titleBudget()`), kyunki suffix
+wahi lagata hai. Component ka "65 minus takreeban attharah" ek `SITE_NAME` edit
+door se galat ho jaata.
+
+---
+
+#### 🔴 2.82.7 — DO SUITE EK HI RATE-LIMIT BUDGET MAANG RAHI THIN
+
+Ye **poori regression chalaane par hi** dikha, aur dono bar isne galat file ki
+taraf ishaara kiya.
+
+**(a) READ budget.** `public-contract` ka section 7 jaan-boojh kar per-IP read
+budget khatam karta hai (limit saabit karne ke liye). Wo bucket **saari machine
+ke saath shared** hai — public website ke apne SSR ke saath bhi. `public-screens`
+usi 60-second window mein chali aur uska server-rendered `/jobs` **429** aaya.
+Suite ne likha *"the job listing is not server-rendered"* — jo **jhooth** tha
+aur bilkul galat file par le jaata.
+
+🔴 **Fix: jo suite shared resource ganda karti hai, wahi use wapas karti hai.**
+`public-contract` ke EXIT mein ab budget ke 200 hone ka intezaar hai (poll, flat
+sleep nahi) — wahi ENTRY/EXIT discipline, ek rate-limit bucket par lagi.
+
+**(b) CONTACT budget.** 3 per hour per IP. `public-contract` teeno kharch karti
+hai (limit hi test hai), aur `public-screens` do aur maang rahi thi. Regression
+mein jo doosri chali, uske 429 **toote honeypot** jaise padhe.
+
+🔴 **Fix: zimmedari baant di**, aur ye test design hai, samjhauta nahi:
+
+| Suite | Kiska maalik | Budget |
+|---|---|---|
+| `public-contract` | **server ka contract** — asli row banti hai, honeypot kuch nahi likhta, chautha refuse hota hai | teeno kharch |
+| `public-screens` | **screen** — form wire par kya bhejta hai (interception), aur kaun si state render hoti hai | **zero** |
+
+⚠️ Kuch bina test nahi raha: section 7 saabit karta hai browser sahi payload
+bhejta hai, `public-contract` saabit karta hai server us payload ka sahi karta
+hai. Jo gaya wo ek **fazool hop** tha, koi case nahi.
+
+Aur ab ek naya case bhi aa gaya jo pehle nahi tha — **failed send**: 500 par page
+kehta hai nahi gaya, **jo likha tha wo form mein rehta hai**, aur prefilled
+mailto: milta hai. Yehi wo cheez thi jiski 2.44 ko sabse zyada fikr thi.
+
+---
+
+#### FAQ KI COPY DATABASE MEIN AA GAYI, AUR EK JAWAB JHOOTA HO GAYA THA
+
+2.44 ne baarah sawaal `faq.component.ts` ke array mein likhe the aur page
+prerender kiya tha. 2.81 ne FAQ ko admin-editable banaya, to copy ab
+`t_app_faqs` mein hai aur route `RenderMode.Server` hai.
+
+🔴 **Ek jawab usi commit mein badla:** *"Can I search for jobs without an
+account?"* ka jawab tha *"Not yet. Public job search is being built…"* — aur
+**yehi phase use bana raha tha**. Us jumle ko seed kar dena us page ko publish
+karna hota jo visitor ko bata raha hai ki jo feature wo dekh raha hai wo nahi
+hai. Seed mein uska **guard** bhi hai (purana wording wapas aaye to RAISERROR),
+aur dono suite data ki taraf se wahi assert karti hain.
+
+⚠️ **Array delete hua, comment nahi.** Do copy jisme ek pahunch se bahar — agla
+banda galat wali edit karta hai.
+
+⚠️ **Seed insert-if-absent hai, overwrite kabhi nahi.** 7B se admin in rows ko
+edit karega; har deploy par apna text wapas likhne wali seed unki mehnat
+**chupchaap** mita deti, aur symptom hafton baad "FAQ apne aap palat jaata hai"
+ke roop mein aata.
+
+---
+
+#### ⚠️ `role` FIELD HATA DIYA — AUR YE FAISLA HAI, BHOOL NAHI
+
+2.44 ke form mein "I am a: teacher / school" tha, jo ek mailto: body mein jaata
+tha. `t_app_contact_enquiries` mein uske liye column nahi hai aur brief ne maanga
+bhi nahi tha.
+
+Teen raaste the: column jodna jo brief ne nahi maanga; control rakhna aur jawab
+**phenk dena**; ya poochna band karna. **Beech wala hi saaf galat hai** — jo
+form kuch maangta hai aur use discard karta hai. Aur **jo sawaal poochha hi na
+jaaye usme kuch khota nahi**, kyunki message khud bata deta hai.
+
+---
+
+#### 🔒 ANONYMOUS HONA WIRE PAR NAAPA GAYA
+
+```
+API calls observed: 5
+  GET /public/jobs/filters
+  GET /public/jobs?pageNumber=1&pageSize=20
+  GET /public/jobs?subjectId=1&pageNumber=1&pageSize=20
+PASS  🔒 NOT ONE request carried an Authorization header or a cookie
+localStorage: []   sessionStorage: []   document.cookie: ""
+PASS  🔒 …and nothing was stored in the browser either
+```
+
+Aur doosri taraf se bhi: **wahi request ek valid token ke saath byte-identical
+JSON** deti hai (1117 === 1117). Grep teen layer neeche inject kiya gaya
+accessor miss kar sakti hai; **ek jaise bytes** nahi.
+
+---
+
+#### ⚠️ 7A MEIN JO JAAN-BOOJH KAR NAHI BANA
+
+| Cheez | Kyun nahi |
+|---|---|
+| `t_app_cms_pages` | 2.81: MVP mein koi page CMS se nahi aata; retrofit sasta hai (029 ka consumer guard) |
+| Featured jobs/schools | **7B** — aur 2.44 ka "mock data par mat banao" ab bhi lagu |
+| Sitemap mein har job | churn; sitemap ki poori wajah "machinery nahi chahiye" hai. `/jobs` server-rendered hai, crawler wahan se har live job tak pahunch jaata hai |
+| City filter | **G40** — master khaali hai, to control render hi nahi hota |
+| HTTP 404 status job-not-found par | Angular ka renderer 200 deta hai; `noindex` mitigation hai, **fix nahi**, aur ye saaf likha hua hai |
+
+---
+
 ## 3. SCOPE (Client spec ke against)
 
 ### IN SCOPE — MVP
@@ -8235,6 +8821,7 @@ naya Code, agla free Id, kuch renumber mat karo.
 | 2026-10-11 | 6C-2-0 | **G37 band — badge asli hua — 6C-2 ki ek bhi screen se pehle.** Screens badge teen jagah dikhati hain; aaj tak koi asli teacher use kama hi nahi sakta tha, to har dikhta badge seed-data ka jhooth hota. `031` (`VerifiedByUserId` — school ke paas 2F se hai, teacher ke paas do hi the kyunki badge kabhi set hi nahi hota tha), `022 USP_SetTeacherVerified` (badge + stamp + notification, **ek transaction**, idempotent), stub ki jagah asli call, type 13/14 seed **apne consumer ke saath** (029 ka guard har type ke liye procedure ka naam maangta hai), aur decline ka notification `ApprovalService` ki rejection branch se. 🔴 **Jo stub chaar phase chala:** "setting IsVerified requires t_app_teachers, which is Phase 3" — Phase 3 chaar phase pehle ship hua tha; admin approve kar sakta tha, trail likha jaata tha, badge kabhi nahi lagta, aur **koi error nahi** kyunki wo branch pehle se failure report karti thi. Bacha isliye ki **badge ke raaste par koi test kabhi chala hi nahi** — chaar badge wale teacher seed row hain, to badge ki har assertion aise data par pass hoti thi jo kisi ne kamaya nahi. 🔴 **Test wahi raasta chalta hai jo aadmi:** teacher submit (HTTP) → admin ka **queue** → action endpoint se approve → `orchestrationCompleted` **true** (yahi false aata tha) → badge + stamp + verifier **admin (40), teacher (147) nahi** → **`/teacher-search` ke asli result mein `isVerified true`** → `verifiedOnly` 4 se 5 → notification teacher tak, admin ka note us mein nahi par **trail par hai**. 🔴 **Decline badge chheenta nahi** — `@Approved` faisla hai, store karne wali value nahi (ek character chhota raasta pehle se verified teacher ka badge chup-chaap le leta). 🔴 **Decline ka notification gate ke peeche nahi** — orchestration approval par gated hai (Phase 2E ka bug) aur wo gate hilaya nahi gaya; batana provisioning nahi hai, aur peeche daalne ka matlab hota ki reject hua teacher hamesha intezaar kare. ⚠️ **Mera pehla build guard galat tha, pehle hi run mein pakda gaya** — usne maana ki seeded verified teacher ke paas `VerifiedOn` nahi hai; chaaron ke paas hai. Backfill karna ek na-hui approval gadhna hota, date se scope karna date check hota — to guard wahi assert karta hai jo har row par sach hai, aur "teenon column saath" wali baat suite mein gayi. ✅ **G35 band mechanism se:** `scripts/verify/run.mjs` — har run ka poora output file mein (G35), aur assertion count committed manifest se compare, **ghatna = failure** (6C-0 ka `team-contract`). Us 56/57 ka kaaran ab bhi pata nahi aur likha hua hai; band risk hua hai. 🔴 **Runner ne pehle hi pass par `team-contract` 48/48 pakdi** — uska fixture doosri suite ke leftover par conditional tha; ab apna campus naam, har baar banta hai (49 → 50). `teacher-verification.mjs` **33/33** · `notifications` 12 → 14 type (teen assertion wajah ke saath badli) · **25/25 suite clean, 334 s, bina kisi API restart** | ✅ Done |
 | 2026-10-11 | 6C-2 | **Search, invite, invitations inbox, offer ke dono taraf, notification centre — 6C-2 POORA.** `search-invite-screens` 31/31 · `invitation-screens` **31/31 (nayi)** · `offer-screens` 34/34 · `notification-screens` 21 → 33. 🔒 **Consent path 2 ab screen se saabit hai** — dialog email/phone/resume teeno naam leta hai, "no other school" kehta hai, aur accept par `fn_TeacherContactUnlocked` 0 → 1; **dekhna aur decline dono 0 par chhodte hain**. Accept hone par koi inaam nahi (na "unlocked", na 🎉 — warna consent transaction ban jaata). 🔴 **Devtools-forced negative dono jagah:** kisi doosre ka offer/invitation `fetch` se answer → **404, 403 nahi** (2.6), refusal mein kisi ka naam nahi, row chhui nahi gayi, aur **kisi ka contact nahi khula**. 🔴 **Jo sirf asli raasta chala kar mila (koi suite green hone se nahi):** Selected application par "Offer sent" button jo 400 `OFFER_ACTION_REQUIRED` deta tha (6A se live) · `<input type="time">` "09:00" deta hai par `TimeSpan` binder "09:00:00" maangta hai, to reporting time wala **har** offer refuse ho raha tha · viewer ko 403 par screen "No teacher matches those filters" keh rahi thi · `FullName` teeno layer mein khaali tha. ⚠️ **Teen test galat wajah se pass ho rahe the:** 375 ka check accept ke baad **answered** row (bina button) naap raha tha — ab accept se pehle, aur live row + uske button assert hote hain · "newest first" ek row par trivially sach tha — doosri application add ki, ab **title se** order assert hota hai kyunki din ek hi hai · **positional locator (`.first()`) mere hi chhode hue probe row par ACCEPT dabaa sakta tha** — suite ab sirf apni banayi row ko address karti hai. 🔴 **`run.mjs` manifest mein na hone wali suite skip kar deta tha** — is phase likhi suite bilkul na chalti aur `--update` uska count seekh hi nahi sakta tha; ab chalti hai, `NEW` dikhti hai, pin hone tak NOT CLEAN. 🔴 **`TEACHER_OFFERS` seed row (2.37), `PermissionCode` NULL, route usi commit mein** — teacher sidebar 8 → 9, aur `HOW_TO_RUN`/`local-accounts`/ye file **isi commit** mein; ⚠️ stale 32 par +1 kiya tha, asli 34 hai — **stale number par arithmetic rot confirm karta hai**. ⚠️ **/notifications ek hi shared component, dono portal usi par route** (G27), aur **fail hua read khaali inbox nahi** — request abort kar ke naapa gaya. **29/29 suite clean, 1105 assertion, 454 s · SQL 296 · backend 0/0 · paanchon frontend 0 warning · run_all ×2 byte-identical** | ✅ Done |
 | 2026-10-11 | 6.5A | **Billing — manual first. Design addendum PEHLE, phir backend.** `billing.mjs` **47/47**. 🔴 **Addendum ne code se pehle teen galtiyan pakdin:** (1) "ek procedure" **bana hi nahi sakta tha** — payment `jp_mdm`, subscription `jp_app`, cross query mana (2.2), distributed transaction nahi (2.48); seam **service** par hai aur handoff ka sach `activationCompleted` se bataya jaata hai. (2) **paid plan seed karna likhit mein mana hai** (`008_seed_plans.sql`: "jo number hum ship karte hain wo wapas quote kiya jaata hai") — premise check ki, aaj bhi sach hai (FAQ, Terms, site par ek bhi price nahi); to seed nahi badla, paid plan **suite ka fixture** hai aur **011 ka guard** priced public plan par build gira deta hai (chala kar dekha). (3) **`@ExpectedPlanId` ka comparison ULTA likha tha** — "effective plan se compare karo" build hua aur **verification ne pakda**: lapsed subscription par har consume `409 PLAN_CHANGED`, **hamesha** (2.64 ka retry ek par bounded). Guard ka kaam row badalne ka pata lagana hai; caller plan chunta hi nahi, `USP_ResolveEntitlement` **dono mapping ek query** mein deta hai. 🔴 **Quota plan ke saath chalta hai** — pehla build sirf fallback ka **id** bhejta tha, to 100-post plan ka lapsed account free par girta aur 100 post rakhta; kuch fail nahi hota. Naapa: paid 100, fallback 2 → remaining **1**, 99 nahi. 🔒 **Expiry DERIVED** — `fn_SubscriptionInForce` ek definition, build-time truth table (predicate toda → exit 1), **zero** SQL Agent job; lapsed account ab **marta nahi**, free baseline par chalta hai (pehle `SUBSCRIPTION_INACTIVE` — jo kabhi paid tha wo us se bura tha jo kabhi nahi tha). IST boundary par naapa: DB `status 1, inForce 0`, response `onFreeBaseline true`, consume `QUOTA_EXHAUSTED`. 🔴 **Recorded ≠ expected** — 4900 vs 5000 **record** hota hai, refuse nahi; mismatch par remark zaroori, **par wo rule API layer mein** kyunki gateway caller kisi se remark maang hi nahi sakta. 🔴 **Idempotent dono taraf**, do sach mein samanantar session (WAITFOR TIME): 1 receipt, 1 subscription, 1 ACTIVE per owner; ⚠️ pehle draft mein chaaron ke liye EK instant tha aur batch do — doosra batch **kal** ka intezaar karne laga, suite bina output das minute latki (`sys.dm_exec_requests` ne bataya). 🔴 **Ek bypass lagbhag ship ho gaya:** plan change ka request row hai, to admin use **generic approvals endpoint** se approve kar sakta tha — request APPROVED, payment PENDING, kuch activate nahi, aur "ek owner ek khula request" `PENDING` par key karta hai to school **doosra** request bana leta. Poochh kar mila, test se nahi. 🔒 **2.56 ka guard text se nahi, `sys.sql_expression_dependencies` se** — purana guard function ka naam dhoondta tha aur isi liye project ke apne grep mein **fail** hota tha (jo guard naam leta hai wo bhi naam lene wala code hai); grep scope 18 file, aur **scope khud assert hota hai**. ⚠️ **Count guard isi commit mein hile:** request types 4 → 5, permissions 23 → 24 (dono jagah), swagger 105 → **113**. 🔴 **Naya permission** (`PAYMENT.VERIFY`) jabki 2.5 ne reuse kiya tha — paisa confirm karna system setting nahi, operational act hai, aur dono alag logon ko milenge; 006 holders ka **closed set** assert karta hai (SCHOOL_OWNER ko grant → build exit 1). **30/30 suite clean, 1154 assertion · SQL 296 · backend 0/0 · run_all ×2 content-identical** | ✅ Done |
+| 2026-10-14 | 7A | **Public job pages + contact form — pehli ANONYMOUS surface.** `public-contract.mjs` **50/50 (nayi)** · `public-screens.mjs` **41/41 (nayi)**. 🔴 **Chaar asli bug, teen suite ne pakde:** (1) **file sahi thi, database purana** — `/jobs/filters` `id:0 name:""` de raha tha jabki count sahi tha; `024` disk par `AS Id, AS Name` karti hai par **deployed proc** mein purana `AS SubjectName` khada tha, aur SQL-layer probe deployed version par chali thi to C# mapper loop mein hi nahi tha. **Dono raw-bytes sweep pass hue** — shape perfect, content khaali; *schema assertion data assertion nahi hai*. Naya content check joda aur **purana alias wapas daal kar fail karte dekha** (sirf `subjects` ka naam liya, `states` ka nahi). (2) **sirf ek anonymous write hai aur uspar validation hi nahi thi** — `{}` POST → 200 aur Name/Email/Subject/Message chaaron khaali ek row; DTO ke `= string.Empty` ki wajah se sab "valid" bind hua. JP.App.Api ke paas **ek bhi validator nahi tha** (zaroorat bhi nahi thi — ab tak sab token ke peeche tha aur har write apni proc mein check karti thi); `PublicValidators.cs` + `FluentValidationFilter` + `AddValidatorsFromAssembly` wire hue, har maximum **apne column ke barabar**, aur 🔒 **honeypot par koi rule nahi** (ek "Website must be empty" wahi jumla bot likhne wale ko wapas de deta). (3) **Apply CTA job saath le hi nahi ja sakti** — jp-teacher mein `?redirect=` **koi nahi** padhta (poore app mein sirf reset-password ek query param padhta hai), `jobs/:id/apply` route **nahi hai**, aur `jobs/:jobId` `Number()` karta hai jabki public surface jaan-boojh kar sirf uid deta hai (2.47) — parameter **hata diya, chhupaya nahi** (jo parameter koi padhta nahi, use bhejna na bhejne se bura hai), **G41**. (4) **title 66 akshar** — `site-audit` ne pehli hi asli job par pakda; `fitTitle()` teen seedhi utarti hai (at-school → school gira → ellipsis) aur **teeno chal kar dekhi gayi**, school ka naam **beech se kabhi nahi** katta. 🔴 **SSR JavaScript BAND kar ke saabit hua** — wahi ek test jo server render aur hydration mein farq karta hai; `**` catch-all `/jobs` ko chup-chaap build-time par khaali page bana deta (koi error, koi warning nahi), aur build ne confirm kiya: **6 static route prerender**, `/jobs` unme nahi (pehle 7 the — `/faq` ab Server). 🔒 **Anonymous hona wire par naapa** — 5 request, ek par bhi Authorization/cookie nahi, teeno storage khaali, aur **wahi request valid token ke saath byte-identical** (1117 === 1117). 🔒 **404 deewar us lamhe par chali jab IST aur UTC ki date ALAG thi** (IST 10-14 · UTC 10-13) — UTC comparison us waqt har job 5.5 ghante pehle expire kar deta; chaaron state 404 aur refusal **kaaran nahi batati**, aur wahi paanch id school ki apni list par maujood hain. ⚠️ **Do suite ek hi rate-limit budget maang rahi thin, aur ye poori regression par hi dikha** — `public-contract` ka limit test **read budget** khatam karta tha aur agli suite ka SSR 429 aata tha, jise suite ne *"listing is not server-rendered"* likha (jhooth, aur galat file par le jaata); ab EXIT mein budget **wapas** hota hai (poll). Contact ka 3/hour dono maang rahi thin → zimmedari baanti: contract suite **server ka contract** (asli row, honeypot, chautha refuse), screens suite **screen** (interception se exact payload), budget **zero**. ⚠️ **Naya case jo pehle nahi tha:** failed send — 500 par page kehta hai nahi gaya, **jo likha tha wo form mein rehta hai**, prefilled mailto: milta hai — yehi 2.44 ki badi fikr thi. ⚠️ **FAQ copy DB mein** (`003_seed_public_faqs`, insert-if-absent — admin ke edit overwrite nahi) **aur ek jawab jhoota ho gaya tha**: "Can I search for jobs without an account?" ka "Not yet" **usi commit mein** theek hua, seed mein guard, dono suite data se assert. ⚠️ `role` field **hata diya** (column nahi, brief ne maanga nahi; collect kar ke discard karna teen mein se saaf galat raasta). ⚠️ **Swagger floor 113 → 119 (naapa, calculate nahi)** aur anonymous surface par ek **CEILING** — *exactly six operations*, kyunki yahan khatra route **gayab** hone ka nahi, **aa jaane** ka hai. **33/33 suite clean, 1183 assertion, 577 s · backend 0/0 · paanchon frontend 0 warning · Lighthouse 9 page SEO 100/a11y 100 · site-audit NO PROBLEMS · SQL 189 file (3 nayi), 285 DB object** | ✅ Done |
 | 2026-10-11 | 6.5B | **Billing screens — 6.5 POORA.** `billing-screens.mjs` **60/60**. 🔴 **Ek component, dono portal** (`UiBillingPageComponent` `jp-shared` mein, school aur teacher dono usi par route karte hain — wahi shape jo `/notifications` ka tha, G27); **admin ka screen alag**, kyunki "mera plan" aur "sabke pending payment" do kaam hain. 🔴 **Ek asli hole band hua jo 6.5A se khula tha:** `plan-change` par koi permission check nahi tha, to school ka **koi bhi** member — including read-only `SCHOOL_VIEWER` — apne account ko payment ke liye commit kar sakta tha. **Poochh kar mila ki naya menu row kisko dikhta hai**, kisi test ke fail hone se nahi. `BILLING.MANAGE` (SCHOOL_OWNER + TEACHER; 007 ka guard **closed set** assert karta hai, SCHOOL_VIEWER ko grant karte hi build exit 1). Reuse pehle dhoonda — `PROFILE.EDIT`/`USER.MANAGE`/`BRANCH.MANAGE` teeno aaj theek chalte, par koi bhi "paise ka zimmedaar" ka matlab nahi rakhta. 🔒 **Panel dekhna gated NAHI** — HR ko allowance pata honi chahiye, warna wo limit ko refuse hone se jaanta hai; 007 ka doosra guard **ulti disha** se assert karta hai ki row par permission na lage. 🔴 **Control wajah ke saath GHAYAB hai, disabled nahi** (2.62) — disabled "abhi nahi" kehta jo jhooth hai. 🔴 **Koi pay-now button nahi**, aur suite uski ghairhaazri assert karti hai; mode list mein ONLINE nahi aur screen **kehti hai kyun**. 🔴 **Mismatch shabdon mein** — "₹100.00 short" / "₹100.00 overpaid", server ke `ShortBy` ki wahi direction; remark zaroori hote hi Confirm disabled, par **server bhi wahi rule enforce karta hai** — client pehle poochhta hai, jagah nahi leta. 🔒 **Lapsed plan screen par naam se aata hai:** "paid plan ended on …", free plan par chal raha hai, allowance `of 3` (paid `of 25` nahi), kuch delete nahi hua, aur DB row `status 1, isActive 1` — kuch sweep nahi hua. **Teen forced negative:** viewer `plan-change` → **403**, school apna hi `verify` → **403** (payment PENDING, koi receipt nahi), teacher school plan id → **404 aur 403 nahi** (2.6). ⚠️ **Do apni galtiyan:** owner ka button ghayab tha aur stale cheez sirf ek **cached JWT** thi (claims mein permission hoti hai; suite ab cached token shuru mein phenk deti hai) · admin ka **375 check khaali queue naap raha tha** — table hi nahi tha, aur table hi 375 par overflow karta hai; ab pehle row banti hai aur assertion node count par nahi, us cheez par hai jo overflow karti. ⚠️ **Count guard isi commit mein hile:** permissions 24 → 25, SUPER_ADMIN **24 of 25** (pehli permission jo uske paas nahi), teacher 2 → 3, menus 34 → **37**, swagger **113 hi** (ek bhi endpoint nahi jura). **31/31 suite clean, 1214 assertion · SQL 296 · backend 0/0 · paanchon frontend 0 warning · run_all ×2 content-identical · 34 RoutePath, 0 dangling** | ✅ Done |
 
 ---
@@ -9274,6 +9861,83 @@ thin; ab severity se naam hain.
 ⚠️ **Mere chaar test galat the**, aur pehla sabse mehnga: `applicationStatusId`
 bheja jabki DTO `toStatusId` maangta hai — **har call 200 deta aur kuch
 badalta nahi**, aur us ek chup no-op ke neeche atharah assertion fail hui.
+
+---
+
+## ✅ 7A COMPLETE — 2026-10-14 (THE PUBLIC FACE — PEHLI ANONYMOUS SURFACE)
+
+Details **2.82**. 2.81 ne teen faisle code se pehle likhe; ye unka build hai.
+
+```
+public-contract.mjs 50/50 · public-screens.mjs 41/41
+33/33 suite clean, 1183 assertion, 577 s
+backend 0/0 · paanchon frontend 0 warning
+Lighthouse 9 page: SEO 100 / a11y 100 · site-audit NO PROBLEMS
+swagger floor 113 -> 119 · Prerendered 6 static routes (pehle 7 — /faq ab Server)
+SQL 189 file (3 nayi) · 285 DB object
+```
+
+🔴 **Chaar asli bug mile, teen suite ne pakde — review ne nahi.**
+
+1. **File sahi, database purana.** `/jobs/filters` `id:0, name:""` de raha tha
+   (count sahi). `024` disk par `AS Id, AS Name` karti thi, deployed proc mein
+   purana `AS SubjectName` khada tha — file edit ke baad **deploy nahi hui**.
+   Dono raw-bytes sweep **pass** hue: shape perfect, content khaali. Naya
+   content check joda, aur **purana alias wapas daal kar fail karte dekha**.
+2. **Sirf ek anonymous write hai aur uspar validation hi nahi thi.** Suite ne
+   `{}` bheja → **200 aur ek poori khaali row**. JP.App.Api ke paas ek bhi
+   validator nahi tha (zaroorat bhi nahi thi — sab token ke peeche tha).
+3. **Apply CTA job saath le hi nahi ja sakti** — jp-teacher mein `?redirect=`
+   koi padhta nahi, apply route nahi hai, aur job **integer id** se khulti hai
+   jo public surface kabhi deta nahi. Parameter hata diya, **G41**.
+4. **Title 66 akshar.** `site-audit` ne **pehli hi asli job par** pakda;
+   `fitTitle()` teen seedhi utarti hai aur teeno chal kar dekhi gayi.
+
+🔴 **SSR saabit hua, maana nahi gaya** — JavaScript **band** kar ke. Wahi ek
+test hai jo server render aur hydration mein farq kar sakta hai, aur `**`
+catch-all `/jobs` ko **chup-chaap** build-time par ek khaali page bana deta.
+Build ne confirm kiya: **6 static route prerender** hue, `/jobs` unme nahi.
+
+🔒 **Anonymous hona wire par naapa gaya** — 5 request, **ek par bhi**
+Authorization ya cookie nahi; localStorage/sessionStorage/cookie teeno khaali.
+Aur doosri taraf se: **wahi request valid token ke saath byte-identical** (1117
+=== 1117). Grep teen layer neeche ka accessor miss kar sakti hai, ek jaise bytes
+nahi.
+
+🔒 **404 ki deewar us lamhe par chali jab IST aur UTC ki date alag thi** —
+`IST 2026-10-14 · UTC 2026-10-13`. Ek UTC comparison us waqt har job ko **5.5
+ghante pehle** expire kar deta. Draft/expired/closed/deleted chaaron 404, aur
+refusal **kaaran nahi batati** (enumeration oracle); wahi paanch id school ki
+apni list par maujood hain, warna toota endpoint bhi pass kar jaata.
+
+⚠️ **Do suite ek hi rate-limit budget maang rahi thin, aur ye poori regression
+chalaane par hi dikha** — dono baar galat file ki taraf ishaara karte hue.
+`public-contract` ab **read budget wapas** karti hai (EXIT mein poll), aur
+`public-screens` contact budget **bilkul kharch nahi** karti (sab intercept).
+Zimmedari baant di: contract suite server ki, screens suite screen ki.
+
+⚠️ **Ek naya case jo pehle nahi tha:** failed send — 500 par page kehta hai nahi
+gaya, **jo likha tha wo form mein rehta hai**, aur prefilled mailto: milta hai.
+Yehi 2.44 ki sabse badi fikr thi, aur ab wo **assert** hoti hai.
+
+⚠️ **FAQ ki copy DB mein aa gayi aur ek jawab jhoota ho gaya tha** — "Can I
+search for jobs without an account?" ka "Not yet" usi commit mein theek hua, seed
+mein uska guard hai, aur dono suite data ki taraf se assert karti hain.
+
+⚠️ **`role` field hata diya** — column nahi hai, brief ne maanga nahi tha, aur
+jo form kuch maang kar discard karta hai wahi teen mein se saaf galat raasta hai.
+
+⚠️ **Ek number is file mein verify nahi ho paya:** pichhle close-out "SQL 296"
+likhte hain, par aaj `find database -name '*.sql'` = **189** aur teen DB ke
+objects = **285**. Kis basis par 296 tha, pata nahi chala. Is row se aage basis
+likha hua hai (file count + object count), taaki agli baar reproduce ho sake.
+
+⚠️ **Point 7 (interview/offer scope)** aur **§4 Q4 (billing MVP ka likhit
+confirmation)** dono **ab bhi client ke paas** hain.
+
+⚠️ **Khula:** **G41** (apply CTA job nahi le jaati), **G40** (city master khaali),
+**G39** (Admin Settings ka scope client ke paas). 7B ke paas: moderation,
+reports, featured, CMS, enquiry queue.
 
 ---
 

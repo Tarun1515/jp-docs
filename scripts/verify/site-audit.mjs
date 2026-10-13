@@ -1,7 +1,30 @@
 import { chromium } from 'playwright';
 
 const BASE = 'http://localhost:4500';
-const ROUTES = ['/', '/how-it-works', '/about', '/faq', '/contact', '/terms', '/privacy', '/continue?mode=login'];
+import { discoverJobSlug } from './lib/job-slug.mjs';
+
+/*
+  🔴 /jobs AND /jobs/:slug JOINED THIS LIST IN 7A.
+
+  They were found by the LINK crawl below as soon as the header gained "Find
+  jobs" — but being linked is not being audited. Until they were listed here,
+  nothing checked their h1, title length, description or canonical, which is
+  exactly what this script exists to check.
+
+  ⚠️ The detail route is discovered, because a job's path contains its uid and
+  there is no literal to write down. With no live job it is left out and the
+  run SAYS so — a page quietly dropping out of an audit is the same failure as
+  a suite that silently gets smaller.
+*/
+const STATIC_ROUTES = ['/', '/jobs', '/how-it-works', '/about', '/faq', '/contact', '/terms', '/privacy', '/continue?mode=login'];
+
+const jobSlug = await discoverJobSlug();
+
+if (!jobSlug) {
+  console.log('⚠️  no live job, so /jobs/:slug is NOT audited in this run\n');
+}
+
+const ROUTES = jobSlug ? [...STATIC_ROUTES, `/jobs/${jobSlug}`] : STATIC_ROUTES;
 
 const browser = await chromium.launch();
 let problems = 0;

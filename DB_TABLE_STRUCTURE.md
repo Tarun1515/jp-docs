@@ -218,14 +218,43 @@
 ## CMS & Featured tables (5) ⭐
 
 **`t_app_cms_pages`** — `PageId` · `PageTypeId` · `Title` · `Slug` · `Content` nvarchar(max) · `MetaTitle` · `MetaDescription` · `IsPublished`
-**`t_app_cms_content_blocks`** — `BlockId` · `PageId` · `BlockKey` · `BlockTitle` · `BlockContent` · `ImagePath` · `DisplayOrder`
-**`t_app_faqs`** — `FaqId` · `Category` (Teacher/School/General) · `Question` · `Answer` · `DisplayOrder`
+**`t_app_cms_content_blocks`** — `BlockId` · ~~`PageId`~~ · `BlockKey` · `BlockTitle` · `BlockContent` · `ImagePath` · `DisplayOrder`
+> ⚠️ **7A mein BANI, par `PageId` ke BINA** (`033_public_content.sql`). `t_app_cms_pages`
+> ban hi nahi rahi (2.81: MVP mein koi page CMS se nahi aata), to ek FK jiska
+> parent maujood nahi hai wo ya **NULL hamesha** rehta ya ek aadhi-bani table ki
+> taraf ishaara karta. Block ab `BlockKey` se address hota hai — template naam
+> leta hai, page nahi. `PageId` us din judega jis din `cms_pages` bane, aur wo
+> ek naya column hai, migration nahi.
+**`t_app_faqs`** — `FaqId` · `Category` (`TEACHER`/`SCHOOL`/`GENERAL`, CHECK) · `Question` · `Answer` · `DisplayOrder`
+> ⚠️ **7A mein BANI aur SEED hui** (`003_seed_public_faqs.sql`, baarah sawaal).
+> Category UPPERCASE hai ek CHECK ke saath, kyunki `/faq` page isi value par
+> group karta hai — mixed case ek silently-gayab section ban jaata.
+> `GENERAL` ko kuch seed nahi karta, par page use **render karta hai**: warna
+> admin ka likha sawaal kahin dikhta hi nahi.
+>
+> ⚠️ Seed **insert-if-absent hai, overwrite kabhi nahi** — 7B se admin in rows
+> ko edit karega, aur har deploy par apna text wapas likhne wali seed unki
+> mehnat chupchaap mita deti.
 **`t_app_featured_jobs`** — `Id` · `JobId` · `FromDate` · `ToDate` · `DisplayOrder` · `CreatedBy`
 **`t_app_featured_schools`** — `Id` · `SchoolId` · `FromDate` · `ToDate` · `DisplayOrder` · `CreatedBy`
 
 ## Support tables (2) ⭐
 
-**`t_app_contact_enquiries`** — `EnquiryId` · `Name` · `Email` · `Mobile` · `Subject` · `Message` · `IsResolved` · `ResolvedByUserId` · `ResolvedOn`
+**`t_app_contact_enquiries`** — `EnquiryId` · `Name` · `Email` · `Mobile` · `Subject` · `Message` · `IsResolved` · `ResolvedByUserId` · `ResolvedOn` · **`ResolutionRemarks`**
+> ⚠️ **7A mein BANI.** `ResolutionRemarks` is list mein nahi tha — joda gaya
+> kyunki ek resolved row ke saath "kisne band kiya" aur "kab" hai par **"kya
+> jawab diya" nahi**, aur agla banda jo poochhta hai "isko koi dekha?" usse
+> jawab chahiye, khaali flag nahi. Ek CHECK structurally enforce karta hai ki
+> resolved row ke paas resolver AUR timestamp dono hon (2.36).
+>
+> 🔒 **Is table mein koi CALLER IDENTITY column nahi hai, aur ye jaan-boojh kar
+> hai** — ye product ki pehli table hai jisme ek **unauthenticated** request
+> insert karti hai, to record karne ko koi identity hai hi nahi. `033` mein ek
+> guard hai jo `UserUid`/`UserId`/`OrganizationUid` jaisa column aate hi fail
+> karta hai, aur `public-contract.mjs` data ki taraf se wahi assert karti hai.
+> 🔴 **Koi honeypot column nahi**: jo bot hidden field bharta hai use 200 milta
+> hai aur **row banti hi nahi** — attempt store karna ek aisi table hai jo bots
+> se bhar jaati aur ek admin ko triage karni padti.
 **`t_app_saved_jobs`** — `Id` · `TeacherId` · `JobId` · `SavedOn`
 
 ---
