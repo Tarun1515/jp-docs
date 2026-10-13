@@ -1,7 +1,7 @@
 # TEACHER RECRUITMENT PORTAL — PROJECT MEMORY
 
 > **Ye file har kaam ke baad update hogi.** Har naye chat/session mein sabse pehle ye file padho.
-> Last updated: **2026-10-14** | Phase **3 COMPLETE** + **2.5 engine** + **4 jobs COMPLETE** + **2.67 swagger fix** + **PRE-5 (G26 band, 2.68/2.69)** + **PRE-5b (baseline green)** + **5A applications BACKEND (2.70, G28)** + **5B applications SCREENS COMPLETE — PHASE 5 POORA (2.71, G30)** + **6A-0 approval engine above level 1 (2.72, G14 BAND, G31)** + **6A Offer Lite BACKEND COMPLETE (2.73, G32)** + **6B TEACHER SEARCH + INVITES BACKEND COMPLETE — 🔒 CONSENT PATH 2 (2.74, G33, G34)** + **6C-0 verification ka bakaya: G33 aur G34 BAND (2.75, G35, G36)** + **6C-1 NOTIFICATIONS BACKEND + G27 BAND (2.76, G37)** + **6C-2-0 G37 BAND — badge asli hua, aur shared suite runner (2.77, G35 BAND)** + **6C-2 SCREENS COMPLETE — 🔒 consent path 2 screen se, devtools-forced negatives dono taraf (2.78)** + **6.5A BILLING BACKEND COMPLETE — manual first, seam service par, expiry derived (2.79, G38)** + **6.5B BILLING SCREENS COMPLETE — PHASE 6.5 POORA (2.80)** + **7A-0 PUBLIC SURFACE KE TEEN FAISLE, CODE SE PEHLE (2.81, G39, G40)** + **7A PUBLIC JOB PAGES + CONTACT FORM COMPLETE — 🔒 pehli ANONYMOUS surface, SSR JS band kar ke saabit (2.82, G41)** | Next: **7B — admin ka operations desk** (moderation, reports, featured, CMS, enquiry queue) — ⚠️ Point 7 (interview/offer scope) aur §4 Q4 (billing MVP ka likhit confirmation) dono ab bhi client ke paas hain
+> Last updated: **2026-10-14** | Phase **3 COMPLETE** + **2.5 engine** + **4 jobs COMPLETE** + **2.67 swagger fix** + **PRE-5 (G26 band, 2.68/2.69)** + **PRE-5b (baseline green)** + **5A applications BACKEND (2.70, G28)** + **5B applications SCREENS COMPLETE — PHASE 5 POORA (2.71, G30)** + **6A-0 approval engine above level 1 (2.72, G14 BAND, G31)** + **6A Offer Lite BACKEND COMPLETE (2.73, G32)** + **6B TEACHER SEARCH + INVITES BACKEND COMPLETE — 🔒 CONSENT PATH 2 (2.74, G33, G34)** + **6C-0 verification ka bakaya: G33 aur G34 BAND (2.75, G35, G36)** + **6C-1 NOTIFICATIONS BACKEND + G27 BAND (2.76, G37)** + **6C-2-0 G37 BAND — badge asli hua, aur shared suite runner (2.77, G35 BAND)** + **6C-2 SCREENS COMPLETE — 🔒 consent path 2 screen se, devtools-forced negatives dono taraf (2.78)** + **6.5A BILLING BACKEND COMPLETE — manual first, seam service par, expiry derived (2.79, G38)** + **6.5B BILLING SCREENS COMPLETE — PHASE 6.5 POORA (2.80)** + **7A-0 PUBLIC SURFACE KE TEEN FAISLE, CODE SE PEHLE (2.81, G39, G40)** + **7A PUBLIC JOB PAGES + CONTACT FORM COMPLETE — 🔒 pehli ANONYMOUS surface, SSR JS band kar ke saabit (2.82, G41, G42)** | Next: **7B — admin ka operations desk** (moderation, reports, featured, CMS, enquiry queue) — ⚠️ Point 7 (interview/offer scope) aur §4 Q4 (billing MVP ka likhit confirmation) dono ab bhi client ke paas hain
 >
 > 🔴 **Ye do line har phase ke close-out mein update hongi.** File 3I tak
 > pahunch chuki thi aur ye header **Phase 0** par khada tha — saat phase purana,
@@ -2080,6 +2080,53 @@ expire ho gaya.** Us comment mein likha tha ".tabs system mein nahi hai (G27)" �
 ab hai. Baaki wajah apne paon par khadi hai: har option apna **count** carry
 karti hai, jiske liye tab strip mein jagah nahi. Comment theek kar diya — toota
 hua reason likha chhod dena usi class ki galti hai jo G27 thi.
+
+### G42. Contact form ka 3/hour per-IP limit ek shared proxy ke peeche poori site ka 3/hour ban jaata hai — 🟡 OPEN (7A, 2026-10-14)
+
+Ye 7A mein likha gaya limit hai, aur **local par theek chalta hai**. Production
+mein ek risk hai jo abhi tak kisi ne nahi dekha kyunki deploy nahi hua.
+
+```
+RateLimits:Public:ContactPerIp  = { PermitLimit: 3, WindowSeconds: 3600 }
+partition key                  = context.Connection.RemoteIpAddress
+```
+
+**Do faisle milte hain aur saath mein ek problem bante hain:**
+
+1. `ContactPerIp` = **3 per hour per IP** — ek insaan ek baar likhta hai, to
+   tight rakha gaya.
+2. 🔴 `X-Forwarded-For` **jaan-boojh kar nahi padha jaata**
+   (`PublicRateLimiting.cs`): *"ek header jo client set kar sakta hai wo ek limit
+   hai jo client reset kar sakta hai"*. Use honour karne ke liye
+   `ForwardedHeadersOptions` + ek `KnownProxies` list chahiye, jo ek **deployment
+   decision** hai jo is project ne liya hi nahi.
+
+Dono akele theek hain. **Saath mein:** reverse proxy ke peeche har visitor ka
+`RemoteIpAddress` **proxy ka** hota hai — to 3/hour **poori website ka** ho
+jaata hai, har visitor ke liye nahi. Chauthe visitor ko 429 milega, us din.
+
+⚠️ File apni taraf ka cost **likhti hai** ("behind a single reverse proxy, every
+visitor shares one bucket"), par usse **3 ke saath jodti nahi**. Jodne par number
+galat lagta hai: ek NAT ke peeche baitha school jiska 30 staff hai, ya ek college
+campus, teen enquiry ek ghante mein aasaani se paar kar lega.
+
+🔴 **Maine number khud nahi badla, aur ye jaan-boojh kar hai.** Ye ek
+anti-abuse control hai; use chupchaap dheela karna ek security decision hai jo
+mera nahi hai. Aur asli fix number nahi hai — **proxy ka faisla** hai.
+
+**Band kaise hoga** (ek saath, warna aadha):
+1. Deployment topology tay ho — kitne proxy, kaun, kis address se.
+2. `ForwardedHeaders` + `KnownProxies` wire ho, taaki partition key **asli
+   visitor** ka ho. Tab 3/hour ka matlab wahi ho jaayega jo iraada tha.
+3. Tab tak agar deploy karna ho, to `ContactPerIp` config se **ooncha** karna
+   hoga (2.7 — number config mein hai, code mein nahi), aur
+   `public-contract.mjs` ka limit assertion **usi commit mein** hilega.
+
+⚠️ **Read budget par bhi wahi baat lagu hai** (`PublicReadsPerIp` 60/minute),
+par wahan blast radius chhota hai: ek browse karne wala visitor 60 se door hai,
+aur 429 ka matlab "ek minute ruk jao" hai, "tumhari enquiry gayi" nahi.
+
+---
 
 ### G41. Apply CTA job ko saath nahi le ja sakti — jp-teacher ke teen tukde missing — 🟡 OPEN (7A, 2026-10-14)
 
@@ -9935,7 +9982,7 @@ likha hua hai (file count + object count), taaki agli baar reproduce ho sake.
 ⚠️ **Point 7 (interview/offer scope)** aur **§4 Q4 (billing MVP ka likhit
 confirmation)** dono **ab bhi client ke paas** hain.
 
-⚠️ **Khula:** **G41** (apply CTA job nahi le jaati), **G40** (city master khaali),
+⚠️ **Khula:** **G42** (3/hour contact limit ek shared proxy ke peeche poori site ka 3/hour ban jaata hai), **G41** (apply CTA job nahi le jaati), **G40** (city master khaali),
 **G39** (Admin Settings ka scope client ke paas). 7B ke paas: moderation,
 reports, featured, CMS, enquiry queue.
 
