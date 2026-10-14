@@ -82,10 +82,35 @@ console.log('\n=== 1. A THROWAWAY TEACHER, THROUGH THE REAL SIGNUP ===');
 
 const registered = await j(`${SSO}/auth/register/teacher`, {
   method: 'POST', headers: { 'content-type': 'application/json' },
-  body: JSON.stringify({ email: EMAIL, password: PASSWORD }),
+  /*
+    ⚠️ name IS REQUIRED from Phase 7B (G43). The signup form always demanded
+    one; the request contract had no field for it, so this suite registered
+    without a name and the server accepted it. Now both agree.
+  */
+  body: JSON.stringify({ name: 'Verification Teacher', email: EMAIL, password: PASSWORD }),
 });
 
 check('a teacher can sign up', registered.http === 200, `${registered.http} · ${registered.body?.message}`);
+
+/*
+  🔴 AND THE NAME REACHED THE DATABASE (G43).
+
+  For six phases the form required a name, the request contract had no field
+  for it, and t_app_teachers.FullName was written as the empty string — while
+  002_provisioning_accounts.sql had an @FullName parameter the whole time and
+  AuthService passed it a literal null. Nothing was missing but the argument.
+
+  ⚠️ This assertion exists so it cannot quietly break again: a payload that
+  stops carrying the name, or a service that stops forwarding it, fails here
+  rather than in a support question about blank names.
+*/
+const storedName = sql(`SET NOCOUNT ON;
+  SELECT t.FullName FROM jp_app.dbo.t_app_teachers t
+    INNER JOIN jp_sso.dbo.t_sso_users u ON u.UserUid = t.UserUid
+   WHERE u.Email = '${EMAIL}'`);
+
+check('🔴 …and the name they typed is stored, not an empty string',
+  storedName === 'Verification Teacher', `FullName = "${storedName}"`);
 
 const token = await login(EMAIL, PASSWORD);
 const read = async () => (await j(`${APP}/teacher/profile`, { headers: head(token) })).body?.data;

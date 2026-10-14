@@ -1,7 +1,7 @@
 # TEACHER RECRUITMENT PORTAL — PROJECT MEMORY
 
 > **Ye file har kaam ke baad update hogi.** Har naye chat/session mein sabse pehle ye file padho.
-> Last updated: **2026-10-14** | Phase **3 COMPLETE** + **2.5 engine** + **4 jobs COMPLETE** + **2.67 swagger fix** + **PRE-5 (G26 band, 2.68/2.69)** + **PRE-5b (baseline green)** + **5A applications BACKEND (2.70, G28)** + **5B applications SCREENS COMPLETE — PHASE 5 POORA (2.71, G30)** + **6A-0 approval engine above level 1 (2.72, G14 BAND, G31)** + **6A Offer Lite BACKEND COMPLETE (2.73, G32)** + **6B TEACHER SEARCH + INVITES BACKEND COMPLETE — 🔒 CONSENT PATH 2 (2.74, G33, G34)** + **6C-0 verification ka bakaya: G33 aur G34 BAND (2.75, G35, G36)** + **6C-1 NOTIFICATIONS BACKEND + G27 BAND (2.76, G37)** + **6C-2-0 G37 BAND — badge asli hua, aur shared suite runner (2.77, G35 BAND)** + **6C-2 SCREENS COMPLETE — 🔒 consent path 2 screen se, devtools-forced negatives dono taraf (2.78)** + **6.5A BILLING BACKEND COMPLETE — manual first, seam service par, expiry derived (2.79, G38)** + **6.5B BILLING SCREENS COMPLETE — PHASE 6.5 POORA (2.80)** + **7A-0 PUBLIC SURFACE KE TEEN FAISLE, CODE SE PEHLE (2.81, G39, G40)** + **7A PUBLIC JOB PAGES + CONTACT FORM COMPLETE — 🔒 pehli ANONYMOUS surface, SSR JS band kar ke saabit (2.82, G41, G42)** + **7B-0 G41 BAND — public→teacher funnel, aur ek parameter jo do jagah likha jaata tha aur kahin padha nahi (2.83, G43)** | Next: **7B — admin ka operations desk** (moderation, reports, featured, CMS, enquiry queue) — ⚠️ Point 7 (interview/offer scope) aur §4 Q4 (billing MVP ka likhit confirmation) dono ab bhi client ke paas hain
+> Last updated: **2026-10-14** | Phase **3 COMPLETE** + **2.5 engine** + **4 jobs COMPLETE** + **2.67 swagger fix** + **PRE-5 (G26 band, 2.68/2.69)** + **PRE-5b (baseline green)** + **5A applications BACKEND (2.70, G28)** + **5B applications SCREENS COMPLETE — PHASE 5 POORA (2.71, G30)** + **6A-0 approval engine above level 1 (2.72, G14 BAND, G31)** + **6A Offer Lite BACKEND COMPLETE (2.73, G32)** + **6B TEACHER SEARCH + INVITES BACKEND COMPLETE — 🔒 CONSENT PATH 2 (2.74, G33, G34)** + **6C-0 verification ka bakaya: G33 aur G34 BAND (2.75, G35, G36)** + **6C-1 NOTIFICATIONS BACKEND + G27 BAND (2.76, G37)** + **6C-2-0 G37 BAND — badge asli hua, aur shared suite runner (2.77, G35 BAND)** + **6C-2 SCREENS COMPLETE — 🔒 consent path 2 screen se, devtools-forced negatives dono taraf (2.78)** + **6.5A BILLING BACKEND COMPLETE — manual first, seam service par, expiry derived (2.79, G38)** + **6.5B BILLING SCREENS COMPLETE — PHASE 6.5 POORA (2.80)** + **7A-0 PUBLIC SURFACE KE TEEN FAISLE, CODE SE PEHLE (2.81, G39, G40)** + **7A PUBLIC JOB PAGES + CONTACT FORM COMPLETE — 🔒 pehli ANONYMOUS surface, SSR JS band kar ke saabit (2.82, G41, G42)** + **7B-0 G41 BAND — public→teacher funnel, aur ek parameter jo do jagah likha jaata tha aur kahin padha nahi (2.83, G43)** + **7B ADMIN OPERATIONS DESK COMPLETE — paanch surface, chha screen, athaarah route, aur ek column jo hamesha zero rehta tha (2.84, G43 BAND, G44)** | Next: **jo admin console mein bacha hai** (users, master data, analytics) ya **Phase 8 E2E (G9)** — ⚠️ Point 7 (interview/offer scope) aur §4 Q4 (billing MVP ka likhit confirmation) dono ab bhi client ke paas hain
 >
 > 🔴 **Ye do line har phase ke close-out mein update hongi.** File 3I tak
 > pahunch chuki thi aur ye header **Phase 0** par khada tha — saat phase purana,
@@ -2081,7 +2081,88 @@ ab hai. Baaki wajah apne paon par khadi hai: har option apna **count** carry
 karti hai, jiske liye tab strip mein jagah nahi. Comment theek kar diya — toota
 hua reason likha chhod dena usi class ki galti hai jo G27 thi.
 
-### G43. Teacher signup ka `name` field **required** hai aur server tak pahunchta hi nahi — 🟡 OPEN (7B-0, 2026-10-14)
+### G44. CMS content blocks ka likha hua kahin render nahi hota — 🟡 OPEN (7B, 2026-10-14)
+
+7B ne blocks ka editor banaya. Endpoint pehle se tha, aur **live aur anonymous**
+hai:
+
+```
+GET /api/public/content-blocks              -> 200, Is_Active = 1 wale rows
+jp-public/src/app/core/public-api.service.ts -> getContentBlocks() maujood
+caller                                       -> ZERO (poore jp-public source mein)
+```
+
+To is screen par likhi copy **save hoti hai, serve hoti hai, aur kisi page par
+dikhti nahi.** Table bhi khaali hai (0 row), to aaj tak kisi ne notice bhi nahi
+kiya.
+
+⚠️ **Sirf missing component ki baat nahi hai.** jp-public apne static pages
+**prerender** karta hai (`RenderMode.Prerender` on `**`) — to homepage par
+block build-time par bake hoga aur admin ka edit **redeploy** maangega. Jo page
+edit ke baad turant dikha sakte hain wo `RenderMode.Server` wale hain
+(`/jobs`, `/faq`).
+
+🔴 **Jo 7B ne kiya: screen khud ye baat kehti hai** — banner pehli line par, aur
+endpoint ka naam leta hai taaki dava check ki ja sake. Editor jo hero line likh
+kar site par kuch na badalte dekhe wo **theek yehi** nateeja nikalega ki save
+fail hua.
+
+🔴 **Aur dava test hoti hai, maani nahi jaati:** `admin-desk-screens.mjs`
+jp-public ka source **chal kar** confirm karti hai ki `getContentBlocks` ka
+caller zero hai. Jis din ek page block padhega, us assertion ka **fail hona hi**
+banner hatane ka reminder hai.
+
+**Band kaise hoga** (ek saath, warna aadha):
+1. Tay karo kaun se page ka kaun sa block — key **contract** hai (rename edit
+   nahi hai, purana block unpublish ho jaata hai).
+2. Us page ka render mode dekho. Prerendered page par block ka matlab
+   "redeploy par badlega" hai — wo likhna padega, warna admin ka edit chup-chaap
+   gayab lagta hai.
+3. Fallback copy rakho: block na ho to page ki apni copy chale. Khaali hero
+   section is se bura hai.
+4. Banner hatao aur suite ka caller-zero assertion palto — **usi commit mein**.
+
+⚠️ FAQ ke saath ye problem **nahi** hai: `/faq` `RenderMode.Server` hai aur
+usi API se padhta hai, aur 7B ki suite ne off/on karke public response ke **raw
+bytes** se saabit kiya.
+
+---
+
+### G43. Teacher signup ka `name` field **required** hai aur server tak pahunchta hi nahi — ✅ BAND (7B, 2026-10-14)
+
+> ✅ **BAND 7B MEIN.** Chain ka toota hua hissa ek **literal null** tha:
+>
+> ```csharp
+> // AuthService.RegisterTeacherAsync — 7B se pehle
+> await _teacherProvisioning.ProvisionAsync(result.UserUid ?? Guid.Empty, fullName: null, ct);
+> ```
+>
+> Procedure `@FullName` Phase 3B se leti thi. Kuch missing nahi tha, sirf ye
+> argument. Paanch jagah badli: C# DTO, TS model, SSO validator (required, max
+> 150 — column ke barabar), register component ka payload, aur `AuthService`.
+>
+> 🔴 **Saboot funnel ke landing par hai, DB query se nahi:** landing ab naam se
+> greet karti hai — *"Welcome, Priya Ramaswamy — you were applying for FUNNEL
+> Chemistry Teacher"*. Naam ko form → request contract → SSO → provisioning →
+> column → **aur wapas** teacher app ke profile read se guzarna padta hai. Ek
+> SQL check ek link saabit karta; greeting poori chain saabit karti hai.
+> `funnel-e2e.mjs` **26/26**, aur column bhi assert hota hai (greeting kahin
+> cached value se bhi aa sakti thi).
+>
+> ⚠️ `teacher-profile.mjs` **33 → 34**: wo suite bina naam register karti thi
+> (server accept kar leta tha, kyunki field hi nahi thi). Ab naam bhejti hai
+> **aur assert karti hai ki wo column mein pahuncha**.
+>
+> ⚠️ **Greeting sirf funnel ke landing par fetch hoti hai**, har job page par
+> nahi — ek extra `/teacher/profile` request us ek screen ke liye jahan ek
+> naya account chaar screen paar kar ke aaya hai. Token se nahi aa sakti:
+> `CurrentUser` claims rakhta hai aur naam **jaan-boojh kar nahi** (JWT mein
+> display name wo naam hai jo spelling theek karte hi stale ho jaata hai).
+>
+> ⚠️ **Ek apni galti:** suite ne page ko profile request ke beech mein padha aur
+> *"NOT GREETED"* likha — feature theek tha. Ab wahi cheez wait hoti hai jo
+> assert hoti hai; isi session mein teesri baar wahi sabak.
+
 
 7B-0 ka funnel banate waqt mila, kyunki suite ko ye form bharna padta hai.
 
@@ -8899,6 +8980,286 @@ karti hai — `This posting has gone` — to pass apna saboot dikhata hai.
 
 ---
 
+### 2.84 7B — ADMIN KA OPERATIONS DESK, AUR EK COLUMN JO HAMESHA ZERO REHTA HAI
+
+Paanch surface: moderation, reports, featured, CMS (blocks + FAQ), enquiries.
+Chha screen, athaarah route, teen service — ek service **per permission**, jo
+mapping jaan-boojh kar hai.
+
+Jo **naapne par mila** aur brief mein nahi tha: do cheezein. Ek column jo
+project ne khud likhne se mana kiya hua hai aur meri queue use padh rahi thi,
+aur ek editor jiska likha kahin render hi nahi hota.
+
+---
+
+#### 🔴 2.84.1 — `ApplicationCount` HAMESHA ZERO HAI, AUR MODERATION QUEUE USE PADH RAHI THI
+
+Moderation screen par ek column hai: **kitne logon ne apply kiya**. Wahi number
+decision ka wazan hai — nau application wale advert ko girana nau logon ko
+chhoota hai jinki koi galti nahi.
+
+Pehli version ne `t_app_jobs.ApplicationCount` project kiya, aur `025` ke header
+mein maine likh bhi diya ki *"column job row par maintained hai"*. **Wo jhooth
+tha**, aur project ne ye do jagah pehle se likha hua tha:
+
+```
+016_applications.sql : ApplicationCount ON t_app_jobs IS NEVER WRITTEN HERE
+017_application_reads.sql : ...deliberately left at zero and must never be
+                            written... This file never reads that column
+                            either, so a stale value cannot leak through a
+                            projection.
+```
+
+017 ne **exactly wahi leak** mana kiya tha jo maine banaya. Nateeja: har advert
+par **0 applied**, hamesha — aur ye wo jagah hai jahan 0 ka matlab hai
+*"kisi ko farq nahi padega, gira do"*.
+
+🔴 **Pakda screens suite ne, review ne nahi.** Do application maujood thin aur
+cell `0` keh raha tha. *Jo procedure compile ho gayi uske number sahi hone ka
+koi saboot nahi hai* — 7A ne yehi baat `AS Id`/`AS SubjectName` par seekhi thi
+(file sahi, database purana), aur yahan shape sahi tha aur **source** galat.
+
+Theek karna seedha tha (`COUNT(*)`), par usne **guard todi**: `025` ka
+dependency guard kehta tha ki koi bhi moderation proc `t_app_applications` ko
+**chhue hi na**. Aur ye tension asli hai —
+
+⚠️ **Guard ko kamzor karna aasaan tha, aur galat.** Sahi jawab: guard ko
+**teez** karna. `sys.dm_sql_referenced_entities` ke paas `is_updated` hai (jo
+dependency **view** ke paas nahi hai) — 1 us entity ke liye jisme module
+**likhta** hai, 0 us ke liye jise sirf **padhta** hai. To ab do guard hain:
+
+| Procedure | Rule |
+|---|---|
+| `USP_PullJob`, `USP_RestoreJob`, `USP_GetJobModerationHistory` | application data ko **chhu bhi nahi sakti** (dependency hi nahi) |
+| `USP_SearchJobsForModeration` | **gin sakti hai, likh nahi sakti** (`is_updated = 0` assert) |
+
+Brief ka vaada *"applications UNTOUCHED"* isse **zyada** saaf hota hai, kam
+nahi: moderator dekh sakta hai ki nau logon ne apply kiya, aur jo procedure
+dikhati hai wo un nau rows ko **badal nahi sakti**.
+
+🔴 **Guard dono taraf chala kar dekhi gayi, bharosa karne se pehle:** ek probe
+proc `COUNT(*)` karti hai → `is_updated = 0`; doosri `UPDATE ... WHERE 1 = 0`
+karti hai → `is_updated = 1`. Phir asli proc ko jaan-boojh kar toda (queue ko
+UPDATE karne wali bana diya) → **guard fire hui**. *Jo guard fail hote dekhi
+nahi gayi wo ek anumaan hai.*
+
+---
+
+#### 🔴 2.84.2 — DESK AISI THI JISE SIRF UID JAANNE WALA KHOL SAKTA THA (brief se bahar)
+
+Pull aur restore job ko **uid** se address karte hain. Behaviour saabit karne
+ke liye kaafi, desk ke liye nahi: Monday subah moderator ka pehla sawaal hai
+*"kya report hua hai, aur abhi kya pulled hai?"* — aur us sawaal ka product ke
+paas **koi jawab nahi tha**. Koi admin job-browse route maujood nahi thi (public
+search sirf effective-ACTIVE deti hai, school ki list apne scope mein).
+
+To `USP_SearchJobsForModeration` + `GET /api/admin/desk/jobs` **jodi gayi** —
+brief ki list se bahar, aur iss wajah se: *"Clean boundary → stop and report;
+never half of one."* Lookup-only moderation screen aadhi boundary thi.
+
+⚠️ **Filter EFFECTIVE status par hai (2.65), stored par nahi.** EXPIRED (3) list
+mein hai jabki koi row 3 store nahi karti — moderator jo site par dikhta hai
+usse filter kare to list site se **ulti** nahi hoti.
+
+⚠️ **Pulled job list mein HAI, aur hona chahiye:** restore karne ka koi doosra
+raasta nahi hai.
+
+🔴 **Swagger floor 119 → 137 usi commit mein, naapa gaya — calculate nahi.**
+119 + 18 bhi milta hai, par dono gine gaye (7A ne yehi discipline tab likhi thi
+jab ek menu count stale number mein +1 kar ke "theek" kiya gaya tha).
+
+---
+
+#### 🔴 2.84.3 — CMS BLOCKS KA LIKHA KAHIN RENDER NAHI HOTA (G44), AUR SCREEN KHUD KEHTI HAI
+
+`GET /api/public/content-blocks` **live aur anonymous** hai. jp-public ke
+service mein `getContentBlocks()` **maujood** hai. Caller **zero** — poore
+jp-public source mein wo naam ek hi file mein hai, apni hi service mein.
+
+Matlab: is screen par likhi copy **save hoti hai, serve hoti hai, aur kisi page
+par dikhti nahi.**
+
+⚠️ Aur sirf missing component ki baat nahi hai: jp-public apne static pages
+**prerender** karta hai (`RenderMode.Prerender` on `**`), to homepage par block
+build-time par bake hoga aur admin ka edit **redeploy** maangega. Jo page live
+dikha sakte hain wo server-rendered wale hain. Ye jp-public ka badlaav hai aur
+us phase ka kaam hai jo jp-public ka maalik hai — 7B **reach across nahi karti**,
+gap likhti hai.
+
+🔴 **Jo kiya gaya: screen khud ye baat kehti hai**, banner mein, pehle hi line
+par — aur endpoint ka naam leti hai taaki dava **check ki ja sake**. Editor jo
+hero line likh kar site par kuch na badalte dekhe wo **theek** yehi nateeja
+nikalega ki save fail hua. *"Save ho gaya, dikhata kuch nahi"* ek jumla hai jo
+product ko kehne ki himmat rakhni chahiye.
+
+Suite us banner ko sirf padhti nahi — **jp-public ka source chal kar** confirm
+karti hai ki caller zero hai. Jis din ek page block padhega, us assertion ka
+fail hona **notice** banner hatane ka reminder hai.
+
+---
+
+#### 🔒 2.84.4 — EK SERVICE PER PERMISSION, AUR TEENON PERMISSION SERVER PAR HI CHECK HOTI HAIN
+
+```
+moderation.service.ts  -> MODERATION.JOB + MODERATION.REPORT
+content.service.ts     -> CMS.MANAGE          (featured + FAQ + blocks)
+enquiry.service.ts     -> ENQUIRY.MANAGE
+```
+
+🔒 **Client mein koi permission check nahi hai, jaan-boojh kar** — wahi kaaran
+jo `settings/plans` aur `billing/payments` ke paas likha hai: route chhupana
+presentation hai, protection API ka kaam. Menu row wahi chaar code carry karti
+hai, to link kisi aur ko offer hoti hi nahi; aur URL type karne par **har call
+403**.
+
+🔴 **`ENQUIRY.MANAGE` alag permission hai, `MODERATION.REPORT` reuse nahi
+kiya** — complaint padhne ka haq har visitor ka email address padhne ka haq
+nahi hona chahiye. Agar support aur moderation ek hi do log nikle, to `008` ke
+seed mein **ek line** se MODERATION_ADMIN ko grant ho jaata hai. Ulta —
+permission ko baad mein **todna** — aise kaam nahi karta. (Yehi faisla client
+ke liye flag kiya gaya hai.)
+
+🔴 **`CMS.MANAGE` featured placement ko bhi gate karta hai**, alag
+`FEATURED.MANAGE` nahi: teenon ek hi kaam hain — *bina sign-in wala visitor kya
+dekhta hai*. Do holder set ek jaise rakhna padta. ⚠️ Likh kar rakha hai: agar
+featured placement **becha** jaane lage (slot, invoice), wo editorial nahi
+rehta aur apni permission kama leta hai.
+
+⚠️ **Sidebar ka wall naapa gaya, maana nahi:** MODERATION_ADMIN ko teen link
+milte hain (Jobs, Reports, Enquiries), CMS **poora gayab** — aur *khaali CMS
+heading bhi nahi*, kyunki `menu.service.ts` ka `navigationTree` group node ko
+drop karta hai jiske children na hon. Aur `/cms/featured` type karne par screen
+apna **FAILED** note dikhati hai, **empty state nahi** — *"dikhane ko kuch nahi
+hai"* aur *"aapko dekhne ka haq nahi"* do alag jumle hain aur sirf ek sach hai.
+
+---
+
+#### 🔴 2.84.4a — CHHA ROUTE, TAB NAHI — AUR `/cms` REDIRECT BAN KAR ZINDA RAHA
+
+CMS teen screen hai (featured, FAQs, page content) aur teeno **asli route**
+hain. Signal mein rakhi hui tab back button todti hai, bookmark nahi hoti, aur
+email se link nahi hoti — aur `005_seed_menus.sql` ko har path ki row chahiye
+hoti hai, to route banana hi padta.
+
+⚠️ `ADMIN_CMS` **leaf se group** ban gaya (RoutePath → NULL, teen children) —
+MERGE usi row ko update karta hai. Isi wajah se `app.routes.ts` mein `/cms`
+**redirect** ban kar raha: ye row ab us par point nahi karti, par **bookmark
+aur handover document** karte hain.
+
+---
+
+#### 🔴 2.84.5 — PULL KA SABOOT: BUTTON SE, AUR PUBLIC 404 MILLISECOND MEIN
+
+HTTP suite ne POST se saabit kiya tha. Screens suite **reason type karti hai
+aur button dabati hai**, phir:
+
+```
+pull -> banner -> public re-read 404 · 11 ms later
+public cache header: no-store, no-cache, must-revalidate
+before: 900|2|never|0   901|3|never|0
+after:  900|2|never|0   901|3|never|0
+```
+
+🔴 **Cache ka sawaal header se band hota hai, intezaar se nahi** — 7A-0 ka
+faisla (har public response `no-store`) ka matlab yehi hai: koi edge ya browser
+copy nahi jiska TTL khatam hone ka wait karna pade. Isliye `11 ms` ka number
+asli hai.
+
+🔴 **Dono application byte-for-byte wahi** — status, `ModifiedOn`, `Is_Deleted`.
+Guard structural hai (2.84.1), ye uska **observed** jawab hai.
+
+⚠️ **Panel pehle hi kehta hai ki school ye reason padhega** (2.62). Jo moderator
+samajhta hai ki internal note likh raha hai wo **alag cheez** likhta hai us se
+jo jaanta hai ki school padhega. Aur restore panel kehta hai *"us status par
+wapas jo pull se pehle tha"* — **"republished" nahi**, kyunki pulled draft draft
+par wapas jaata hai.
+
+🔒 **Log kisi administrator ka naam nahi leta** — kisne moderate kiya wo row
+mein record hai aur **kisi ko dikhaya nahi jaata**; log append-only hai (034 ne
+us table ko `Is_Deleted`/`ModifiedOn`/`ModifiedBy` diya hi nahi).
+
+---
+
+#### 🔴 2.84.6 — FEATURED: TEEN GROUP EK DATE COLUMN SE
+
+Screen "live today / starting later / finished" teen group dikhati hai — teen
+**state** se nahi, **ek date range** se. Jo window kal khatam hui usse khatam
+karne ko kuch **chala hi nahi**, aur screen par finished group par **koi
+"unfeature" button nahi hai** kyunki undo karne ko kuch nahi hai.
+
+🔴 `isLiveToday` **server ka jawab** hai, client par dobara derive nahi hota:
+London ka browser din mein **saadhe paanch ghante** alag jawab deta hai (2.28),
+aur public listing database ke jawab se order hoti hai.
+
+🔴 **Wo case jo bug jaisa lagta hai aur nahi hai:** window live hai aur jo advert
+promote kar rahi hai wo **pulled** ho gaya — public listing use chup-chaap drop
+karti hai. Screen ye **bolti** hai (*"...so it does not appear publicly — the
+placement is doing nothing"*) aur **status ka naam leti hai**, warna admin ka
+nateeja yehi hota ki featuring toot gayi.
+
+---
+
+#### 🔴 2.84.7 — FAQ OFF KARNA: PUBLIC RESPONSE KE RAW BYTES SE SAABIT
+
+Admin screen **sab** FAQ dikhati hai, public page **sirf active**. Wahi farq
+feature hai: sawaal retire karna, jawab khoye bina.
+
+```
+switch off -> public /faqs 3471 bytes -> 3323 bytes (sawaal gayab)
+switch on  -> wapas
+```
+
+🔴 **"NOT SHOWN" badge, sirf grey karna nahi** — jo FAQ off hai wo on wali jaisi
+dikhti hai agar farq sirf opacity ho, aur *"ye site par kyun nahi hai?"* screen
+se **unanswerable** ho jaata hai.
+
+⚠️ **Delete soft hai, aur ek-click wala act REVERSIBLE wala hai** (switch off).
+Blocks par **delete hi nahi hai**: block **key** se address hota hai, to use
+hatana ka matlab hai koi page aisi copy maang raha hai jo ab nahi hai. Isi
+wajah se **key edit par read-only** hai — rename edit nahi hai, wo purane block
+ko unpublish kar ke naya banata hai jise koi maangta nahi.
+
+---
+
+#### 🔒 2.84.8 — REPORTER KA NAAM SCREEN PAR NAHI, AUR POORA UID BHI NAHI
+
+Reports queue wo **ek** jagah hai jahan reporter ka uid pahunchta hai. Screen
+par **uid ka pehla segment** aur *"is account se N report"* ka count jaata hai —
+naam **kabhi nahi**.
+
+Sawaal jo moderator ke paas asli mein hai: *"kya ek hi aadmi sab report kar raha
+hai?"* — us ka jawab **count** deta hai, naam nahi. Naam us complaint ke paas
+rakhna jiske against wo hai (aur school usi teacher ka applicant hota hai) wo
+retaliation ka raasta hai.
+
+⚠️ **Suite ne pehle ye assertion GALAT KAARAN se pass ki thi** — queue ki pehli
+row **admin-desk.mjs ke purane bug ka orphan** thi (literal backtick wali
+description, aur uska job delete ho chuka tha). Ab row **apne text se** dhoondhi
+jaati hai, aur `admin-desk.mjs` ka teardown **dono pattern** delete karta hai:
+*"jo debris teardown ko dikhta nahi wo debris se bura hai."*
+
+---
+
+#### ⚠️ 2.84.9 — ENQUIRY: EK ADMIN SCREEN JO EMAIL DIKHATI HAI, AUR KYUN THEEK HAI
+
+2.56 teacher ke contact ki baat karta hai — school tak teacher ki consent ke
+bina na pahunche. Visitor jo contact form bhar kar **reply maangta** hai wo
+khud apni consent de raha hai, aur **koi teacher row shaamil nahi**: 033 ki
+table ke paas user id hi nahi, kyunki form anonymous hai (7A — token bheja bhi
+jaaye to padha nahi jaata).
+
+⚠️ **Reply `mailto:` hai, "send" button nahi.** Product kisi admin ki taraf se
+mail nahi bhejta, aur bhejne jaisa dikhne wala button **jhooth** hota ki reply
+kahan se aaya.
+
+🔴 **Resolve par note REQUIRED hai** — 033 ka CHECK poora trail ek saath maangta
+hai (resolved, kisne, kab, kya bataya). *"Resolved"* akela agle aadmi ko kuch
+nahi batata, aur agla aadmi ek mahine baad **wahi aadmi** hota hai. Screen
+`waiting N days` dikhati hai, date nahi: inbox apne **sabse purane** unanswered
+message se naapa jaata hai.
+
+---
+
 ## 3. SCOPE (Client spec ke against)
 
 ### IN SCOPE — MVP
@@ -9119,6 +9480,7 @@ naya Code, agla free Id, kuch renumber mat karo.
 | 2026-10-11 | 6C-2-0 | **G37 band — badge asli hua — 6C-2 ki ek bhi screen se pehle.** Screens badge teen jagah dikhati hain; aaj tak koi asli teacher use kama hi nahi sakta tha, to har dikhta badge seed-data ka jhooth hota. `031` (`VerifiedByUserId` — school ke paas 2F se hai, teacher ke paas do hi the kyunki badge kabhi set hi nahi hota tha), `022 USP_SetTeacherVerified` (badge + stamp + notification, **ek transaction**, idempotent), stub ki jagah asli call, type 13/14 seed **apne consumer ke saath** (029 ka guard har type ke liye procedure ka naam maangta hai), aur decline ka notification `ApprovalService` ki rejection branch se. 🔴 **Jo stub chaar phase chala:** "setting IsVerified requires t_app_teachers, which is Phase 3" — Phase 3 chaar phase pehle ship hua tha; admin approve kar sakta tha, trail likha jaata tha, badge kabhi nahi lagta, aur **koi error nahi** kyunki wo branch pehle se failure report karti thi. Bacha isliye ki **badge ke raaste par koi test kabhi chala hi nahi** — chaar badge wale teacher seed row hain, to badge ki har assertion aise data par pass hoti thi jo kisi ne kamaya nahi. 🔴 **Test wahi raasta chalta hai jo aadmi:** teacher submit (HTTP) → admin ka **queue** → action endpoint se approve → `orchestrationCompleted` **true** (yahi false aata tha) → badge + stamp + verifier **admin (40), teacher (147) nahi** → **`/teacher-search` ke asli result mein `isVerified true`** → `verifiedOnly` 4 se 5 → notification teacher tak, admin ka note us mein nahi par **trail par hai**. 🔴 **Decline badge chheenta nahi** — `@Approved` faisla hai, store karne wali value nahi (ek character chhota raasta pehle se verified teacher ka badge chup-chaap le leta). 🔴 **Decline ka notification gate ke peeche nahi** — orchestration approval par gated hai (Phase 2E ka bug) aur wo gate hilaya nahi gaya; batana provisioning nahi hai, aur peeche daalne ka matlab hota ki reject hua teacher hamesha intezaar kare. ⚠️ **Mera pehla build guard galat tha, pehle hi run mein pakda gaya** — usne maana ki seeded verified teacher ke paas `VerifiedOn` nahi hai; chaaron ke paas hai. Backfill karna ek na-hui approval gadhna hota, date se scope karna date check hota — to guard wahi assert karta hai jo har row par sach hai, aur "teenon column saath" wali baat suite mein gayi. ✅ **G35 band mechanism se:** `scripts/verify/run.mjs` — har run ka poora output file mein (G35), aur assertion count committed manifest se compare, **ghatna = failure** (6C-0 ka `team-contract`). Us 56/57 ka kaaran ab bhi pata nahi aur likha hua hai; band risk hua hai. 🔴 **Runner ne pehle hi pass par `team-contract` 48/48 pakdi** — uska fixture doosri suite ke leftover par conditional tha; ab apna campus naam, har baar banta hai (49 → 50). `teacher-verification.mjs` **33/33** · `notifications` 12 → 14 type (teen assertion wajah ke saath badli) · **25/25 suite clean, 334 s, bina kisi API restart** | ✅ Done |
 | 2026-10-11 | 6C-2 | **Search, invite, invitations inbox, offer ke dono taraf, notification centre — 6C-2 POORA.** `search-invite-screens` 31/31 · `invitation-screens` **31/31 (nayi)** · `offer-screens` 34/34 · `notification-screens` 21 → 33. 🔒 **Consent path 2 ab screen se saabit hai** — dialog email/phone/resume teeno naam leta hai, "no other school" kehta hai, aur accept par `fn_TeacherContactUnlocked` 0 → 1; **dekhna aur decline dono 0 par chhodte hain**. Accept hone par koi inaam nahi (na "unlocked", na 🎉 — warna consent transaction ban jaata). 🔴 **Devtools-forced negative dono jagah:** kisi doosre ka offer/invitation `fetch` se answer → **404, 403 nahi** (2.6), refusal mein kisi ka naam nahi, row chhui nahi gayi, aur **kisi ka contact nahi khula**. 🔴 **Jo sirf asli raasta chala kar mila (koi suite green hone se nahi):** Selected application par "Offer sent" button jo 400 `OFFER_ACTION_REQUIRED` deta tha (6A se live) · `<input type="time">` "09:00" deta hai par `TimeSpan` binder "09:00:00" maangta hai, to reporting time wala **har** offer refuse ho raha tha · viewer ko 403 par screen "No teacher matches those filters" keh rahi thi · `FullName` teeno layer mein khaali tha. ⚠️ **Teen test galat wajah se pass ho rahe the:** 375 ka check accept ke baad **answered** row (bina button) naap raha tha — ab accept se pehle, aur live row + uske button assert hote hain · "newest first" ek row par trivially sach tha — doosri application add ki, ab **title se** order assert hota hai kyunki din ek hi hai · **positional locator (`.first()`) mere hi chhode hue probe row par ACCEPT dabaa sakta tha** — suite ab sirf apni banayi row ko address karti hai. 🔴 **`run.mjs` manifest mein na hone wali suite skip kar deta tha** — is phase likhi suite bilkul na chalti aur `--update` uska count seekh hi nahi sakta tha; ab chalti hai, `NEW` dikhti hai, pin hone tak NOT CLEAN. 🔴 **`TEACHER_OFFERS` seed row (2.37), `PermissionCode` NULL, route usi commit mein** — teacher sidebar 8 → 9, aur `HOW_TO_RUN`/`local-accounts`/ye file **isi commit** mein; ⚠️ stale 32 par +1 kiya tha, asli 34 hai — **stale number par arithmetic rot confirm karta hai**. ⚠️ **/notifications ek hi shared component, dono portal usi par route** (G27), aur **fail hua read khaali inbox nahi** — request abort kar ke naapa gaya. **29/29 suite clean, 1105 assertion, 454 s · SQL 296 · backend 0/0 · paanchon frontend 0 warning · run_all ×2 byte-identical** | ✅ Done |
 | 2026-10-11 | 6.5A | **Billing — manual first. Design addendum PEHLE, phir backend.** `billing.mjs` **47/47**. 🔴 **Addendum ne code se pehle teen galtiyan pakdin:** (1) "ek procedure" **bana hi nahi sakta tha** — payment `jp_mdm`, subscription `jp_app`, cross query mana (2.2), distributed transaction nahi (2.48); seam **service** par hai aur handoff ka sach `activationCompleted` se bataya jaata hai. (2) **paid plan seed karna likhit mein mana hai** (`008_seed_plans.sql`: "jo number hum ship karte hain wo wapas quote kiya jaata hai") — premise check ki, aaj bhi sach hai (FAQ, Terms, site par ek bhi price nahi); to seed nahi badla, paid plan **suite ka fixture** hai aur **011 ka guard** priced public plan par build gira deta hai (chala kar dekha). (3) **`@ExpectedPlanId` ka comparison ULTA likha tha** — "effective plan se compare karo" build hua aur **verification ne pakda**: lapsed subscription par har consume `409 PLAN_CHANGED`, **hamesha** (2.64 ka retry ek par bounded). Guard ka kaam row badalne ka pata lagana hai; caller plan chunta hi nahi, `USP_ResolveEntitlement` **dono mapping ek query** mein deta hai. 🔴 **Quota plan ke saath chalta hai** — pehla build sirf fallback ka **id** bhejta tha, to 100-post plan ka lapsed account free par girta aur 100 post rakhta; kuch fail nahi hota. Naapa: paid 100, fallback 2 → remaining **1**, 99 nahi. 🔒 **Expiry DERIVED** — `fn_SubscriptionInForce` ek definition, build-time truth table (predicate toda → exit 1), **zero** SQL Agent job; lapsed account ab **marta nahi**, free baseline par chalta hai (pehle `SUBSCRIPTION_INACTIVE` — jo kabhi paid tha wo us se bura tha jo kabhi nahi tha). IST boundary par naapa: DB `status 1, inForce 0`, response `onFreeBaseline true`, consume `QUOTA_EXHAUSTED`. 🔴 **Recorded ≠ expected** — 4900 vs 5000 **record** hota hai, refuse nahi; mismatch par remark zaroori, **par wo rule API layer mein** kyunki gateway caller kisi se remark maang hi nahi sakta. 🔴 **Idempotent dono taraf**, do sach mein samanantar session (WAITFOR TIME): 1 receipt, 1 subscription, 1 ACTIVE per owner; ⚠️ pehle draft mein chaaron ke liye EK instant tha aur batch do — doosra batch **kal** ka intezaar karne laga, suite bina output das minute latki (`sys.dm_exec_requests` ne bataya). 🔴 **Ek bypass lagbhag ship ho gaya:** plan change ka request row hai, to admin use **generic approvals endpoint** se approve kar sakta tha — request APPROVED, payment PENDING, kuch activate nahi, aur "ek owner ek khula request" `PENDING` par key karta hai to school **doosra** request bana leta. Poochh kar mila, test se nahi. 🔒 **2.56 ka guard text se nahi, `sys.sql_expression_dependencies` se** — purana guard function ka naam dhoondta tha aur isi liye project ke apne grep mein **fail** hota tha (jo guard naam leta hai wo bhi naam lene wala code hai); grep scope 18 file, aur **scope khud assert hota hai**. ⚠️ **Count guard isi commit mein hile:** request types 4 → 5, permissions 23 → 24 (dono jagah), swagger 105 → **113**. 🔴 **Naya permission** (`PAYMENT.VERIFY`) jabki 2.5 ne reuse kiya tha — paisa confirm karna system setting nahi, operational act hai, aur dono alag logon ko milenge; 006 holders ka **closed set** assert karta hai (SCHOOL_OWNER ko grant → build exit 1). **30/30 suite clean, 1154 assertion · SQL 296 · backend 0/0 · run_all ×2 content-identical** | ✅ Done |
+| 2026-10-14 | 7B | **Admin ka operations desk — paanch surface, chha screen, athaarah route.** `admin-desk.mjs` **61/61 (nayi)** · `admin-desk-screens.mjs` **88/88 (nayi)**. 🔴 **Jo naapne par mila aur brief mein nahi tha (1): `t_app_jobs.ApplicationCount` HAMESHA ZERO hai aur moderation queue use padh rahi thi** — `016` likhta hai *"IS NEVER WRITTEN"*, `017` likhta hai ki padha bhi nahi jaata *"so that a stale value cannot leak through a projection"*, aur meri queue **exactly wahi leak** thi: har advert par **0 applied**, usi jagah jahan 0 ka matlab hai *"kisi ko farq nahi padega, gira do"*. **Screens suite ne pakda, review ne nahi** — do application maujood thin aur cell 0 keh raha tha. Fix `COUNT(*)`, par usne guard todi: `025` kehti thi koi moderation proc `t_app_applications` ko **chhue hi na**. Guard **kamzor nahi, teez** ki gayi — `sys.dm_sql_referenced_entities.is_updated` (jo dependency **view** ke paas nahi hai): teen acting proc ko **chhoona bhi mana**, queue ko **ginna haan, likhna mana**. Guard **dono taraf chala kar dekhi** (probe `COUNT(*)` → 0, probe `UPDATE ... WHERE 1=0` → 1) aur phir asli proc ko tod kar **fire karte dekhi**. 🔴 **(2) Desk aisi thi jise sirf uid jaanne wala khol sakta tha** — pull/restore uid se address karte hain, par *"kya report hua hai, abhi kya pulled hai?"* ka product ke paas **koi jawab nahi tha** (admin job-browse route maujood hi nahi thi). `USP_SearchJobsForModeration` + `GET /admin/desk/jobs` **jodi gayi**, brief se bahar, kyunki lookup-only moderation screen **aadhi boundary** thi; filter **EFFECTIVE status** par (2.65 — EXPIRED list mein hai jabki koi row 3 store nahi karti), aur **pulled job list mein HAI** warna restore unreachable. 🔴 **(3) G44: CMS blocks ka likha kahin render nahi hota** — endpoint live aur anonymous, jp-public mein `getContentBlocks()` maujood, **caller zero**; screen **khud banner mein kehti hai** aur endpoint ka naam leti hai, aur suite **jp-public ka source chal kar** confirm karti hai ki caller zero hai — us assertion ka fail hona hi banner hatane ka reminder hoga. 🔴 **Pull button se, aur public 404 `11 ms` baad** — cache ka sawaal **header se** band hota hai (`no-store`, 7A-0), intezaar se nahi; **dono application byte-for-byte wahi** (status, ModifiedOn, Is_Deleted). ⚠️ **Panel pehle hi kehta hai ki school reason padhega** (2.62) — jo moderator samajhta hai ki internal note likh raha hai wo alag cheez likhta hai; restore panel kehta hai *"us status par wapas jo pehle tha"*, **"republished" nahi**. 🔒 **Log kisi administrator ka naam nahi leta** aur append-only hai (034 ne `Is_Deleted`/`ModifiedOn`/`ModifiedBy` diya hi nahi). 🔒 **Reporter ka naam screen par nahi, poora uid bhi nahi** — uid ka pehla segment aur *"is account se N report"* ka count; ⚠️ aur ye assertion **pehle galat kaaran se pass** hui thi (queue ki pehli row `admin-desk.mjs` ke purane interpolation bug ka **orphan** thi, jiska job delete ho chuka tha) — ab row **apne text se** dhoondhi jaati hai aur teardown **dono pattern** delete karta hai. 🔴 **Featured: teen group ek date column se** (live today / starting later / finished), `isLiveToday` **server ka jawab** (client derive kare to din mein saadhe paanch ghante alag), aur **pulled advert ko promote karne wali live window bolti hai** ki wo kuch nahi kar rahi. 🔴 **FAQ off → public `/faqs` ke raw bytes se gayab** (3471 → 3323), on → wapas; **"NOT SHOWN" badge**, sirf grey nahi. **Blocks par delete hi nahi** aur **key edit par read-only** — rename edit nahi hai. 🔒 **Ek service per permission**, client mein **koi** permission check nahi (route chhupana presentation hai); `ENQUIRY.MANAGE` **alag** permission hai — complaint padhne ka haq har visitor ka email padhne ka haq nahi; sidebar **naapa gaya**: MODERATION_ADMIN ko teen link, CMS **poora gayab** (khaali heading bhi nahi), aur `/cms/featured` type karne par screen apna **FAILED** note dikhati hai, **empty state nahi**. ⚠️ **Chha route, tab nahi** (signal wali tab back button todti hai, bookmark nahi hoti) aur `/cms` **redirect ban kar zinda** raha — bookmark aur handover document us par point karte hain. 🔴 **Swagger floor 119 → 137, naapa gaya** aur anonymous ceiling **dobara** assert: 18 route jodne ke baad bhi **exactly six**. ⚠️ **Teen apni galtiyan, teeno suite ne pakdin:** `selectOption('4')` `[ngValue]` ke saath kuch match nahi karta (timeout aisa padhta tha jaise select disabled hai), ek card par **do mailto** the to locator refuse kar gaya, aur count assertion row ke **poore text** par thi jise date satisfy kar deti. **37/37 suite clean, 1534 assertion, 816 s · backend 0/0 · paanchon frontend 0 warning** | ✅ Done |
 | 2026-10-14 | 7B-0 | **G41 BAND — public se teacher tak ka poora raasta.** `funnel-e2e.mjs` **24/24 (nayi)** · `safe-path.mjs` **37/37 (nayi)**. 🔴 **Jo naapne par mila aur gap mein likha nahi tha:** `?returnUrl=` **authenticated side par bhi** ignore ho raha tha — `auth.guard.ts` aur `auth.interceptor.ts` dono use Phase 3 se **likhte** hain aur chaar repo mein ek bhi **reader** nahi tha, to guard ka comment *"returnUrl brings them back where they were headed"* **jhooth** tha; jis teacher ka session application ke beech khatam hota wo dashboard par chhoda jaata. ⚠️ **Naam `redirect` → `returnUrl`**: brief ne `redirect` kaha, par `returnUrl` ke **do live emitter** the aur `redirect` ke **zero** — jiske emitter the usko poora karna sasta tha aur usse doosra hole bhi band hua; do naam ek kaam ke liye dono se bura. ⚠️ **Brief ka ek premise galat tha:** "same validation reset-password gets" — **aisi validation thi hi nahi** (`token` path nahi hai, server use validate karta hai), to likhi gayi. 🔒 **`safeInternalPath` mein koi Angular import nahi**, jaan-boojh kar, taaki table-test ho sake — jis security check ka ek hi test end-to-end ho wo do yaad aaye case par test hota hai; **nau hostile value `startsWith('/')` paas karti hain aur refuse hoti hain** (protocol-relative, `/\`, NUL, CRLF, raw space), aur **validator tod kar dekha** — aath admit ho gaye, normalisation aur traversal clamp bhi gaye. ⚠️ **Route-table allowlist jaan-boojh kar nahi** — teen app ke route ke saath sync rakhna padta aur stale allowlist legitimate destination ko chupchaap dashboard bana deta; jo defend hoti hai wo **ORIGIN** hai. 🔴 **Destination store hoti hai, pass nahi ki jaati** — funnel ke teen hop hain aur har beech wale navigation ko yaad rakhna padta; darwaze par capture, aakhir mein consume. **sessionStorage** (token ke ulta): pending destination ek visit ki cheez hai. 🔒 **Nikalte waqt bhi validate** hoti hai — storage page ka koi script likh sakta hai. ⚠️ `scopedStorageKey` ab **export** hota hai (`TokenStorageService` ka private method tha) — teen-line key rule ki doosri copy hi wo tareeka hai jisse do store alag jagah dekhne lagte hain; output identical, warna har session sign out. 🔴 **Uid route naya darwaza NAHI:** `USP_GetJobForTeacher` ab `@JobId` **ya** `@JobUid` leta hai (**exactly one**, warna RAISERROR — dono dena "ye id ya ye uid" padhta hai aur jo jeete wo haadsa), uid **procedure ke andar** id banta hai aur **wahi WHERE clause** milta hai; chha case chal kar dekhe: id → job, uid → **wahi** job, **DRAFT ka uid → khaali**, na-maujood uid → khaali (error nahi), dono → RAISERROR, koi nahi → RAISERROR. ⚠️ **C# mein do NAMED method**, ek do-nullable-id wala nahi — `(long?, Guid?, Guid?)` do nullable Guid aas-paas rakhta hai aur palat dene wala call site **compile ho jaata** aur us job ko dhoondhta jiska uid caller ka user uid hai. 🔴 **Funnel ek browser session mein, signed out:** public job → Apply (href `?returnUrl=%2Fjobs%2F<uid>%2Fapply`) → signup screen **kehti hai** ki wapas us job par le jaayegi → landing **us job ko naam se** bulati hai, kehti hai **"nothing has been sent yet"**, apply control maujood hai (**funnel pahunchata hai, apply nahi karta** — 2.56), aur stored destination **consume** ho jaati hai. ⚠️ **Teen apni galtiyan, teeno suite ne pakdin:** (1) section 2 **chaar sign-in** kharch kar raha tha aur paanchwa per-IP window (5/60s) se bahar tha — failure ek **navigation timeout** thi jo *"app navigate nahi hua"* padhti hai jabki limiter ne refuse kiya tha; helper ab refusal **uske apne shabdon mein** likhta hai aur mechanism (ek bhi value store nahi hoti) **bina sign-in** check hota hai. (2) **seeded account ka hourly cap** (10/3600s) chauthe run par khatam — run ke andar nahi khulta, to suite ab **apne hi banaye account** se sign in karti hai. (3) **retry ne test ki cheez delete kar di** — `signOut` sessionStorage saaf karta hai, to retry chal gaya aur **/dashboard** par utra, aur suite ne likha ki guard ka returnUrl ignore hota hai; feature theek tha. ⚠️ Log line **do baar bekaar** thi (`heading: (no heading)`, phir `the page says: Staffroom`) — ab wahi line chhapti hai jo assertion match karti hai: `This posting has gone`. ⚠️ **G43 khula:** signup ka `name` **required** hai aur server tak pahunchta hi nahi, jabki `002_provisioning_accounts.sql` ke paas `@FullName` **pehle se** hai — wahi class jo contact form ka `role` tha, par yahan field **rakhni aur bhejni** chahiye. **35/35 suite clean, 1341 assertion, 592 s · backend 0/0 · paanchon frontend 0 warning** | ✅ Done |
 | 2026-10-14 | 7A | **Public job pages + contact form — pehli ANONYMOUS surface.** `public-contract.mjs` **50/50 (nayi)** · `public-screens.mjs` **41/41 (nayi)**. 🔴 **Chaar asli bug, teen suite ne pakde:** (1) **file sahi thi, database purana** — `/jobs/filters` `id:0 name:""` de raha tha jabki count sahi tha; `024` disk par `AS Id, AS Name` karti hai par **deployed proc** mein purana `AS SubjectName` khada tha, aur SQL-layer probe deployed version par chali thi to C# mapper loop mein hi nahi tha. **Dono raw-bytes sweep pass hue** — shape perfect, content khaali; *schema assertion data assertion nahi hai*. Naya content check joda aur **purana alias wapas daal kar fail karte dekha** (sirf `subjects` ka naam liya, `states` ka nahi). (2) **sirf ek anonymous write hai aur uspar validation hi nahi thi** — `{}` POST → 200 aur Name/Email/Subject/Message chaaron khaali ek row; DTO ke `= string.Empty` ki wajah se sab "valid" bind hua. JP.App.Api ke paas **ek bhi validator nahi tha** (zaroorat bhi nahi thi — ab tak sab token ke peeche tha aur har write apni proc mein check karti thi); `PublicValidators.cs` + `FluentValidationFilter` + `AddValidatorsFromAssembly` wire hue, har maximum **apne column ke barabar**, aur 🔒 **honeypot par koi rule nahi** (ek "Website must be empty" wahi jumla bot likhne wale ko wapas de deta). (3) **Apply CTA job saath le hi nahi ja sakti** — jp-teacher mein `?redirect=` **koi nahi** padhta (poore app mein sirf reset-password ek query param padhta hai), `jobs/:id/apply` route **nahi hai**, aur `jobs/:jobId` `Number()` karta hai jabki public surface jaan-boojh kar sirf uid deta hai (2.47) — parameter **hata diya, chhupaya nahi** (jo parameter koi padhta nahi, use bhejna na bhejne se bura hai), **G41**. (4) **title 66 akshar** — `site-audit` ne pehli hi asli job par pakda; `fitTitle()` teen seedhi utarti hai (at-school → school gira → ellipsis) aur **teeno chal kar dekhi gayi**, school ka naam **beech se kabhi nahi** katta. 🔴 **SSR JavaScript BAND kar ke saabit hua** — wahi ek test jo server render aur hydration mein farq karta hai; `**` catch-all `/jobs` ko chup-chaap build-time par khaali page bana deta (koi error, koi warning nahi), aur build ne confirm kiya: **6 static route prerender**, `/jobs` unme nahi (pehle 7 the — `/faq` ab Server). 🔒 **Anonymous hona wire par naapa** — 5 request, ek par bhi Authorization/cookie nahi, teeno storage khaali, aur **wahi request valid token ke saath byte-identical** (1117 === 1117). 🔒 **404 deewar us lamhe par chali jab IST aur UTC ki date ALAG thi** (IST 10-14 · UTC 10-13) — UTC comparison us waqt har job 5.5 ghante pehle expire kar deta; chaaron state 404 aur refusal **kaaran nahi batati**, aur wahi paanch id school ki apni list par maujood hain. ⚠️ **Do suite ek hi rate-limit budget maang rahi thin, aur ye poori regression par hi dikha** — `public-contract` ka limit test **read budget** khatam karta tha aur agli suite ka SSR 429 aata tha, jise suite ne *"listing is not server-rendered"* likha (jhooth, aur galat file par le jaata); ab EXIT mein budget **wapas** hota hai (poll). Contact ka 3/hour dono maang rahi thin → zimmedari baanti: contract suite **server ka contract** (asli row, honeypot, chautha refuse), screens suite **screen** (interception se exact payload), budget **zero**. ⚠️ **Naya case jo pehle nahi tha:** failed send — 500 par page kehta hai nahi gaya, **jo likha tha wo form mein rehta hai**, prefilled mailto: milta hai — yehi 2.44 ki badi fikr thi. ⚠️ **FAQ copy DB mein** (`003_seed_public_faqs`, insert-if-absent — admin ke edit overwrite nahi) **aur ek jawab jhoota ho gaya tha**: "Can I search for jobs without an account?" ka "Not yet" **usi commit mein** theek hua, seed mein guard, dono suite data se assert. ⚠️ `role` field **hata diya** (column nahi, brief ne maanga nahi; collect kar ke discard karna teen mein se saaf galat raasta). ⚠️ **Swagger floor 113 → 119 (naapa, calculate nahi)** aur anonymous surface par ek **CEILING** — *exactly six operations*, kyunki yahan khatra route **gayab** hone ka nahi, **aa jaane** ka hai. **33/33 suite clean, 1183 assertion, 577 s · backend 0/0 · paanchon frontend 0 warning · Lighthouse 9 page SEO 100/a11y 100 · site-audit NO PROBLEMS · SQL 189 file (3 nayi), 285 DB object** | ✅ Done |
 | 2026-10-11 | 6.5B | **Billing screens — 6.5 POORA.** `billing-screens.mjs` **60/60**. 🔴 **Ek component, dono portal** (`UiBillingPageComponent` `jp-shared` mein, school aur teacher dono usi par route karte hain — wahi shape jo `/notifications` ka tha, G27); **admin ka screen alag**, kyunki "mera plan" aur "sabke pending payment" do kaam hain. 🔴 **Ek asli hole band hua jo 6.5A se khula tha:** `plan-change` par koi permission check nahi tha, to school ka **koi bhi** member — including read-only `SCHOOL_VIEWER` — apne account ko payment ke liye commit kar sakta tha. **Poochh kar mila ki naya menu row kisko dikhta hai**, kisi test ke fail hone se nahi. `BILLING.MANAGE` (SCHOOL_OWNER + TEACHER; 007 ka guard **closed set** assert karta hai, SCHOOL_VIEWER ko grant karte hi build exit 1). Reuse pehle dhoonda — `PROFILE.EDIT`/`USER.MANAGE`/`BRANCH.MANAGE` teeno aaj theek chalte, par koi bhi "paise ka zimmedaar" ka matlab nahi rakhta. 🔒 **Panel dekhna gated NAHI** — HR ko allowance pata honi chahiye, warna wo limit ko refuse hone se jaanta hai; 007 ka doosra guard **ulti disha** se assert karta hai ki row par permission na lage. 🔴 **Control wajah ke saath GHAYAB hai, disabled nahi** (2.62) — disabled "abhi nahi" kehta jo jhooth hai. 🔴 **Koi pay-now button nahi**, aur suite uski ghairhaazri assert karti hai; mode list mein ONLINE nahi aur screen **kehti hai kyun**. 🔴 **Mismatch shabdon mein** — "₹100.00 short" / "₹100.00 overpaid", server ke `ShortBy` ki wahi direction; remark zaroori hote hi Confirm disabled, par **server bhi wahi rule enforce karta hai** — client pehle poochhta hai, jagah nahi leta. 🔒 **Lapsed plan screen par naam se aata hai:** "paid plan ended on …", free plan par chal raha hai, allowance `of 3` (paid `of 25` nahi), kuch delete nahi hua, aur DB row `status 1, isActive 1` — kuch sweep nahi hua. **Teen forced negative:** viewer `plan-change` → **403**, school apna hi `verify` → **403** (payment PENDING, koi receipt nahi), teacher school plan id → **404 aur 403 nahi** (2.6). ⚠️ **Do apni galtiyan:** owner ka button ghayab tha aur stale cheez sirf ek **cached JWT** thi (claims mein permission hoti hai; suite ab cached token shuru mein phenk deti hai) · admin ka **375 check khaali queue naap raha tha** — table hi nahi tha, aur table hi 375 par overflow karta hai; ab pehle row banti hai aur assertion node count par nahi, us cheez par hai jo overflow karti. ⚠️ **Count guard isi commit mein hile:** permissions 24 → 25, SUPER_ADMIN **24 of 25** (pehli permission jo uske paas nahi), teacher 2 → 3, menus 34 → **37**, swagger **113 hi** (ek bhi endpoint nahi jura). **31/31 suite clean, 1214 assertion · SQL 296 · backend 0/0 · paanchon frontend 0 warning · run_all ×2 content-identical · 34 RoutePath, 0 dangling** | ✅ Done |
@@ -10160,6 +10522,64 @@ thin; ab severity se naam hain.
 ⚠️ **Mere chaar test galat the**, aur pehla sabse mehnga: `applicationStatusId`
 bheja jabki DTO `toStatusId` maangta hai — **har call 200 deta aur kuch
 badalta nahi**, aur us ek chup no-op ke neeche atharah assertion fail hui.
+
+---
+
+## ✅ 7B COMPLETE — 2026-10-14 (ADMIN KA OPERATIONS DESK — PAANCH SURFACE, CHHA SCREEN)
+
+Details **2.84**. Moderation, reports, featured, CMS (blocks + FAQ), enquiries.
+
+```
+admin-desk.mjs 61/61 (nayi) · admin-desk-screens.mjs 88/88 (nayi)
+37/37 suite clean, 1534 assertion, 816 s
+swagger floor 119 -> 137 (naapa) · anonymous surface ab bhi EXACTLY SIX
+backend 0/0 · paanchon frontend 0 warning
+```
+
+🔴 **Jo naapne par mila, aur gap mein likha hi nahi tha:**
+`t_app_jobs.ApplicationCount` **hamesha zero hai** — `016` use likhne se mana
+karta hai, `017` padhne se, aur meri moderation queue use project kar rahi thi.
+Har advert par **0 applied**, aur yehi wo screen hai jahan 0 ka matlab hai
+*"kisi ko farq nahi padega, gira do"*. **Screens suite ne pakda**, review ne
+nahi: do application thin aur cell 0 keh raha tha.
+
+🔴 **Fix ne guard todi, aur guard kamzor nahi — teez hui.** `025` kehti thi ki
+koi moderation proc `t_app_applications` ko chhue hi na; count ke liye chhoona
+padta hai. `sys.dm_sql_referenced_entities` ke paas `is_updated` hai (dependency
+**view** ke paas nahi): teen acting proc ko **chhoona bhi mana**, queue ko
+**ginna haan, likhna mana**. Dono taraf chala kar dekhi, phir asli proc tod kar
+**fire karte dekhi** — *jo guard fail hote dekhi nahi gayi wo anumaan hai.*
+
+🔴 **Desk aisi thi jise sirf uid jaanne wala khol sakta tha.** Pull/restore uid
+se chalte hain; *"kya report hua, abhi kya pulled hai?"* ka **koi jawab nahi
+tha**. `USP_SearchJobsForModeration` + `GET /admin/desk/jobs` brief se bahar
+jodi gayi — *"Clean boundary → stop and report; never half of one."*
+
+🔴 **G44 khula: CMS blocks ka likha kahin render nahi hota.** Endpoint live aur
+anonymous, jp-public mein method maujood, **caller zero**. Screen **khud kehti
+hai**, banner mein, endpoint ka naam leke — aur suite jp-public ka source chal
+kar confirm karti hai. Us assertion ka fail hona hi banner hatane ka reminder
+hoga.
+
+🔴 **Pull button se chal kar dekha:** banner → public re-read **404, 11 ms
+baad**, `no-store` header ke saath chhapa hua; **dono application byte-for-byte
+wahi**. School ko reason **uske apne** job par dikhta hai (2.62) aur log **kisi
+administrator ka naam nahi leta**.
+
+🔒 **Reporter ka naam screen par kahin nahi, poora uid bhi nahi** — pehla
+segment aur *"is account se N report"*. ⚠️ Ye assertion **pehle galat kaaran se
+pass** hui thi: queue ki pehli row `admin-desk.mjs` ke purane bug ka orphan
+thi. Ab row apne text se dhoondhi jaati hai, aur teardown dono pattern delete
+karta hai — *jo debris teardown ko dikhta nahi wo debris se bura hai.*
+
+⚠️ **Teen apni galtiyan, teeno suite ne pakdin:** `selectOption('4')`
+`[ngValue]` ke saath kuch match nahi karta, ek card par **do mailto** the to
+locator refuse kar gaya, aur count assertion row ke poore text par thi jise
+**date** satisfy kar deti.
+
+⚠️ **Do faisle client ke liye flag:** `ENQUIRY.MANAGE` alag permission (reuse
+nahi) aur `CMS.MANAGE` featured placement ko bhi gate karta hai. Dono ka ulta
+raasta mehnga hai, seedha raasta ek seed line.
 
 ---
 

@@ -128,8 +128,45 @@ const APIS = [
       auditing the anonymous surface by path name will find it and must not
       count it — what defines that surface is the absence of [Authorize] on
       PublicController, not the word in the URL.
+
+      🔴 RAISED TO 137 ON 2026-10-14 (PHASE 7B — the admin operations desk), in
+      the same change that added the routes. EIGHTEEN, and the headline is what
+      they are NOT: not one of them is anonymous.
+
+        MODERATION.JOB     POST   /admin/desk/jobs/{jobUid}/pull
+                           POST   /admin/desk/jobs/{jobUid}/restore
+                           GET    /admin/desk/jobs/{jobUid}/history
+
+        MODERATION.REPORT  GET    /admin/desk/reports
+                           POST   /admin/desk/reports/{reportUid}/status
+
+        ENQUIRY.MANAGE     GET    /admin/desk/enquiries
+                           POST   /admin/desk/enquiries/{id}/resolve
+
+        CMS.MANAGE         GET    /admin/desk/featured
+                           POST   /admin/desk/featured
+                           DELETE /admin/desk/featured/{type}/{id}
+                           GET    /admin/desk/faqs
+                           POST   /admin/desk/faqs
+                           DELETE /admin/desk/faqs/{faqId}
+                           GET    /admin/desk/content-blocks
+                           POST   /admin/desk/content-blocks
+
+        signed in, no permission
+                           POST   /reports
+                           GET    /jobs/{jobUid}/moderation
+
+      ⚠️ The last two are deliberately NOT under /admin/. Reporting is not an
+      admin act — a teacher reports a job — and a school reading why its own
+      advert was pulled is its own business. A reader checks the route prefix
+      first, so putting either under /admin/ would make every future reader
+      pause over whether it is gated.
+
+      ⚠️ 137 WAS MEASURED, not calculated. 119 + 18 agrees, and both were
+      computed — the same discipline 7A recorded after a menu count was once
+      "fixed" by adding one to a stale number.
     */
-    minOperations: 119,
+    minOperations: 137,
   },
 ];
 
@@ -405,6 +442,55 @@ try {
   check('🔒 …and none takes one as a query parameter either',
     publicIdentityParams.length === 0,
     publicIdentityParams.length ? `LEAKED: ${publicIdentityParams.join(', ')}` : 'none');
+
+  /*
+    ------------------------------------------------------------------------
+    PHASE 7B — THE ADMIN OPERATIONS DESK
+    ------------------------------------------------------------------------
+  */
+  const pull = doc?.paths?.['/api/admin/desk/jobs/{jobUid}/pull']?.post;
+  const restore = doc?.paths?.['/api/admin/desk/jobs/{jobUid}/restore']?.post;
+  const reportQueue = doc?.paths?.['/api/admin/desk/reports']?.get;
+  const reportStatus = doc?.paths?.['/api/admin/desk/reports/{reportUid}/status']?.post;
+  const featured = doc?.paths?.['/api/admin/desk/featured']?.post;
+  const enquiries = doc?.paths?.['/api/admin/desk/enquiries']?.get;
+  const submitReport = doc?.paths?.['/api/reports']?.post;
+  const ownModeration = doc?.paths?.['/api/jobs/{jobUid}/moderation']?.get;
+
+  check('the pull and restore operations are documented (Phase 7B)',
+    !!pull && !!restore, pull && restore ? 'both present' : 'MISSING');
+
+  check('…and the reports queue and its state machine',
+    !!reportQueue && !!reportStatus, reportQueue && reportStatus ? 'both present' : 'MISSING');
+
+  check('…and featured placement',
+    !!featured, featured ? 'present' : 'MISSING');
+
+  check('…and the enquiries queue',
+    !!enquiries, enquiries ? 'present' : 'MISSING');
+
+  check('…and the two routes that are NOT admin: report, and a school\'s own history',
+    !!submitReport && !!ownModeration,
+    'reporting is not an admin act, and a school reading its own advert is its own business');
+
+  /*
+    🔴 THE ANONYMOUS CEILING, RE-ASSERTED AFTER A PHASE THAT ADDED EIGHTEEN
+    ROUTES.
+
+    7A set this at exactly six and said why: everywhere else the risk is a
+    route vanishing, and on the anonymous surface it is a route APPEARING. 7B
+    is the first phase since, and it is exactly the kind of phase that could
+    have added one — an admin desk with queues, a report button, a public
+    listing change. The count below is the proof that it did not.
+  */
+  const anonymousAfter7B = Object.keys(doc?.paths ?? {})
+    .filter((p) => p.startsWith('/api/public'))
+    .flatMap((p) => Object.keys(doc.paths[p] ?? {})
+      .filter((verb) => ['get', 'post', 'put', 'patch', 'delete'].includes(verb)));
+
+  check('🔴 7B added 18 routes and the anonymous surface is STILL exactly six',
+    anonymousAfter7B.length === 6,
+    `${anonymousAfter7B.length} — every 7B route requires a token`);
 } catch (error) {
   check('the entitlement matrix operation is documented', false, error.message);
 }

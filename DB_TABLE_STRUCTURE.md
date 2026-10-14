@@ -189,7 +189,18 @@
 
 **`t_app_job_subjects`** — `Id` · `JobId` · `SubjectId` (multi-subject job)
 **`t_app_job_class_levels`** ⭐ — `Id` · `JobId` · `ClassLevelId`
-**`t_app_job_moderation_log`** ⭐ — `LogId` · `JobId` · `ActionByUserId` · `ActionType` · `Remarks` · `ActionOn`
+**`t_app_job_moderation_log`** ⭐ **BAN GAYI — 7B** — `LogId` · `JobId` · `ActionType` (PULL/RESTORE) · `PreviousStatusId` · `Remarks` NOT NULL · `ActionByUserId` · `ActionOn`
+>
+> 🔴 **APPEND-ONLY, aur jo ISME NAHI HAI wahi design hai:** koi `Is_Deleted`,
+> koi `ModifiedOn`, koi `ModifiedBy`. Moderation ka record baad mein edit ya
+> withdraw nahi ho sakta — soft-delete column hota to ho sakta tha.
+>
+> 🔴 `PreviousStatusId` isliye hai ki **restore wapas wahi status** de jo pull
+> se pehle tha. Pulled draft draft par wapas jaata hai, live par nahi — server
+> log se padhta hai, guess nahi karta.
+>
+> ⚠️ `Remarks` NOT NULL hai kyunki wahi text **school ko dikhta** hai (2.62).
+> "Pulled" bina kaaran school ko theek karne ko kuch nahi deta.
 
 ## Application & Offer tables (4)
 
@@ -210,9 +221,26 @@
 **`t_app_notifications`** — `NotificationId` · `NotificationTypeId` · `RecipientUserUid` · `Title` · `Body` · `RefEntityType` · `RefEntityId` · `ActionUrl` · `IsRead` bit · `ReadOn` · `CreatedOn`
 **`t_app_notification_delivery_log`** — `LogId` · `NotificationId` · `Channel` (InApp/Email/SMS) · `SentTo` · `IsSent` · `SentOn` · `FailureReason`
 
-## Report / Moderation tables (2) ⭐
+## Report / Moderation tables (4) ⭐  _— 7B ne do master jodi_
 
-**`t_app_reports`** — `ReportId` · `ReportReasonId` · `ReportedEntityType` (School/Teacher/Job) · `ReportedEntityId` · `ReportedByUserUid` · `Description` · `ReportStatusId` · `ReviewedByUserId` · `ReviewedOn` · `ActionTaken` · `AdminRemarks`
+**`t_app_reports`** **BAN GAYI — 7B** — `ReportId` · `ReportUid` · `ReportReasonId` · `ReportedEntityType` (JOB/SCHOOL/TEACHER) · `ReportedEntityId` · `ReportedByUserUid` · `Description` · `ReportStatusId` · `ReviewedByUserId` · `ReviewedOn` · `AdminRemarks`
+>
+> 🔒 `ReportedByUserUid` product mein **exactly do** procedure project karti
+> hain, dono admin-only, aur `025` ka guard teesri aane par **fail** hota hai.
+> Reported party tak reporter ki identity kabhi nahi pahunchti.
+>
+> 🔴 `CK_ReviewTrail` — terminal status (3 Action taken / 4 Dismissed) par
+> `ReviewedByUserId`, `ReviewedOn` aur `AdminRemarks` **teeno** chahiye.
+> Aadha trail wala faisla chha mahine baad padha nahi ja sakta.
+>
+> 🔴 `UX_t_app_reports_OneOpenPerReporter` — filtered unique index on
+> (reporter, entity type, entity id) **jahan status 1 ya 2 ho**: wahi aadmi wahi
+> cheez dobara report kare to **idempotent** (2.48), aur pehle report ka uid
+> wapas milta hai `ALREADY_REPORTED` ke saath. Terminal rows index se bahar
+> hain, to dismiss hone ke baad dobara report **ho sakti** hai.
+
+**`m_app_report_reasons`** **BAN GAYI — 7B** — `ReportReasonId` · `Code` · `Name` · `AppliesTo` (CSV: JOB,TEACHER,SCHOOL) · `DisplayOrder` — 7 row
+**`m_app_report_status`** **BAN GAYI — 7B** — `ReportStatusId` · `Code` · `Name` · `IsTerminal` · `DisplayOrder` — 4 row (OPEN · UNDER_REVIEW · ACTION_TAKEN⛔ · DISMISSED⛔)
 **`t_app_user_suspensions`** — `SuspensionId` · `TargetUserUid` · `EntityType` · `ReasonText` · `SuspendedByUserId` · `SuspendedOn` · `RevokedOn` · `RevokedByUserId`
 
 ## CMS & Featured tables (5) ⭐
@@ -235,8 +263,18 @@
 > ⚠️ Seed **insert-if-absent hai, overwrite kabhi nahi** — 7B se admin in rows
 > ko edit karega, aur har deploy par apna text wapas likhne wali seed unki
 > mehnat chupchaap mita deti.
-**`t_app_featured_jobs`** — `Id` · `JobId` · `FromDate` · `ToDate` · `DisplayOrder` · `CreatedBy`
-**`t_app_featured_schools`** — `Id` · `SchoolId` · `FromDate` · `ToDate` · `DisplayOrder` · `CreatedBy`
+**`t_app_featured_jobs`** **BAN GAYI — 7B** — `FeaturedJobId` · `JobId` · `FromDate` date · `ToDate` date · `DisplayOrder`
+**`t_app_featured_schools`** **BAN GAYI — 7B** — `FeaturedSchoolId` · `SchoolId` · `FromDate` date · `ToDate` date · `DisplayOrder`
+>
+> 🔴 **Koi `IsFeatured`/`IsActive`/`StatusId` column NAHI hai, aur ye naap
+> kar assert hota hai.** Featured hona ek **date comparison** hai
+> (`fn_IstToday()` `FromDate` aur `ToDate` ke beech), har read par. Isi wajah
+> se koi midnight job nahi hai: jo window kal khatam hui usse khatam karne ko
+> **kuch chala hi nahi**.
+>
+> ⚠️ Dono end **inclusive** hain — 1st se 1st tak ki window ek din chalti hai.
+> Dates `date` hain, instant nahi: instant likhne par boundary 05:30 IST par
+> girti (2.28).
 
 ## Support tables (2) ⭐
 

@@ -4,7 +4,7 @@
   "_notInHere": "chooser-e2e, final-verify, signin-check, check-scss-depth, lh, measure, shoot-site, site-audit — these report differently or are not assertion suites. signin-check is the sign-in canary (see lib/login.mjs) and is run on its own.",
   "updatedOn": "2026-10-14",
   "suites": {
-    "swagger": 35,
+    "swagger": 41,
     "notifications": 74,
     "teacher-verification": 33,
     "notification-screens": 33,
@@ -23,7 +23,7 @@
     "team-contract": 50,
     "profile-branches": 37,
     "browse-contract": 31,
-    "teacher-profile": 33,
+    "teacher-profile": 34,
     "screens-3f": 27,
     "screens-3h": 21,
     "screens-3i": 17,
@@ -38,6 +38,8 @@
     "public-contract": 50,
     "public-screens": 41,
     "safe-path": 37,
-    "funnel-e2e": 24
+    "funnel-e2e": 26,
+    "admin-desk": 61,
+    "admin-desk-screens": 88
   }
 }

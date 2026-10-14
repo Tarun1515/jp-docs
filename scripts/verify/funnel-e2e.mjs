@@ -4,7 +4,8 @@
   ----------------------------------------------------------------------------
     0. ENTRY       shipped state; one live job, and an email nobody has used
     1. 🔴 THE WALK public job detail -> Apply -> teacher signup -> land ON
-                   that job's apply screen, with the job NAMED
+                   that job's apply screen, with the job NAMED and the teacher
+                   greeted by the name they typed (G43, end to end)
     2. 🔒 FORCED   ?returnUrl= to an absolute, protocol-relative, backslashed
                    or foreign-origin URL is never even stored — and a sign-in
                    carrying one lands on the dashboard
@@ -51,6 +52,15 @@ const PROBE = 'FUNNEL';
 const stamp = `${Date.now()}`.slice(-7);
 const EMAIL = `verify.funnel.${stamp}@yopmail.com`;
 const PASSWORD = 'Funnel#Teacher2026!';
+
+/**
+ * ⚠️ A DISTINCTIVE NAME, ON PURPOSE (G43). The landing greets by name, and the
+ * assertion below is the only proof that the name survived the whole funnel —
+ * form, request, SSO, provisioning, column, and back out through the teacher
+ * app's own profile read. A name like "Test" could match something already on
+ * the page.
+ */
+const FULL_NAME = 'Priya Ramaswamy';
 
 /**
  * 🔴 THE SIGN-IN SECTIONS USE THE ACCOUNT THIS RUN CREATES, NOT A SEEDED ONE.
@@ -326,7 +336,7 @@ try {
     suite fills it because the form will not submit otherwise, which is the
     whole reason the gap is worth recording.
   */
-  await page.fill('input#name', 'Funnel Probe');
+  await page.fill('input#name', FULL_NAME);
   await page.fill('input#email', EMAIL);
   await page.fill('input#new-password', PASSWORD);
 
@@ -361,6 +371,45 @@ try {
   check('🔴 …and says plainly that nothing has been sent yet',
     /Nothing has been sent yet/i.test(landed), 'no silent application');
 
+  /*
+    🔴 AND THE NAME THEY TYPED SURVIVED THE WHOLE FUNNEL (G43).
+
+    This is the assertion that closes G43, and it is deliberately made HERE
+    rather than against the database: the name has to cross the signup form,
+    the request contract, the SSO account, the provisioning procedure's
+    @FullName, the column, and then come back out through the teacher app's own
+    profile read. A SQL check would prove one link; the greeting proves the
+    chain.
+
+    ⚠️ Until 7B this was impossible to assert at all. The form required a name
+    and RegisterTeacherRequest had no field for it, so every teacher typed one
+    and it never left the browser — while 002_provisioning_accounts.sql had an
+    @FullName parameter and AuthService passed it a literal null.
+  */
+  /*
+    ⚠️ WAITED FOR, NOT READ IMMEDIATELY. The greeting needs the teacher's own
+    profile, which is a SECOND request made after the job has already rendered
+    — so the banner appears without a name and gains one a moment later.
+
+    The first version read the page as soon as the banner existed and reported
+    "NOT GREETED" for a feature that worked: a probe with an extra two seconds
+    showed "Welcome, Priya Ramaswamy — you were applying for …". Waiting on the
+    thing being asserted is the fix, as it was twice before in this suite.
+  */
+  await page.waitForFunction(
+    (name) => document.body.innerText.includes(name),
+    FULL_NAME,
+    { timeout: 15_000 },
+  ).catch(() => { /* asserted below, with the page's actual text as evidence */ });
+
+  const greeted = await page.locator('body').innerText();
+
+  console.log(`    greeted as: ${greeted.match(new RegExp(`[^\\n]*${FULL_NAME}[^\\n]*`))?.[0]?.trim()?.slice(0, 72) ?? 'NOT GREETED'}`);
+
+  check('🔴 …and the name typed at signup is on the page — G43, end to end',
+    greeted.includes(FULL_NAME),
+    `"${FULL_NAME}" crossed form -> request -> SSO -> provisioning -> column -> screen`);
+
   check('🔒 …and the apply control is there, so consent is still theirs to give',
     (await page.locator('button:has-text("Apply for this job")').count()) > 0,
     'applying is consent (2.56) — the funnel delivers them, it does not apply');
@@ -379,6 +428,20 @@ try {
   check('🔴 …and the stored destination was CONSUMED, not left behind',
     pendingAfter === null,
     pendingAfter === null ? 'gone' : `STILL THERE: ${pendingAfter}`);
+
+  /*
+    ⚠️ AND IN THE COLUMN, not only on the screen. The greeting could in
+    principle be rendered from something the browser still held from the signup
+    form; the column is the end of the chain, and only a stored value survives
+    the next sign-in.
+  */
+  const storedName = scalar(`SET NOCOUNT ON;
+    SELECT t.FullName FROM jp_app.dbo.t_app_teachers t
+      INNER JOIN jp_sso.dbo.t_sso_users u ON u.UserUid = t.UserUid
+     WHERE u.Email = '${EMAIL}';`);
+
+  check('🔴 …and t_app_teachers.FullName holds it, not an empty string',
+    storedName === FULL_NAME, `FullName = "${storedName}"`);
 
   // =========================================================================
   section('2. 🔒 FORCED — a hostile returnUrl is dropped');
