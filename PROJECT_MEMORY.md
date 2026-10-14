@@ -1,7 +1,7 @@
 # TEACHER RECRUITMENT PORTAL — PROJECT MEMORY
 
 > **Ye file har kaam ke baad update hogi.** Har naye chat/session mein sabse pehle ye file padho.
-> Last updated: **2026-10-14** | Phase **3 COMPLETE** + **2.5 engine** + **4 jobs COMPLETE** + **2.67 swagger fix** + **PRE-5 (G26 band, 2.68/2.69)** + **PRE-5b (baseline green)** + **5A applications BACKEND (2.70, G28)** + **5B applications SCREENS COMPLETE — PHASE 5 POORA (2.71, G30)** + **6A-0 approval engine above level 1 (2.72, G14 BAND, G31)** + **6A Offer Lite BACKEND COMPLETE (2.73, G32)** + **6B TEACHER SEARCH + INVITES BACKEND COMPLETE — 🔒 CONSENT PATH 2 (2.74, G33, G34)** + **6C-0 verification ka bakaya: G33 aur G34 BAND (2.75, G35, G36)** + **6C-1 NOTIFICATIONS BACKEND + G27 BAND (2.76, G37)** + **6C-2-0 G37 BAND — badge asli hua, aur shared suite runner (2.77, G35 BAND)** + **6C-2 SCREENS COMPLETE — 🔒 consent path 2 screen se, devtools-forced negatives dono taraf (2.78)** + **6.5A BILLING BACKEND COMPLETE — manual first, seam service par, expiry derived (2.79, G38)** + **6.5B BILLING SCREENS COMPLETE — PHASE 6.5 POORA (2.80)** + **7A-0 PUBLIC SURFACE KE TEEN FAISLE, CODE SE PEHLE (2.81, G39, G40)** + **7A PUBLIC JOB PAGES + CONTACT FORM COMPLETE — 🔒 pehli ANONYMOUS surface, SSR JS band kar ke saabit (2.82, G41, G42)** | Next: **7B — admin ka operations desk** (moderation, reports, featured, CMS, enquiry queue) — ⚠️ Point 7 (interview/offer scope) aur §4 Q4 (billing MVP ka likhit confirmation) dono ab bhi client ke paas hain
+> Last updated: **2026-10-14** | Phase **3 COMPLETE** + **2.5 engine** + **4 jobs COMPLETE** + **2.67 swagger fix** + **PRE-5 (G26 band, 2.68/2.69)** + **PRE-5b (baseline green)** + **5A applications BACKEND (2.70, G28)** + **5B applications SCREENS COMPLETE — PHASE 5 POORA (2.71, G30)** + **6A-0 approval engine above level 1 (2.72, G14 BAND, G31)** + **6A Offer Lite BACKEND COMPLETE (2.73, G32)** + **6B TEACHER SEARCH + INVITES BACKEND COMPLETE — 🔒 CONSENT PATH 2 (2.74, G33, G34)** + **6C-0 verification ka bakaya: G33 aur G34 BAND (2.75, G35, G36)** + **6C-1 NOTIFICATIONS BACKEND + G27 BAND (2.76, G37)** + **6C-2-0 G37 BAND — badge asli hua, aur shared suite runner (2.77, G35 BAND)** + **6C-2 SCREENS COMPLETE — 🔒 consent path 2 screen se, devtools-forced negatives dono taraf (2.78)** + **6.5A BILLING BACKEND COMPLETE — manual first, seam service par, expiry derived (2.79, G38)** + **6.5B BILLING SCREENS COMPLETE — PHASE 6.5 POORA (2.80)** + **7A-0 PUBLIC SURFACE KE TEEN FAISLE, CODE SE PEHLE (2.81, G39, G40)** + **7A PUBLIC JOB PAGES + CONTACT FORM COMPLETE — 🔒 pehli ANONYMOUS surface, SSR JS band kar ke saabit (2.82, G41, G42)** + **7B-0 G41 BAND — public→teacher funnel, aur ek parameter jo do jagah likha jaata tha aur kahin padha nahi (2.83, G43)** | Next: **7B — admin ka operations desk** (moderation, reports, featured, CMS, enquiry queue) — ⚠️ Point 7 (interview/offer scope) aur §4 Q4 (billing MVP ka likhit confirmation) dono ab bhi client ke paas hain
 >
 > 🔴 **Ye do line har phase ke close-out mein update hongi.** File 3I tak
 > pahunch chuki thi aur ye header **Phase 0** par khada tha — saat phase purana,
@@ -2081,6 +2081,62 @@ ab hai. Baaki wajah apne paon par khadi hai: har option apna **count** carry
 karti hai, jiske liye tab strip mein jagah nahi. Comment theek kar diya — toota
 hua reason likha chhod dena usi class ki galti hai jo G27 thi.
 
+### G43. Teacher signup ka `name` field **required** hai aur server tak pahunchta hi nahi — 🟡 OPEN (7B-0, 2026-10-14)
+
+7B-0 ka funnel banate waqt mila, kyunki suite ko ye form bharna padta hai.
+
+`register.component.ts` ka form:
+
+```ts
+name: ['', [Validators.required, Validators.maxLength(150)]],   // <- REQUIRED
+email: [...], mobile: [...], password: [...]
+```
+
+aur usi file ka payload:
+
+```ts
+const { email, mobile, password } = this.form.getRawValue();
+const payload = { email: ..., mobile: mobile || null, password };   // name NAHI
+```
+
+`RegisterTeacherRequest` (dono taraf — TS model aur C# DTO) mein `name` hai hi
+nahi. To **har teacher apna naam type karta hai aur wo browser se bahar nahi
+jaata**.
+
+🔴 **Sabse khaas baat: DB ke paas parameter PEHLE SE hai.**
+
+```sql
+-- 002_provisioning_accounts.sql:103
+INSERT INTO dbo.t_app_teachers (UserUid, FullName, CreatedBy)
+VALUES (@UserUid, ISNULL(@FullName, N''), NULL);
+```
+
+To chain ka **sirf browser/API wala hissa** toota hai. Aaj naya teacher
+`FullName = ''` ke saath banta hai aur use **profile screen par wahi naam
+dobara** likhna padta hai — jo usne signup par likha tha.
+
+⚠️ **Ye wahi class ka bug hai jo 7A ne contact form ke `role` field mein pakda
+tha** (2.82): form kuch maangta hai aur jawab phenk deta hai. Farq ye hai ki
+wahan column hi nahi tha aur maine field hata diya; **yahan column aur
+procedure parameter dono maujood hain**, to sahi raasta field rakhna aur
+bhejna hai.
+
+**Band kaise hoga** (chaar chhoti edit, ek hi commit):
+1. `RegisterTeacherRequest` — TS model aur C# DTO dono mein `name` (required,
+   max 150, column `nvarchar(150)` ke barabar).
+2. `register.component.ts` ka payload usme `name` bheje.
+3. Registration service `@FullName` ko provisioning tak pahunchaye.
+4. Ek assertion: registration ke baad `t_app_teachers.FullName` wahi ho jo
+   form mein bhara tha — warna ye chupchaap dobara toot sakta hai.
+
+⚠️ **7B-0 mein jaan-boojh kar nahi kiya.** Brief ne teen cheezein maangi thin
+(parameter padhna, uid route, `applyToJobUrl` wapas) aur ye chauthi hai, ek
+alag surface par (SSO registration), jiska school ka samaantar raasta bhi hai
+(`RegisterSchoolRequest`) aur jiska apna verification chahiye. "Clean boundary
+→ stop and report; never half of one."
+
+---
+
 ### G42. Contact form ka 3/hour per-IP limit ek shared proxy ke peeche poori site ka 3/hour ban jaata hai — 🟡 OPEN (7A, 2026-10-14)
 
 Ye 7A mein likha gaya limit hai, aur **local par theek chalta hai**. Production
@@ -2128,7 +2184,22 @@ aur 429 ka matlab "ek minute ruk jao" hai, "tumhari enquiry gayi" nahi.
 
 ---
 
-### G41. Apply CTA job ko saath nahi le ja sakti — jp-teacher ke teen tukde missing — 🟡 OPEN (7A, 2026-10-14)
+### G41. Apply CTA job ko saath nahi le ja sakti — jp-teacher ke teen tukde missing — ✅ BAND (7B-0, 2026-10-14)
+
+> ✅ **BAND 7B-0 MEIN.** Teeno tukde ban gaye: `ReturnUrlService` parameter
+> padhta aur validate karta hai, `jobs/:jobUid/apply` route uid se job kholta
+> hai (usi procedure aur usi WHERE clause se), aur `applyToJobUrl` wapas apna
+> caller hai. Poora funnel ek browser session mein, signed out,
+> `funnel-e2e.mjs` **24/24**. Details **2.83**.
+>
+> 🔴 **Aur ek chhupa hua hissa mila jo is gap mein likha hi nahi tha:** wahi
+> parameter **authenticated side par bhi** nazarandaaz ho raha tha — auth guard
+> aur session-expiry interceptor dono `?returnUrl=` likhte hain, aur koi
+> padhta nahi tha. Wo bhi band hua, aur assert hota hai.
+>
+> ⚠️ Parameter ka naam `redirect` se `returnUrl` hua — kyunki `returnUrl` pehle
+> se do jagah likha jaata tha aur `redirect` kahin nahi. 2.83 mein wajah.
+
 
 2.43 aur 7A-0.0 dono kehte hain: job detail par **"Apply" seedha teacher signup
 par jaaye, job uske redirect target ke saath**. Pehla aadha chalta hai. Dusra
@@ -8648,6 +8719,186 @@ accessor miss kar sakti hai; **ek jaise bytes** nahi.
 
 ---
 
+### 2.83 7B-0 — PUBLIC SE TEACHER TAK KA RAASTA, AUR EK PARAMETER JO DO JAGAH LIKHA JAATA THA AUR KAHIN PADHA NAHI
+
+G41 band karne ka kaam. Teen tukde brief ne maange the; **chautha tukda naapne
+par mila** aur wo gap mein likha hi nahi tha.
+
+---
+
+#### 🔴 2.83.1 — JO NAAPNE PAR MILA: AUTHENTICATED SIDE PAR WAHI HOLE THA
+
+G41 sirf public funnel ki baat karta tha. Pehla kaam ye dekhna tha ki
+jp-teacher `?redirect=` kaise padhta hai — aur jawab mila **padhta hi nahi**,
+par uske saath ek aur cheez:
+
+```
+grep -rn "returnUrl" src   (jp-shared, jp-teacher, jp-school, jp-admin)
+
+jp-shared/src/core/guards/auth.guard.ts:25   // returnUrl brings them back where they were headed
+jp-shared/src/core/guards/auth.guard.ts:27   queryParams: { returnUrl: state.url }
+jp-shared/src/core/interceptors/auth.interceptor.ts:81
+                                             queryParams: { returnUrl: router.url, reason: 'session-expired' }
+
+teen hit, chaar repo mein — aur teeno WRITE hain. Ek bhi READ nahi.
+```
+
+🔴 **To guard ka apna comment jhooth tha.** Jis teacher ka session ek
+application ke beech mein khatam hota, use `/auth/login?returnUrl=/applications`
+par bheja jaata aur phir **dashboard** par chhod diya jaata. Phase 3 se.
+
+⚠️ **Isliye brief ka `?redirect=` naam nahi liya gaya.** Do aadhe-bane
+mechanism ek hi kaam ke liye the; jiske **do live emitter** the usko poora karna
+aur jiske **zero** the usko rename karna sasta tha — aur usse doosra hole bhi
+band hua. Do naam ek kaam ke liye dono se bura hota: receiving screen dono
+padhti, aur kaun jeeta ye kisi ne likha na hota.
+
+⚠️ Brief ne ye bhi kaha tha *"the same safe-internal-path validation the
+reset-password param gets"* — **aisi validation maujood nahi thi**.
+`reset-password` apna `token` bina kisi path check ke padhta hai, aur theek
+padhta hai: token path nahi hai, use server validate karta hai. To validation
+likhi gayi, copy nahi ki gayi.
+
+---
+
+#### 🔒 2.83.2 — OPEN REDIRECT KI DEEWAR, AUR `startsWith('/')` KAAFI NAHI HAI
+
+`safeInternalPath` (`jp-shared/core/utils/safe-internal-path.ts`) — **koi Angular
+import nahi**, jaan-boojh kar, taaki use seedha table-test kiya ja sake. Jis
+security check ka ek hi test end-to-end ho, wo un do case par test hota hai jo
+page likhte waqt yaad aaye the.
+
+`safe-path.mjs` **37/37**, aur usme ek section hi ye assert karta hai ki
+**nau hostile value `startsWith('/')` paas karti hain aur phir bhi refuse hoti
+hain**:
+
+```
+"//evil.example"              protocol-relative — browser ke liye absolute
+"/\\evil.example"            browser "\" ko "/" banata hai -> upar wala case
+"/\\/evil.example"           wahi, padding ke saath
+"/a\\b"                      backslash kahin bhi — outright ban
+"/\u0000/dashboard"           NUL, jisse kuch parser truncate karte hain
+"/\r\nhttps://evil.example"   CRLF, classic parser-disagreement payload
+"/ /dashboard"                raw space, jise kuch parser strip karte hain
+```
+
+🔴 **Guard ko tod kar dekha:** function ko sirf `startsWith('/')` par le aaya
+— aath hostile case **admit** ho gaye, aur normalisation/traversal clamp bhi
+chale gaye. Har failure apna **asli nuksaan** likhti hai, sirf "expected null"
+nahi.
+
+⚠️ **Route-table allowlist jaan-boojh kar NAHI.** Wo zyada strong hota par
+teen app ke har route ke saath sync rakhna padta, aur stale allowlist ka
+failure mode hai *legitimate destination chupchaap dashboard ban jaana*. Jo
+boundary yahan defend hoti hai wo **ORIGIN** hai — visitor is app ke andar
+rahega. App ke andar ka na-maujood path app ka apna 404 dikhata hai, jo bura
+link hai, handover nahi.
+
+---
+
+#### 🔴 2.83.3 — DESTINATION STORE HOTI HAI, PASS NAHI KI JAATI
+
+Funnel ke teen hop hain:
+
+```
+/auth/register?returnUrl=/jobs/<uid>/apply
+  -> register, aur peeche se sign-in
+  -> us job ke apply par landing
+```
+
+Query parameter ko har beech ke navigation se aage bhejna matlab har ek ko
+yaad rakhna padta — aur jo bhool jaata hai wahi dikhai nahi deta. Darwaze par
+ek baar capture, aakhir mein ek baar consume: beech mein bhoolne ko kuch nahi.
+
+⚠️ **sessionStorage, localStorage nahi** (token ke ulta). Pending destination ek
+visit ki cheez hai; do din pehle browser band karne wale ko uski aadhi shuru ki
+application mein nahi phenkna chahiye.
+
+🔒 **Nikalte waqt bhi validate hoti hai**, kyunki storage page ka koi bhi script
+padh aur likh sakta hai — jo value likhte waqt safe thi, padhte waqt apne aap
+safe nahi hoti.
+
+⚠️ `scopedStorageKey` ab `app-identity.ts` se **export** hota hai.
+`TokenStorageService` ka private method tha; teen-line key rule ki doosri copy
+wahi tareeka hai jisse do store apni jagah par ek-doosre se alag ho jaate hain.
+Output bilkul wahi hai (warna har session sign out ho jaata), aur
+`signin-check.mjs` app-scoped key assert karta hai.
+
+---
+
+#### 🔴 2.83.4 — UID WALA ROUTE EK NAYA DARWAZA NAHI HAI
+
+`USP_GetJobForTeacher` ab `@JobId` **ya** `@JobUid` leta hai — **exactly one**,
+warna RAISERROR (dono dena khatarnaak shape hai: "ye id, ya ye uid" padhta hai
+aur jo jeete wo haadsa hai; kuch na dena har set khaali karta, jo "job maujood
+nahi" jaisa dikhta — caller ki bhool seekhne ka sabse bura tareeka).
+
+🔴 Uid **procedure ke andar** id banta hai aur phir **wahi WHERE clause** milta
+hai: published, abhi khuli, school suspended nahi. Chal kar dekha:
+
+```
+1. @JobId se       -> job (JobId 1162)
+2. @JobUid se      -> WAHI job, same row
+3. DRAFT ka uid    -> KHAALI  <- uid ka raasta rule ko bypass nahi karta
+4. na-maujood uid  -> khaali, error nahi
+5. dono            -> RAISERROR
+6. koi nahi        -> RAISERROR
+```
+
+⚠️ C# mein **do named method** hain, ek do-nullable-id wala nahi:
+`(long? jobId, Guid? jobUid, Guid? userUid)` do nullable Guid ko aas-paas rakh
+deta hai, aur jo call site unhe palat de wo **compile ho jaata hai** aur us job
+ko dhoondhta hai jiska uid caller ka apna user uid hai. Do naam se wo
+likha hi nahi ja sakta.
+
+⚠️ Route par `{jobId:long}` aur `{jobUid:guid}` saath rehte hain kyunki
+constraint unhe alag karte hain — bina constraint ek doosre ko dhak leta aur
+jeet registration order par hoti.
+
+---
+
+#### 🔴 2.83.5 — FUNNEL EK BROWSER SESSION MEIN, AUR TEEN APNI GALTIYAN
+
+`funnel-e2e.mjs` **24/24**. G41 ke teen tukde akele theek lagte the; toota hua
+unka **jod** tha — ek link jo parameter bhejta tha, ek app jo koi nahi padhti
+thi, aur ek route jo nahi tha. Teen green unit test kuch na batate.
+
+```
+Apply href: .../auth/register?returnUrl=%2Fjobs%2F<uid>%2Fapply
+settled on: /jobs/<uid>/apply
+PASS  signup screen kehti hai ki wo us job par wapas le jaayegi
+PASS  landing us job ko NAAM se bulati hai, aur kehti hai "nothing has been sent yet"
+PASS  apply control maujood hai — funnel pahunchata hai, apply nahi karta (2.56)
+PASS  stored destination CONSUME ho gayi, chhodi nahi
+PASS  guard ka returnUrl ab kaam karta hai -> /applications
+```
+
+⚠️ **Teen galtiyan apni, aur teeno suite ne pakdin:**
+
+1. **Section 2 chaar sign-in kharch kar raha tha** aur section 3 ka paanchwa
+   per-IP window (5/60s) se bahar tha. Failure ek 30-second navigation timeout
+   thi — *"app navigate nahi hua"* padhti hai, jabki limiter ne credentials
+   refuse kiye the. Ab sign-in helper **refusal ko uske apne shabdon mein**
+   report karta hai, aur mechanism (ek bhi value store nahi hoti) alag se
+   check hota hai — jiske liye sign-in hi nahi chahiye.
+2. **Seeded account ka hourly cap** (LoginPerIdentifier 10/3600s) chauthe run
+   par khatam ho gaya, aur wo run ke andar wait karne se nahi khulta. Suite ab
+   **apne hi banaye account** se sign in karti hai — section 1 use banata hi
+   hai, to teen sign-in ek bilkul naye identifier par, aur kisi shared account
+   ka budget nahi kharch hota.
+3. **Retry ne wahi cheez delete kar di jo test ho rahi thi.** Helper retry se
+   pehle `signOut` karta tha, jo sessionStorage saaf karta hai — aur pending
+   destination wahi rehti hai. To retry chal gaya aur **/dashboard** par utra,
+   aur suite ne likha ki guard ka returnUrl ignore hota hai. Feature theek tha;
+   retry ne test ki cheez mita di thi.
+
+⚠️ Aur log line **do baar** bekaar thi: pehle `heading: (no heading)` (refusal
+paragraph hai, heading nahi), phir `the page says: Staffroom` (body ki pehli
+line shell ka brand hai). Ab wo **wahi line** chhapti hai jo assertion match
+karti hai — `This posting has gone` — to pass apna saboot dikhata hai.
+
+---
+
 ## 3. SCOPE (Client spec ke against)
 
 ### IN SCOPE — MVP
@@ -8868,6 +9119,7 @@ naya Code, agla free Id, kuch renumber mat karo.
 | 2026-10-11 | 6C-2-0 | **G37 band — badge asli hua — 6C-2 ki ek bhi screen se pehle.** Screens badge teen jagah dikhati hain; aaj tak koi asli teacher use kama hi nahi sakta tha, to har dikhta badge seed-data ka jhooth hota. `031` (`VerifiedByUserId` — school ke paas 2F se hai, teacher ke paas do hi the kyunki badge kabhi set hi nahi hota tha), `022 USP_SetTeacherVerified` (badge + stamp + notification, **ek transaction**, idempotent), stub ki jagah asli call, type 13/14 seed **apne consumer ke saath** (029 ka guard har type ke liye procedure ka naam maangta hai), aur decline ka notification `ApprovalService` ki rejection branch se. 🔴 **Jo stub chaar phase chala:** "setting IsVerified requires t_app_teachers, which is Phase 3" — Phase 3 chaar phase pehle ship hua tha; admin approve kar sakta tha, trail likha jaata tha, badge kabhi nahi lagta, aur **koi error nahi** kyunki wo branch pehle se failure report karti thi. Bacha isliye ki **badge ke raaste par koi test kabhi chala hi nahi** — chaar badge wale teacher seed row hain, to badge ki har assertion aise data par pass hoti thi jo kisi ne kamaya nahi. 🔴 **Test wahi raasta chalta hai jo aadmi:** teacher submit (HTTP) → admin ka **queue** → action endpoint se approve → `orchestrationCompleted` **true** (yahi false aata tha) → badge + stamp + verifier **admin (40), teacher (147) nahi** → **`/teacher-search` ke asli result mein `isVerified true`** → `verifiedOnly` 4 se 5 → notification teacher tak, admin ka note us mein nahi par **trail par hai**. 🔴 **Decline badge chheenta nahi** — `@Approved` faisla hai, store karne wali value nahi (ek character chhota raasta pehle se verified teacher ka badge chup-chaap le leta). 🔴 **Decline ka notification gate ke peeche nahi** — orchestration approval par gated hai (Phase 2E ka bug) aur wo gate hilaya nahi gaya; batana provisioning nahi hai, aur peeche daalne ka matlab hota ki reject hua teacher hamesha intezaar kare. ⚠️ **Mera pehla build guard galat tha, pehle hi run mein pakda gaya** — usne maana ki seeded verified teacher ke paas `VerifiedOn` nahi hai; chaaron ke paas hai. Backfill karna ek na-hui approval gadhna hota, date se scope karna date check hota — to guard wahi assert karta hai jo har row par sach hai, aur "teenon column saath" wali baat suite mein gayi. ✅ **G35 band mechanism se:** `scripts/verify/run.mjs` — har run ka poora output file mein (G35), aur assertion count committed manifest se compare, **ghatna = failure** (6C-0 ka `team-contract`). Us 56/57 ka kaaran ab bhi pata nahi aur likha hua hai; band risk hua hai. 🔴 **Runner ne pehle hi pass par `team-contract` 48/48 pakdi** — uska fixture doosri suite ke leftover par conditional tha; ab apna campus naam, har baar banta hai (49 → 50). `teacher-verification.mjs` **33/33** · `notifications` 12 → 14 type (teen assertion wajah ke saath badli) · **25/25 suite clean, 334 s, bina kisi API restart** | ✅ Done |
 | 2026-10-11 | 6C-2 | **Search, invite, invitations inbox, offer ke dono taraf, notification centre — 6C-2 POORA.** `search-invite-screens` 31/31 · `invitation-screens` **31/31 (nayi)** · `offer-screens` 34/34 · `notification-screens` 21 → 33. 🔒 **Consent path 2 ab screen se saabit hai** — dialog email/phone/resume teeno naam leta hai, "no other school" kehta hai, aur accept par `fn_TeacherContactUnlocked` 0 → 1; **dekhna aur decline dono 0 par chhodte hain**. Accept hone par koi inaam nahi (na "unlocked", na 🎉 — warna consent transaction ban jaata). 🔴 **Devtools-forced negative dono jagah:** kisi doosre ka offer/invitation `fetch` se answer → **404, 403 nahi** (2.6), refusal mein kisi ka naam nahi, row chhui nahi gayi, aur **kisi ka contact nahi khula**. 🔴 **Jo sirf asli raasta chala kar mila (koi suite green hone se nahi):** Selected application par "Offer sent" button jo 400 `OFFER_ACTION_REQUIRED` deta tha (6A se live) · `<input type="time">` "09:00" deta hai par `TimeSpan` binder "09:00:00" maangta hai, to reporting time wala **har** offer refuse ho raha tha · viewer ko 403 par screen "No teacher matches those filters" keh rahi thi · `FullName` teeno layer mein khaali tha. ⚠️ **Teen test galat wajah se pass ho rahe the:** 375 ka check accept ke baad **answered** row (bina button) naap raha tha — ab accept se pehle, aur live row + uske button assert hote hain · "newest first" ek row par trivially sach tha — doosri application add ki, ab **title se** order assert hota hai kyunki din ek hi hai · **positional locator (`.first()`) mere hi chhode hue probe row par ACCEPT dabaa sakta tha** — suite ab sirf apni banayi row ko address karti hai. 🔴 **`run.mjs` manifest mein na hone wali suite skip kar deta tha** — is phase likhi suite bilkul na chalti aur `--update` uska count seekh hi nahi sakta tha; ab chalti hai, `NEW` dikhti hai, pin hone tak NOT CLEAN. 🔴 **`TEACHER_OFFERS` seed row (2.37), `PermissionCode` NULL, route usi commit mein** — teacher sidebar 8 → 9, aur `HOW_TO_RUN`/`local-accounts`/ye file **isi commit** mein; ⚠️ stale 32 par +1 kiya tha, asli 34 hai — **stale number par arithmetic rot confirm karta hai**. ⚠️ **/notifications ek hi shared component, dono portal usi par route** (G27), aur **fail hua read khaali inbox nahi** — request abort kar ke naapa gaya. **29/29 suite clean, 1105 assertion, 454 s · SQL 296 · backend 0/0 · paanchon frontend 0 warning · run_all ×2 byte-identical** | ✅ Done |
 | 2026-10-11 | 6.5A | **Billing — manual first. Design addendum PEHLE, phir backend.** `billing.mjs` **47/47**. 🔴 **Addendum ne code se pehle teen galtiyan pakdin:** (1) "ek procedure" **bana hi nahi sakta tha** — payment `jp_mdm`, subscription `jp_app`, cross query mana (2.2), distributed transaction nahi (2.48); seam **service** par hai aur handoff ka sach `activationCompleted` se bataya jaata hai. (2) **paid plan seed karna likhit mein mana hai** (`008_seed_plans.sql`: "jo number hum ship karte hain wo wapas quote kiya jaata hai") — premise check ki, aaj bhi sach hai (FAQ, Terms, site par ek bhi price nahi); to seed nahi badla, paid plan **suite ka fixture** hai aur **011 ka guard** priced public plan par build gira deta hai (chala kar dekha). (3) **`@ExpectedPlanId` ka comparison ULTA likha tha** — "effective plan se compare karo" build hua aur **verification ne pakda**: lapsed subscription par har consume `409 PLAN_CHANGED`, **hamesha** (2.64 ka retry ek par bounded). Guard ka kaam row badalne ka pata lagana hai; caller plan chunta hi nahi, `USP_ResolveEntitlement` **dono mapping ek query** mein deta hai. 🔴 **Quota plan ke saath chalta hai** — pehla build sirf fallback ka **id** bhejta tha, to 100-post plan ka lapsed account free par girta aur 100 post rakhta; kuch fail nahi hota. Naapa: paid 100, fallback 2 → remaining **1**, 99 nahi. 🔒 **Expiry DERIVED** — `fn_SubscriptionInForce` ek definition, build-time truth table (predicate toda → exit 1), **zero** SQL Agent job; lapsed account ab **marta nahi**, free baseline par chalta hai (pehle `SUBSCRIPTION_INACTIVE` — jo kabhi paid tha wo us se bura tha jo kabhi nahi tha). IST boundary par naapa: DB `status 1, inForce 0`, response `onFreeBaseline true`, consume `QUOTA_EXHAUSTED`. 🔴 **Recorded ≠ expected** — 4900 vs 5000 **record** hota hai, refuse nahi; mismatch par remark zaroori, **par wo rule API layer mein** kyunki gateway caller kisi se remark maang hi nahi sakta. 🔴 **Idempotent dono taraf**, do sach mein samanantar session (WAITFOR TIME): 1 receipt, 1 subscription, 1 ACTIVE per owner; ⚠️ pehle draft mein chaaron ke liye EK instant tha aur batch do — doosra batch **kal** ka intezaar karne laga, suite bina output das minute latki (`sys.dm_exec_requests` ne bataya). 🔴 **Ek bypass lagbhag ship ho gaya:** plan change ka request row hai, to admin use **generic approvals endpoint** se approve kar sakta tha — request APPROVED, payment PENDING, kuch activate nahi, aur "ek owner ek khula request" `PENDING` par key karta hai to school **doosra** request bana leta. Poochh kar mila, test se nahi. 🔒 **2.56 ka guard text se nahi, `sys.sql_expression_dependencies` se** — purana guard function ka naam dhoondta tha aur isi liye project ke apne grep mein **fail** hota tha (jo guard naam leta hai wo bhi naam lene wala code hai); grep scope 18 file, aur **scope khud assert hota hai**. ⚠️ **Count guard isi commit mein hile:** request types 4 → 5, permissions 23 → 24 (dono jagah), swagger 105 → **113**. 🔴 **Naya permission** (`PAYMENT.VERIFY`) jabki 2.5 ne reuse kiya tha — paisa confirm karna system setting nahi, operational act hai, aur dono alag logon ko milenge; 006 holders ka **closed set** assert karta hai (SCHOOL_OWNER ko grant → build exit 1). **30/30 suite clean, 1154 assertion · SQL 296 · backend 0/0 · run_all ×2 content-identical** | ✅ Done |
+| 2026-10-14 | 7B-0 | **G41 BAND — public se teacher tak ka poora raasta.** `funnel-e2e.mjs` **24/24 (nayi)** · `safe-path.mjs` **37/37 (nayi)**. 🔴 **Jo naapne par mila aur gap mein likha nahi tha:** `?returnUrl=` **authenticated side par bhi** ignore ho raha tha — `auth.guard.ts` aur `auth.interceptor.ts` dono use Phase 3 se **likhte** hain aur chaar repo mein ek bhi **reader** nahi tha, to guard ka comment *"returnUrl brings them back where they were headed"* **jhooth** tha; jis teacher ka session application ke beech khatam hota wo dashboard par chhoda jaata. ⚠️ **Naam `redirect` → `returnUrl`**: brief ne `redirect` kaha, par `returnUrl` ke **do live emitter** the aur `redirect` ke **zero** — jiske emitter the usko poora karna sasta tha aur usse doosra hole bhi band hua; do naam ek kaam ke liye dono se bura. ⚠️ **Brief ka ek premise galat tha:** "same validation reset-password gets" — **aisi validation thi hi nahi** (`token` path nahi hai, server use validate karta hai), to likhi gayi. 🔒 **`safeInternalPath` mein koi Angular import nahi**, jaan-boojh kar, taaki table-test ho sake — jis security check ka ek hi test end-to-end ho wo do yaad aaye case par test hota hai; **nau hostile value `startsWith('/')` paas karti hain aur refuse hoti hain** (protocol-relative, `/\`, NUL, CRLF, raw space), aur **validator tod kar dekha** — aath admit ho gaye, normalisation aur traversal clamp bhi gaye. ⚠️ **Route-table allowlist jaan-boojh kar nahi** — teen app ke route ke saath sync rakhna padta aur stale allowlist legitimate destination ko chupchaap dashboard bana deta; jo defend hoti hai wo **ORIGIN** hai. 🔴 **Destination store hoti hai, pass nahi ki jaati** — funnel ke teen hop hain aur har beech wale navigation ko yaad rakhna padta; darwaze par capture, aakhir mein consume. **sessionStorage** (token ke ulta): pending destination ek visit ki cheez hai. 🔒 **Nikalte waqt bhi validate** hoti hai — storage page ka koi script likh sakta hai. ⚠️ `scopedStorageKey` ab **export** hota hai (`TokenStorageService` ka private method tha) — teen-line key rule ki doosri copy hi wo tareeka hai jisse do store alag jagah dekhne lagte hain; output identical, warna har session sign out. 🔴 **Uid route naya darwaza NAHI:** `USP_GetJobForTeacher` ab `@JobId` **ya** `@JobUid` leta hai (**exactly one**, warna RAISERROR — dono dena "ye id ya ye uid" padhta hai aur jo jeete wo haadsa), uid **procedure ke andar** id banta hai aur **wahi WHERE clause** milta hai; chha case chal kar dekhe: id → job, uid → **wahi** job, **DRAFT ka uid → khaali**, na-maujood uid → khaali (error nahi), dono → RAISERROR, koi nahi → RAISERROR. ⚠️ **C# mein do NAMED method**, ek do-nullable-id wala nahi — `(long?, Guid?, Guid?)` do nullable Guid aas-paas rakhta hai aur palat dene wala call site **compile ho jaata** aur us job ko dhoondhta jiska uid caller ka user uid hai. 🔴 **Funnel ek browser session mein, signed out:** public job → Apply (href `?returnUrl=%2Fjobs%2F<uid>%2Fapply`) → signup screen **kehti hai** ki wapas us job par le jaayegi → landing **us job ko naam se** bulati hai, kehti hai **"nothing has been sent yet"**, apply control maujood hai (**funnel pahunchata hai, apply nahi karta** — 2.56), aur stored destination **consume** ho jaati hai. ⚠️ **Teen apni galtiyan, teeno suite ne pakdin:** (1) section 2 **chaar sign-in** kharch kar raha tha aur paanchwa per-IP window (5/60s) se bahar tha — failure ek **navigation timeout** thi jo *"app navigate nahi hua"* padhti hai jabki limiter ne refuse kiya tha; helper ab refusal **uske apne shabdon mein** likhta hai aur mechanism (ek bhi value store nahi hoti) **bina sign-in** check hota hai. (2) **seeded account ka hourly cap** (10/3600s) chauthe run par khatam — run ke andar nahi khulta, to suite ab **apne hi banaye account** se sign in karti hai. (3) **retry ne test ki cheez delete kar di** — `signOut` sessionStorage saaf karta hai, to retry chal gaya aur **/dashboard** par utra, aur suite ne likha ki guard ka returnUrl ignore hota hai; feature theek tha. ⚠️ Log line **do baar bekaar** thi (`heading: (no heading)`, phir `the page says: Staffroom`) — ab wahi line chhapti hai jo assertion match karti hai: `This posting has gone`. ⚠️ **G43 khula:** signup ka `name` **required** hai aur server tak pahunchta hi nahi, jabki `002_provisioning_accounts.sql` ke paas `@FullName` **pehle se** hai — wahi class jo contact form ka `role` tha, par yahan field **rakhni aur bhejni** chahiye. **35/35 suite clean, 1341 assertion, 592 s · backend 0/0 · paanchon frontend 0 warning** | ✅ Done |
 | 2026-10-14 | 7A | **Public job pages + contact form — pehli ANONYMOUS surface.** `public-contract.mjs` **50/50 (nayi)** · `public-screens.mjs` **41/41 (nayi)**. 🔴 **Chaar asli bug, teen suite ne pakde:** (1) **file sahi thi, database purana** — `/jobs/filters` `id:0 name:""` de raha tha jabki count sahi tha; `024` disk par `AS Id, AS Name` karti hai par **deployed proc** mein purana `AS SubjectName` khada tha, aur SQL-layer probe deployed version par chali thi to C# mapper loop mein hi nahi tha. **Dono raw-bytes sweep pass hue** — shape perfect, content khaali; *schema assertion data assertion nahi hai*. Naya content check joda aur **purana alias wapas daal kar fail karte dekha** (sirf `subjects` ka naam liya, `states` ka nahi). (2) **sirf ek anonymous write hai aur uspar validation hi nahi thi** — `{}` POST → 200 aur Name/Email/Subject/Message chaaron khaali ek row; DTO ke `= string.Empty` ki wajah se sab "valid" bind hua. JP.App.Api ke paas **ek bhi validator nahi tha** (zaroorat bhi nahi thi — ab tak sab token ke peeche tha aur har write apni proc mein check karti thi); `PublicValidators.cs` + `FluentValidationFilter` + `AddValidatorsFromAssembly` wire hue, har maximum **apne column ke barabar**, aur 🔒 **honeypot par koi rule nahi** (ek "Website must be empty" wahi jumla bot likhne wale ko wapas de deta). (3) **Apply CTA job saath le hi nahi ja sakti** — jp-teacher mein `?redirect=` **koi nahi** padhta (poore app mein sirf reset-password ek query param padhta hai), `jobs/:id/apply` route **nahi hai**, aur `jobs/:jobId` `Number()` karta hai jabki public surface jaan-boojh kar sirf uid deta hai (2.47) — parameter **hata diya, chhupaya nahi** (jo parameter koi padhta nahi, use bhejna na bhejne se bura hai), **G41**. (4) **title 66 akshar** — `site-audit` ne pehli hi asli job par pakda; `fitTitle()` teen seedhi utarti hai (at-school → school gira → ellipsis) aur **teeno chal kar dekhi gayi**, school ka naam **beech se kabhi nahi** katta. 🔴 **SSR JavaScript BAND kar ke saabit hua** — wahi ek test jo server render aur hydration mein farq karta hai; `**` catch-all `/jobs` ko chup-chaap build-time par khaali page bana deta (koi error, koi warning nahi), aur build ne confirm kiya: **6 static route prerender**, `/jobs` unme nahi (pehle 7 the — `/faq` ab Server). 🔒 **Anonymous hona wire par naapa** — 5 request, ek par bhi Authorization/cookie nahi, teeno storage khaali, aur **wahi request valid token ke saath byte-identical** (1117 === 1117). 🔒 **404 deewar us lamhe par chali jab IST aur UTC ki date ALAG thi** (IST 10-14 · UTC 10-13) — UTC comparison us waqt har job 5.5 ghante pehle expire kar deta; chaaron state 404 aur refusal **kaaran nahi batati**, aur wahi paanch id school ki apni list par maujood hain. ⚠️ **Do suite ek hi rate-limit budget maang rahi thin, aur ye poori regression par hi dikha** — `public-contract` ka limit test **read budget** khatam karta tha aur agli suite ka SSR 429 aata tha, jise suite ne *"listing is not server-rendered"* likha (jhooth, aur galat file par le jaata); ab EXIT mein budget **wapas** hota hai (poll). Contact ka 3/hour dono maang rahi thin → zimmedari baanti: contract suite **server ka contract** (asli row, honeypot, chautha refuse), screens suite **screen** (interception se exact payload), budget **zero**. ⚠️ **Naya case jo pehle nahi tha:** failed send — 500 par page kehta hai nahi gaya, **jo likha tha wo form mein rehta hai**, prefilled mailto: milta hai — yehi 2.44 ki badi fikr thi. ⚠️ **FAQ copy DB mein** (`003_seed_public_faqs`, insert-if-absent — admin ke edit overwrite nahi) **aur ek jawab jhoota ho gaya tha**: "Can I search for jobs without an account?" ka "Not yet" **usi commit mein** theek hua, seed mein guard, dono suite data se assert. ⚠️ `role` field **hata diya** (column nahi, brief ne maanga nahi; collect kar ke discard karna teen mein se saaf galat raasta). ⚠️ **Swagger floor 113 → 119 (naapa, calculate nahi)** aur anonymous surface par ek **CEILING** — *exactly six operations*, kyunki yahan khatra route **gayab** hone ka nahi, **aa jaane** ka hai. **33/33 suite clean, 1183 assertion, 577 s · backend 0/0 · paanchon frontend 0 warning · Lighthouse 9 page SEO 100/a11y 100 · site-audit NO PROBLEMS · SQL 189 file (3 nayi), 285 DB object** | ✅ Done |
 | 2026-10-11 | 6.5B | **Billing screens — 6.5 POORA.** `billing-screens.mjs` **60/60**. 🔴 **Ek component, dono portal** (`UiBillingPageComponent` `jp-shared` mein, school aur teacher dono usi par route karte hain — wahi shape jo `/notifications` ka tha, G27); **admin ka screen alag**, kyunki "mera plan" aur "sabke pending payment" do kaam hain. 🔴 **Ek asli hole band hua jo 6.5A se khula tha:** `plan-change` par koi permission check nahi tha, to school ka **koi bhi** member — including read-only `SCHOOL_VIEWER` — apne account ko payment ke liye commit kar sakta tha. **Poochh kar mila ki naya menu row kisko dikhta hai**, kisi test ke fail hone se nahi. `BILLING.MANAGE` (SCHOOL_OWNER + TEACHER; 007 ka guard **closed set** assert karta hai, SCHOOL_VIEWER ko grant karte hi build exit 1). Reuse pehle dhoonda — `PROFILE.EDIT`/`USER.MANAGE`/`BRANCH.MANAGE` teeno aaj theek chalte, par koi bhi "paise ka zimmedaar" ka matlab nahi rakhta. 🔒 **Panel dekhna gated NAHI** — HR ko allowance pata honi chahiye, warna wo limit ko refuse hone se jaanta hai; 007 ka doosra guard **ulti disha** se assert karta hai ki row par permission na lage. 🔴 **Control wajah ke saath GHAYAB hai, disabled nahi** (2.62) — disabled "abhi nahi" kehta jo jhooth hai. 🔴 **Koi pay-now button nahi**, aur suite uski ghairhaazri assert karti hai; mode list mein ONLINE nahi aur screen **kehti hai kyun**. 🔴 **Mismatch shabdon mein** — "₹100.00 short" / "₹100.00 overpaid", server ke `ShortBy` ki wahi direction; remark zaroori hote hi Confirm disabled, par **server bhi wahi rule enforce karta hai** — client pehle poochhta hai, jagah nahi leta. 🔒 **Lapsed plan screen par naam se aata hai:** "paid plan ended on …", free plan par chal raha hai, allowance `of 3` (paid `of 25` nahi), kuch delete nahi hua, aur DB row `status 1, isActive 1` — kuch sweep nahi hua. **Teen forced negative:** viewer `plan-change` → **403**, school apna hi `verify` → **403** (payment PENDING, koi receipt nahi), teacher school plan id → **404 aur 403 nahi** (2.6). ⚠️ **Do apni galtiyan:** owner ka button ghayab tha aur stale cheez sirf ek **cached JWT** thi (claims mein permission hoti hai; suite ab cached token shuru mein phenk deti hai) · admin ka **375 check khaali queue naap raha tha** — table hi nahi tha, aur table hi 375 par overflow karta hai; ab pehle row banti hai aur assertion node count par nahi, us cheez par hai jo overflow karti. ⚠️ **Count guard isi commit mein hile:** permissions 24 → 25, SUPER_ADMIN **24 of 25** (pehli permission jo uske paas nahi), teacher 2 → 3, menus 34 → **37**, swagger **113 hi** (ek bhi endpoint nahi jura). **31/31 suite clean, 1214 assertion · SQL 296 · backend 0/0 · paanchon frontend 0 warning · run_all ×2 content-identical · 34 RoutePath, 0 dangling** | ✅ Done |
 
@@ -9908,6 +10160,56 @@ thin; ab severity se naam hain.
 ⚠️ **Mere chaar test galat the**, aur pehla sabse mehnga: `applicationStatusId`
 bheja jabki DTO `toStatusId` maangta hai — **har call 200 deta aur kuch
 badalta nahi**, aur us ek chup no-op ke neeche atharah assertion fail hui.
+
+---
+
+## ✅ 7B-0 COMPLETE — 2026-10-14 (G41 BAND — PUBLIC SE TEACHER TAK KA RAASTA)
+
+Details **2.83**. 7A ne Apply ka parameter hata diya tha kyunki doosri taraf
+koi use padhta hi nahi tha. Ye wo doosri taraf hai.
+
+```
+funnel-e2e.mjs 24/24 (nayi) · safe-path.mjs 37/37 (nayi)
+35/35 suite clean, 1341 assertion, 592 s
+backend 0/0 · paanchon frontend 0 warning
+```
+
+🔴 **Jo naapne par mila, aur gap mein likha hi nahi tha:** `?returnUrl=`
+**authenticated side par bhi** nazarandaaz ho raha tha. Auth guard aur
+session-expiry interceptor dono use **Phase 3 se likhte** hain, aur chaar repo
+mein ek bhi reader nahi tha — to guard ka apna comment *"returnUrl brings them
+back where they were headed"* jhooth tha. Wo bhi band hua, aur assert hota hai:
+`/applications` maangne wala wahin wapas aata hai, dashboard par nahi.
+
+⚠️ **Parameter ka naam `redirect` se `returnUrl` kiya** — brief ne `redirect`
+kaha tha, par `returnUrl` ke **do live emitter** pehle se the aur `redirect` ke
+**zero**. Do naam ek kaam ke liye dono se bura hota. Ek line ka badlaav hai agar
+naam `redirect` hi chahiye.
+
+⚠️ **Brief ka ek premise sach nahi tha:** *"the same safe-internal-path
+validation the reset-password param gets"* — aisi validation maujood nahi thi.
+`reset-password` apna `token` bina path check ke padhta hai, aur theek karta
+hai (token path nahi hai). To validation **likhi** gayi.
+
+🔒 **`startsWith('/')` kaafi nahi hai, aur ye assert hota hai:** nau hostile
+value use paas karti hain aur phir bhi refuse hoti hain — protocol-relative,
+backslash, NUL, CRLF, raw space. Validator ko tod kar dekha: aath admit ho
+gaye.
+
+🔴 **Uid wala route naya darwaza nahi hai** — uid procedure ke andar id banta
+hai aur **wahi WHERE clause** milta hai. DRAFT job ka uid: khaali, chaar jagah
+se naapa (proc, API, teacher screen, public screen).
+
+⚠️ **Teen apni galtiyan, teeno suite ne pakdin:** chaar sign-in kharch karna
+(per-IP 5/60s), seeded account ka hourly cap (10/3600s — run ke andar nahi
+khulta, to suite ab **apne hi banaye account** se sign in karti hai), aur
+**retry ne wahi cheez delete kar di jo test ho rahi thi** (`signOut`
+sessionStorage saaf karta hai).
+
+⚠️ **G43 khula:** teacher signup ka `name` field **required** hai aur server
+tak pahunchta hi nahi — aur DB ke paas `@FullName` parameter **pehle se** hai.
+Wahi class ka bug jo 7A ne contact form ke `role` mein pakda tha, par yahan
+sahi raasta field **rakhna aur bhejna** hai.
 
 ---
 

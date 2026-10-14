@@ -2,7 +2,7 @@
   "_why": "Each suite's assertion TOTAL. run.mjs fails a suite whose total drops below this even when every assertion passes — 6C-0 found team-contract had quietly gone from 49 checks to 48 because a stray fixture made it take a skip branch, and nothing was red. A number going DOWN in this file's diff is the thing to stop and read.",
   "_howToChange": "Add assertions, get the suite green, then `node scripts/verify/run.mjs <name> --update`. Never --update to make a drop go away. A BRAND-NEW suite needs no hand-written entry: it runs unpinned, reports NEW, and is counted NOT CLEAN until one --update pins it — so a suite written and forgotten shows up every run instead of silently not running.",
   "_notInHere": "chooser-e2e, final-verify, signin-check, check-scss-depth, lh, measure, shoot-site, site-audit — these report differently or are not assertion suites. signin-check is the sign-in canary (see lib/login.mjs) and is run on its own.",
-  "updatedOn": "2026-10-13",
+  "updatedOn": "2026-10-14",
   "suites": {
     "swagger": 35,
     "notifications": 74,
@@ -36,6 +36,8 @@
     "billing": 47,
     "billing-screens": 60,
     "public-contract": 50,
-    "public-screens": 41
+    "public-screens": 41,
+    "safe-path": 37,
+    "funnel-e2e": 24
   }
 }

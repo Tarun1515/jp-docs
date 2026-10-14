@@ -38,6 +38,8 @@ npx playwright install chromium
 | `shoot-site.mjs` | Screenshots every public page at 1440 and 375 into `design-screens/`, and reports horizontal scroll | `jp-public` |
 | `check-scss-depth.mjs` | Finds the deepest component stylesheet using the shared partials per app and confirms it compiled — the build-time SCSS path that broke after the repo split | nothing (reads source and `dist/`) |
 | `public-contract.mjs` | Phase 7A. The anonymous surface over HTTP: the 404 wall (draft/expired-at-the-IST-boundary/closed/deleted), the raw-bytes sweep plus a key allowlist, byte-identical responses with and without a token, the honeypot, the read and contact rate limits, and the batched view counter | `JP.App.Api`, `JP.Sso.Api` — **restart the App API first**, see above |
+| `safe-path.mjs` | Phase 7B-0. 🔒 The open-redirect check, table-tested: imports jp-shared's `safeInternalPath` DIRECTLY (it has no Angular imports for exactly this reason) and runs ~30 hostile and legitimate candidates past it, each stating what shipping it would mean. Includes an assertion that several hostile values pass `startsWith('/')` and are still refused | **nothing** — a pure function |
+| `funnel-e2e.mjs` | Phase 7B-0. The public→teacher funnel in ONE signed-out browser session: public job detail → Apply → teacher signup → lands on that job's apply route with the job named. Plus the forced negatives (absolute, protocol-relative, backslashed and foreign-origin `returnUrl` never stored), the authenticated hole the auth guard had since Phase 3, and a draft job's uid on the apply route | `jp-public`, `jp-teacher`, `jp-shared`, both APIs |
 | `public-screens.mjs` | Phase 7A. The public site in a browser: the listing with **JavaScript disabled** (the only test that tells server rendering from hydration), filters in the URL, no Authorization header on any request, the job title from the response, the wall through the UI, and the contact form's payload and states by interception | `jp-public`, `JP.App.Api`, `JP.Sso.Api` |
 
 Run them with the dev servers already up:
@@ -68,6 +70,18 @@ twenty minutes in the wrong file.
 intercepts — so it can be run repeatedly in any order. The split is deliberate:
 the contract suite owns the server's behaviour, the screens suite owns the
 screen's.
+
+🔴 **The SIGN-IN budget is a separate trap, and it bit 7B-0 twice.** The SSO
+allows `LoginPerIp` 5 per 60 seconds and `LoginPerIdentifier` 10 per 3600
+seconds. `lib/login.mjs` closes the hourly one for API suites with a disk token
+cache — but a BROWSER suite signs in through the form and cannot use it. So:
+
+- `funnel-e2e.mjs` signs in as **the account it creates**, not a seeded one,
+  because the hourly cap on a shared account cannot be waited out inside a run.
+- Its sign-in helper reports the limiter's own message and waits 65 seconds
+  before retrying. Without that, a refused sign-in surfaces as
+  "page.waitForURL: Timeout 30000ms exceeded" — which reads as a router bug and
+  costs an hour in the wrong file.
 
 ⚠️ And `public-contract` hands the **read** budget back before it exits (it
 polls for a 200). It used to leave the per-IP read bucket empty, and the next
