@@ -451,7 +451,28 @@ try {
   const enginePaths = files.filter((f) =>
     /Entitlement|013_entitlement|020_entitlement_ledger|036_entitlement_catalog|009_entitlement_catalog/i.test(f)
     // 6.5A — billing: the seam, its two halves, and the activation side.
-    || /Billing|010_billing|023_billing_activation|012_subscription|SubscriptionRepository|PlanRepository/i.test(f));
+    || /Billing|010_billing|023_billing_activation|012_subscription|SubscriptionRepository|PlanRepository/i.test(f)
+
+    /*
+      🔴 EXTENDED IN 7B TO THE ADMIN OPERATIONS DESK.
+
+      Billing was where the temptation was sharpest; the desk is where the
+      ARGUMENT is sharpest. Somebody will eventually say that a moderator
+      looking at a reported teacher needs to ring them — and 2.56 is LOCKED at
+      exactly two paths, the teacher applied or the teacher accepted an
+      invitation. An admin desk is not a third one, and an administrator is
+      not an exception to a consent rule.
+
+      ⚠️ THE ENQUIRIES QUEUE PASSES THIS AND MUST KEEP PASSING. EnquiryDto
+      carries `Email` and `Mobile` — a VISITOR'S OWN details, typed into the
+      public contact form in order to be replied to, on a table that has no
+      user id at all (033). The pattern below matches `MobileNumber` and
+      `ContactEmail`, not bare `Mobile`/`Email`, so the two cases are already
+      distinguished. Anybody tempted to widen the pattern to `Mobile` will
+      turn the visitor's own request for a reply into a 2.56 breach: widen the
+      FILE list instead.
+    */
+    || /AdminDesk|025_moderation_reports|026_admin_content|034_moderation_reports_featured/i.test(f));
 
   /*
     🔴 A FILE WHOSE OWN 2.56 GUARD NAMES THE FUNCTION IS NOT A BREACH.

@@ -9098,6 +9098,34 @@ fail hona **notice** banner hatane ka reminder hai.
 
 ---
 
+#### 🔒 2.84.3a — 2.56 KA GREP DESK TAK BADHA, AUR ENQUIRY QUEUE US FARQ KO SAMBHAALTI HAI
+
+Billing par temptation sab se **teez** thi; desk par **argument** sab se teez
+hai. Koi kabhi kahega ki reported teacher ko dekh raha moderator use **phone**
+karna chahta hai — aur 2.56 LOCKED hai **do** raaste par: teacher ne apply
+kiya, ya teacher ne invitation accept kiya. Admin desk **teesra raasta nahi**
+hai, aur administrator consent rule ka exception nahi hai.
+
+To `entitlement-http` ka 2.56 direction-A grep ab **saat desk file** bhi scan
+karta hai (26 file total). Aaj zero hit, aur **tod kar dekha** — desk file mein
+code se `fn_TeacherContactUnlocked` ka naam liya to guard **fire hui**.
+
+⚠️ **Enquiry queue ye grep paas karti hai aur karni chahiye.** `EnquiryDto` ke
+paas `Email` aur `Mobile` hain — **visitor ke apne**, jo usne public contact
+form mein reply paane ke liye likhe, aur us table ke paas **user id hi nahi
+hai** (033). Pattern `MobileNumber` aur `ContactEmail` match karta hai, bare
+`Mobile`/`Email` nahi — to dono case pehle se alag hain. Jo kal pattern ko
+`Mobile` tak chaudha karega wo visitor ki apni reply-request ko 2.56 ka breach
+bana dega: **file list** chaudhi karo, **pattern nahi**.
+
+⚠️ Aur ye block khud ek nishaan hai: pehli koshish mein isse likhne wala shell
+command double-quote ke andar tha, to **har backtick wala naam command
+substitution ban kar gayab** ho gaya aur script ne phir bhi "ok" chhapa. Teesri
+baar isi session mein — *patch script Write tool se likho, heredoc ya
+double-quoted shell string se nahi.*
+
+---
+
 #### 🔒 2.84.4 — EK SERVICE PER PERMISSION, AUR TEENON PERMISSION SERVER PAR HI CHECK HOTI HAIN
 
 ```
