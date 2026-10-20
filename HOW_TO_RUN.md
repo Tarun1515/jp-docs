@@ -769,6 +769,30 @@ the teacher consents, by applying or by accepting an invitation.
 
 Design and rationale: `MONETIZATION_DESIGN.md`.
 
+#### Showing a priced plan anyway — the demo fixture
+
+**Run `scripts/demo/demo-setup.sql` before the demo, and
+`scripts/demo/demo-teardown.sql` after it — a demo plan is never committed as
+seed data.**
+
+```
+sqlcmd -S "localhost\TARUN" -E -I -b -f 65001 -i scripts/demo/demo-setup.sql
+...demo...
+sqlcmd -S "localhost\TARUN" -E -I -b -f 65001 -i scripts/demo/demo-teardown.sql
+node scripts/verify/run.mjs          # proves the shipped state is back
+```
+
+🔴 **While the fixture is installed, `run_all.sql` and several suites FAIL on
+purpose.** 011's build guard refuses a priced public plan and the suites assert
+zero plan-feature mappings. That is the guard working — the plan has to be
+public to be sellable at all (`USP_RequestPlanChange` answers `NOT_FOUND`
+for a non-public plan, measured), so the fixture and a green build cannot
+coexist. Teardown is the fix, and it prints the counts it restored.
+
+⚠️ It sells "Growth Plan (SAMPLE — pricing TBD)" at 999 — a placeholder nobody
+can mistake for a decision, because §4 Q4 is still with the client and a number
+shown in a demo gets quoted back.
+
 ### Fully wired to the API
 
 | Screen | App | Route | Reads |
