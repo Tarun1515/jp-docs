@@ -544,14 +544,40 @@ try {
   check('…on two different SQL sessions',
     ma.spid !== mb.spid, `spids ${ma.spid} and ${mb.spid}`);
 
+  /*
+    🔴 THE LOSER HAS TWO LEGITIMATE ANSWERS — found in 8-0, on the same day the
+    identical shape was found in offers.mjs.
+
+    The winning approval commits two things: the status/level move AND the
+    RowVersion bump. What the loser meets depends on which it reaches first:
+
+      loser reaches the optimistic UPDATE  -> 0 rows -> THROW 50023
+                                           -> CONCURRENCY_CONFLICT
+      loser re-reads the request after the
+        winner committed                   -> already approved
+                                           -> INVALID_STATUS
+
+    Both refuse the same thing and both are correct. The invariant is the one
+    on either side of this line: exactly ONE approval won, and the other was
+    TOLD rather than silently overwriting it.
+
+    ⚠️ The old assertion demanded CONCURRENCY_CONFLICT specifically, so it
+    failed whenever the entry gap was wide enough for the winner to commit
+    first — 16 ms was enough, and the gap is not something a test controls.
+  */
+  const REFUSALS = ['CONCURRENCY_CONFLICT', 'INVALID_STATUS'];
+
   const winners = [oa, ob].filter((r) => r.status === 1).length;
-  const conflicts = [oa, ob].filter((r) => r.code === 'CONCURRENCY_CONFLICT').length;
+  const conflicts = [oa, ob].filter((r) => REFUSALS.includes(String(r.code))).length;
+
+  console.log(`     the loser was refused with ${[oa, ob].find((r) => r.status !== 1)?.code}\n`);
 
   check('🔴 exactly ONE approval won at level 2',
     winners === 1, `${winners} winner(s)`);
 
-  check('🔴 …and the other got CONCURRENCY_CONFLICT — told, not silently overwritten',
-    conflicts === 1, `${conflicts} conflict(s)`);
+  check('🔴 …and the other was REFUSED — told, not silently overwriting the winner',
+    conflicts === 1,
+    `${[oa, ob].map((r) => r.code ?? 'approved').join(' / ')}`);
 
   const raceEnd = state(raceReq.id);
 
@@ -564,7 +590,155 @@ try {
     trail(raceReq.id).join('  '));
 
   // =========================================================================
-  section('6. EXIT — the fixture is gone and the shipped configuration is unchanged');
+  // =========================================================================
+  section('6. 🔴 G31 — AND AN ERROR THAT IS NOT 50023 STILL LOGS AND STILL THROWS');
+  // =========================================================================
+
+  /*
+    🔴 WHY THIS SECTION EXISTS AT ALL.
+
+    8-0 stopped the approval engine logging an ordinary lost race. The cheap
+    way to achieve that would have been to stop logging — and the assertion in
+    section 7 ("the log gained nothing") would pass just as well on a CATCH
+    that logs nothing ever, which would be a far worse product than the one
+    6A-0 described.
+
+    So the suppression has to be shown to be NARROW: 50023 is classified and
+    dropped, everything else is logged and re-thrown.
+
+    ⚠️ THERE IS NO WAY TO MAKE THIS PROCEDURE FAIL FROM OUTSIDE. Every
+    parameter it takes is validated into a graceful refusal — @ActionTypeId is
+    checked against (1,2,3), a stale @RowVersion is the conflict path, and the
+    history table has no foreign keys for a bogus id to violate. A refusal is
+    not an exception and never reaches the CATCH.
+
+    🔴 SO THE FAULT IS INJECTED WHERE A REAL ONE WOULD ARRIVE: a temporary
+    AFTER INSERT trigger on the trail table that raises inside the procedure's
+    own transaction. That is the shape of a genuine runtime fault — a trigger,
+    a constraint, a deadlock — and it exercises the real CATCH in the real
+    procedure rather than a copy of it.
+
+    ⚠️ The number is 50000, which is what RAISERROR gives an ad-hoc message.
+    What matters is only that it is NOT 50023, and the assertions say that
+    rather than naming a number the injection happens to produce.
+
+    ⚠️ The trigger is dropped here AND in the finally, and the next run asserts
+    it is absent before doing anything: a suite that dies mid-section must not
+    leave a booby-trapped history table behind.
+  */
+  const probeTrigger = () => scalar(`SET NOCOUNT ON; USE jp_mdm;
+    SELECT CAST(COUNT(*) AS varchar(4)) FROM sys.triggers WHERE name = 'TR_ZZ_G31Probe';`);
+
+  check('entry to section 6: no probe trigger is left over from an earlier run',
+    probeTrigger() === '0', `${probeTrigger()} probe trigger(s)`);
+
+  /*
+    🔴 THE 50023 PATH, REACHED ON PURPOSE RATHER THAN BY LUCK.
+
+    G31's claim is about ONE branch of the CATCH: an optimistic-check failure
+    is classified and never logged. The race in section 5 reaches that branch
+    only when the loser gets as far as the UPDATE — and on a 16 ms entry gap it
+    does not, it gets INVALID_STATUS from the precondition chain instead.
+
+    ⚠️ WHICH MEANS THE RACE WAS NEVER A TEST OF G31. The flat-log assertion
+    passed either way, and the premise line added in 8-0 is what exposed that:
+    it failed with "0 CONCURRENCY_CONFLICT answers", on a product that was
+    behaving correctly.
+
+    A stale RowVersion is the same refusal with none of the timing: the UPDATE
+    matches zero rows, THROW 50023 fires, and the CATCH does its work — every
+    run, deterministically.
+  */
+  const staleReq = submit(adminA, 'G31 stale rowversion');
+
+  const logBeforeStale = Number(errorLogCount());
+
+  const firstPass = act(staleReq.id, 1, adminA, staleReq.rv, String(ROLE_MODERATION_ADMIN));
+
+  check('premise: the first approval at level 1 succeeded, so the RowVersion moved',
+    firstPass.status === 1, firstPass.raw);
+
+  /* The SAME RowVersion again — now one behind the row. */
+  const stale = act(staleReq.id, 1, adminA, staleReq.rv, String(ROLE_MODERATION_ADMIN));
+
+  console.log(`\n     stale RowVersion -> ${stale.raw}`);
+  console.log(`     error log ${logBeforeStale} -> ${errorLogCount()}\n`);
+
+  check('🔴 a stale RowVersion is refused as CONCURRENCY_CONFLICT — the 50023 path, every run',
+    stale.code === 'CONCURRENCY_CONFLICT', stale.raw);
+
+  check('🔴 …and THAT path wrote nothing to the error log — G31, not by luck',
+    Number(errorLogCount()) === logBeforeStale,
+    `${logBeforeStale} -> ${errorLogCount()} across a refused optimistic check`);
+
+  const negReq = submit(adminA, 'G31 negative');
+
+  const beforeNeg = Number(errorLogCount());
+
+  sql(`SET NOCOUNT ON; USE jp_mdm;
+    EXEC('CREATE TRIGGER dbo.TR_ZZ_G31Probe ON dbo.t_mdm_request_approvals
+          AFTER INSERT AS BEGIN RAISERROR(''G31 probe: an unexpected fault inside the transaction'', 16, 1); END');`);
+
+  let threw = false;
+  let probeError = '';
+
+  try {
+    act(negReq.id, 1, adminA, negReq.rv, String(ROLE_MODERATION_ADMIN));
+  } catch (error) {
+    threw = true;
+    probeError = String(error.message ?? error).replace(/\s+/g, ' ').slice(0, 120);
+  }
+
+  sql(`SET NOCOUNT ON; USE jp_mdm; DROP TRIGGER dbo.TR_ZZ_G31Probe;`);
+
+  /*
+    🔴 TWO COLUMNS, AND THEY SAY DIFFERENT THINGS — which is why the first
+    version of this assertion failed on a working product.
+
+    ErrorProcedure is ERROR_PROCEDURE(): where the fault ORIGINATED, which for
+    an injected trigger fault is the trigger. ContextInfo is what the procedure
+    passes USP_LogError itself: who CAUGHT and logged it. Asserting that the
+    approval engine logged this means asserting on ContextInfo.
+
+    ⚠️ Worth keeping both in the printed line: a reader looking at a real log
+    row needs to know that the two columns can legitimately disagree.
+  */
+  const negRow = scalar(`SET NOCOUNT ON; USE jp_mdm;
+    SELECT TOP 1 CAST(ErrorNumber AS varchar(10)) + '|' + ISNULL(ErrorProcedure, '?')
+               + '|ctx=' + ISNULL(ContextInfo, '?')
+    FROM dbo.t_mdm_error_log ORDER BY ErrorLogId DESC;`);
+
+  const negDelta = Number(errorLogCount()) - beforeNeg;
+
+  console.log(`\n     injected fault -> threw: ${threw} · log delta ${negDelta} · newest ${negRow}`);
+  console.log(`     "${probeError}"\n`);
+
+  check('🔴 an UNEXPECTED fault still surfaces — it is not swallowed as a conflict',
+    threw === true, probeError || 'the call returned normally, which would hide a real bug');
+
+  check('🔴 …and it still writes exactly one error-log row, logged BY this procedure',
+    negDelta === 1
+      && /ctx=USP_ProcessApprovalAction$/.test(negRow)
+      && !negRow.startsWith('50023|'),
+    `delta ${negDelta} · newest row ${negRow}`);
+
+  /*
+    ⚠️ The probe row is then REMOVED, and that is not tidying up after a
+    passing test — it is keeping section 7's baseline honest. This row is the
+    suite's own fault injection, not something the product did, and leaving it
+    would make the "log gained nothing" assertion fail for a reason that has
+    nothing to do with the product.
+  */
+  sql(`SET NOCOUNT ON; USE jp_mdm;
+    DELETE FROM dbo.t_mdm_error_log
+     WHERE ErrorMessage LIKE '%G31 probe%';`);
+
+  check('…and the injected row is removed, so the exit baseline measures the PRODUCT',
+    Number(errorLogCount()) === beforeNeg,
+    `back to ${errorLogCount()} — the number this section started from`);
+
+  // =========================================================================
+  section('7. EXIT — the fixture is gone and the shipped configuration is unchanged');
   // =========================================================================
 
   cleanup();
@@ -584,37 +758,62 @@ try {
 
   /*
     ------------------------------------------------------------------------
-    ⚠️ THE ERROR LOG GAINS EXACTLY ONE ROW, AND IT IS THE CONCURRENCY CONFLICT.
+    🔴 THE ERROR LOG GAINS NOTHING — G31, CLOSED IN PHASE 8-0.
     ------------------------------------------------------------------------
-    The losing approval is refused by `THROW 50023` inside the transaction,
-    which lands in the CATCH — and the CATCH logs before it translates the
-    error into CONCURRENCY_CONFLICT. So a perfectly ordinary race writes an
-    error-log row.
+    This assertion was the exact opposite until 8-0: it expected ONE row and
+    said, in writing, that the behaviour was not obviously right. 6A-0 measured
+    it and left it, because changing what the approval engine logs is an
+    operations decision rather than something G14 owed.
 
-    🔴 This assertion expects it rather than expecting a clean baseline,
-    because that IS the shipped behaviour and a suite must describe what the
-    product does. But it is not obviously right: 5A drew the opposite line for
-    USP_ApplyToJob, where the EXPECTED duplicate is swallowed silently and only
-    an unexpected 2601 is logged. Two engines, two answers, on the same
-    question. Recorded as G31 rather than changed here — altering what the
-    approval engine logs is a decision about operations, not a fix owed to
-    G14, and 6A-0's boundary is G14.
+    8-0 decided it, the way the gap's own note recommended: an ordinary lost
+    race is not news. The CATCH now classifies 50023 BEFORE it logs and logs
+    only what it could not classify — which is precisely what 5A does for an
+    expected duplicate in USP_ApplyToJob. Two engines answering "is this error
+    news?" in opposite ways was the real defect.
+
+    ⚠️ WHAT MUST STILL BE TRUE, and section 6 forces it rather than trusting
+    it: an error that is NOT 50023 still logs and still surfaces. A CATCH that
+    stopped logging altogether would pass the assertion below and be a much
+    worse product.
   */
   const logDelta = Number(errorLogCount()) - Number(entryErrors);
 
-  const logRow = scalar(`SET NOCOUNT ON; USE jp_mdm;
-    SELECT TOP 1 CAST(ErrorNumber AS varchar(10)) + '|' + ISNULL(ErrorProcedure, '?')
-    FROM dbo.t_mdm_error_log ORDER BY ErrorLogId DESC;`);
+  check('🔴 exit: the error log gained NOTHING — an ordinary race is not news (G31 closed)',
+    logDelta === 0,
+    `${entryErrors} -> ${errorLogCount()} across a run containing a real level-2 race`);
 
-  check('exit: the error log gained exactly one row — the level-2 concurrency conflict (G31)',
-    logDelta === 1 && logRow.startsWith('50023|'),
-    `${entryErrors} -> ${errorLogCount()} · newest row ${logRow}`);
+  /*
+    ⚠️ And the race really did happen, so the line above is not vacuous: one
+    of the two approvals was refused with CONCURRENCY_CONFLICT in section 5.
+    Without this premise, deleting the race from the suite would make the
+    "gained nothing" assertion pass for the wrong reason.
+  */
+  /*
+    ⚠️ THE PREMISE IS THE DETERMINISTIC ONE, NOT THE RACE. Section 6 forces a
+    50023 through a stale RowVersion on every run; the race in section 5 may or
+    may not reach that branch depending on a millisecond gap, which is why it
+    is no longer what this assertion leans on.
+  */
+  check('premise: the 50023 branch was actually exercised in this run',
+    stale.code === 'CONCURRENCY_CONFLICT',
+    'section 6 forces it with a stale RowVersion, so this is true every run');
 } catch (error) {
   check('the suite ran to completion', false, error.message);
   console.error(error);
 } finally {
   // ⚠️ A killed run must not leave a two-level configuration behind for the
   // next suite — or for the product — to inherit.
+  /*
+    ⚠️ THE PROBE TRIGGER COMES OFF FIRST. cleanup() deletes history rows, and
+    a history table with an armed RAISERROR trigger would make the teardown
+    itself fail — leaving both the trigger and the fixture behind.
+  */
+  try {
+    sql(`SET NOCOUNT ON; USE jp_mdm;
+      IF OBJECT_ID('dbo.TR_ZZ_G31Probe', 'TR') IS NOT NULL DROP TRIGGER dbo.TR_ZZ_G31Probe;
+      DELETE FROM dbo.t_mdm_error_log WHERE ErrorMessage LIKE '%G31 probe%';`);
+  } catch { /* reported by the assertions above */ }
+
   try { cleanup(); } catch { /* reported above */ }
 }
 

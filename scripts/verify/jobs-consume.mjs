@@ -312,11 +312,100 @@ try {
     `HTTP ${pubC2.http}, consumed ${pubC2.body?.data?.consumed}, ledger ${ledgerCount()}`);
 
   // =========================================================================
+  console.log('\n=== 3b. 🔴 G38 — A LAPSED PLAN STILL PUBLISHES, AT THE FREE ALLOWANCE ===');
+
+  /*
+    🔴 THE REGRESSION THAT WOULD HAVE CAUGHT G38, AND DID NOT EXIST.
+
+    6.5-C removed a cliff: a subscription past EndsOn drops to the default
+    plan's entitlements instead of being refused. billing.mjs asserted that for
+    the ENTITLEMENT path — EntitlementService -> USP_ConsumeFeature — and that
+    assertion passed throughout.
+
+    ⚠️ IT PASSED BECAUSE IT TESTED THE WRONG PATH. Publishing a job does not go
+    through USP_ConsumeFeature; it goes through USP_PublishJob, which calls the
+    core directly and, until 8-0, passed no fallback at all. Same for inviting.
+    So the two consuming actions in the product (2.64) were the two the cliff
+    was still live on, and the suite that covered the cliff never touched them.
+
+    Measured before the fix, on this exact fixture: Status 0
+    SUBSCRIPTION_INACTIVE. The gap called this a risk for "some future
+    procedure"; it was already shipped, in both.
+  */
+  const lapsedJob = (await draft('Lapsed-plan publish')).body?.data;
+
+  const endsBefore = scalar(`SET NOCOUNT ON; USE jp_app;
+    SELECT ISNULL(CONVERT(varchar(10), EndsOn, 120), 'NULL')
+      FROM t_app_subscriptions WHERE OwnerUid='${orgUid}' AND Is_Active=1;`);
+
+  /*
+    ⚠️ LAPSED MEANS *ONLY TIME HAS PASSED*: StatusId 1 and Is_Active 1 are left
+    alone and EndsOn moves into the past. A cancelled or deactivated
+    subscription is a different case and SHOULD be refused — the core's own
+    comment says so, and widening this fixture would hide that difference.
+  */
+  sql(`SET NOCOUNT ON; USE jp_app;
+    UPDATE t_app_subscriptions
+       SET EndsOn = CAST(DATEADD(day, -1, dbo.fn_IstToday()) AS date)
+     WHERE OwnerUid='${orgUid}' AND Is_Active=1;`);
+
+  const inForce = scalar(`SET NOCOUNT ON; USE jp_app;
+    SELECT CAST(dbo.fn_SubscriptionInForce(s.Is_Active, s.StatusId, s.EndsOn, SYSUTCDATETIME()) AS varchar(2))
+      FROM t_app_subscriptions s WHERE s.OwnerUid='${orgUid}' AND s.Is_Active=1;`);
+
+  check('premise: the subscription really is out of force now',
+    inForce === '0', `fn_SubscriptionInForce = ${inForce} (EndsOn was ${endsBefore})`);
+
+  const lapsedPub = await publish(lapsedJob);
+
+  console.log(`\n    lapsed publish -> HTTP ${lapsedPub.http} `
+    + `code ${lapsedPub.body?.code ?? 'none'} consumed ${lapsedPub.body?.data?.consumed}\n`);
+
+  check('🔴 G38: a LAPSED plan publishes — the free baseline, not SUBSCRIPTION_INACTIVE',
+    lapsedPub.http === 200,
+    `HTTP ${lapsedPub.http}${lapsedPub.body?.code ? ' ' + lapsedPub.body.code : ''}`);
+
+  check('🔴 …and the refusal it used to give is named, so this cannot pass vacuously',
+    lapsedPub.body?.code !== 'SUBSCRIPTION_INACTIVE',
+    'before 8-0 this exact call answered SUBSCRIPTION_INACTIVE on a FREE feature');
+
+  sql(`SET NOCOUNT ON; USE jp_app;
+    UPDATE t_app_subscriptions
+       SET EndsOn = ${endsBefore === 'NULL' ? 'NULL' : `'${endsBefore}'`}
+     WHERE OwnerUid='${orgUid}' AND Is_Active=1;`);
+
+  const inForceAgain = scalar(`SET NOCOUNT ON; USE jp_app;
+    SELECT CAST(dbo.fn_SubscriptionInForce(s.Is_Active, s.StatusId, s.EndsOn, SYSUTCDATETIME()) AS varchar(2))
+      FROM t_app_subscriptions s WHERE s.OwnerUid='${orgUid}' AND s.Is_Active=1;`);
+
+  check('…and the subscription is back in force for the rest of the run',
+    inForceAgain === '1', `EndsOn restored to ${endsBefore}`);
+
+  // =========================================================================
   console.log('\n=== 4. IDEMPOTENT REPUBLISH — REOPENING IS FREE ===');
 
+  /*
+    🔴 THE ENTRY FOR *THIS JOB*, NOT "THE NEWEST ONE FOR THIS OWNER".
+
+    This read used to take the newest consume row for the organisation and
+    assume it belonged to jobC, which held only because jobC happened to be
+    the last thing that consumed. Section 3b (G38) then published one more job
+    after it, and the assertion below failed with "returned 1344, original
+    1345" — on a product that was behaving correctly: the republish DID return
+    jobC's original entry.
+
+    ⚠️ So the subject is named. The ledger row carries RefEntityUid, which is
+    the job's own uid, and that is what identifies it — the same correction
+    7B made when a queue assertion read a row's whole text instead of the cell
+    it meant.
+  */
   const entryBefore = scalar(`SET NOCOUNT ON; USE jp_app;
-    SELECT TOP 1 EntryId FROM t_app_feature_ledger
-    WHERE OwnerUid='${orgUid}' AND EntryTypeId=2 AND Is_Deleted=0 ORDER BY EntryId DESC;`);
+    SELECT TOP 1 l.EntryId
+      FROM t_app_feature_ledger l
+      INNER JOIN t_app_jobs j ON j.JobUid = l.RefEntityUid
+     WHERE l.OwnerUid='${orgUid}' AND l.EntryTypeId=2 AND l.Is_Deleted=0
+       AND j.JobId=${jobC}
+     ORDER BY l.EntryId DESC;`);
   const ledgerBeforeRe = ledgerCount();
 
   const closed = await j(`${APP}/jobs/${jobC}/close`, { method: 'POST', headers: HO });
@@ -337,6 +426,20 @@ try {
     ledgerCount() === ledgerBeforeRe, `${ledgerBeforeRe} -> ${ledgerCount()}`);
 } finally {
   console.log('\n=== TEARDOWN ===');
+
+  /*
+    ⚠️ THE SUBSCRIPTION COMES BACK FIRST. Section 3b moves EndsOn into the past
+    and puts it back; a run killed in between would leave this school lapsed for
+    every later suite, which is exactly the contamination a dead run caused once
+    already this project.
+  */
+  if (orgUid) {
+    try {
+      sql(`SET NOCOUNT ON; USE jp_app;
+        UPDATE t_app_subscriptions SET EndsOn = NULL
+         WHERE OwnerUid='${orgUid}' AND Is_Active=1 AND EndsOn IS NOT NULL AND StatusId = 1;`);
+    } catch { /* reported by the assertions above */ }
+  }
 
   if (schoolId) cleanupJobs(schoolId);
   if (orgUid) sql(`SET NOCOUNT ON; USE jp_app;

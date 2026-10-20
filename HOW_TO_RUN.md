@@ -833,6 +833,69 @@ Three routes are reachable only from an email link or by typing the URL:
 
 ---
 
+## 5b. Behind a reverse proxy — the one setting that changes meaning
+
+Everything above assumes you reach the APIs directly. The moment a reverse
+proxy (nginx, a load balancer, Cloudflare) stands in front, **every per-IP
+limit silently becomes a per-SITE limit**: the proxy's address is the only one
+the API can see, so the contact form's three-per-hour budget is shared by every
+visitor on the internet. The fourth person to write in that hour is refused and
+nobody has done anything wrong. That was **G42**.
+
+Phase 8-0 added the switch. It is **off**, and it stays off until a deployment
+can say which addresses are the proxy:
+
+```jsonc
+// JP.App.Api/appsettings.json  (or the matching environment variables)
+"ForwardedHeaders": {
+  "Enabled": false,          // -> true in production, behind a proxy
+  "KnownProxies": [],        // -> the proxy's own addresses, e.g. ["10.0.0.5"]
+  "ForwardLimit": 1          // one proxy hop; raise only if there are two
+}
+```
+
+As environment variables (what a container usually gets):
+
+```
+ForwardedHeaders__Enabled=true
+ForwardedHeaders__KnownProxies__0=10.0.0.5
+ForwardedHeaders__ForwardLimit=1
+```
+
+🔴 **Why it is not simply on.** `X-Forwarded-For` is a header any client can
+set, so honouring it from anybody is a rate limit anybody can reset — a fresh
+fake value per request would buy a fresh budget every time. It is honoured
+**only** from the addresses listed above, and the API prints which posture it
+started in:
+
+```
+Forwarded headers OFF — rate limits partition on the immediate peer address.
+Forwarded headers ON  — trusting X-Forwarded-For from 1 proxy address(es), 1 hop(s).
+```
+
+⚠️ **Enabling it with an empty `KnownProxies` trusts loopback only** — the
+defaults are cleared at startup rather than inherited, so "on" without a list
+does not quietly start trusting the whole network.
+
+**Measured in 8-0, both ways** (contact form, budget 3/hour):
+
+| posture | four requests, four different `X-Forwarded-For` | reading |
+|---|---|---|
+| OFF (shipped) | `200 200 200 429` | one bucket for the whole site |
+| ON (loopback trusted) | `200 200 200 200` | a bucket each |
+| ON, same client four times | `200 200 200 429` | and each bucket still holds three |
+
+The middle row is the fix; the bottom row is the control that shows enabling it
+**relocates** the limit rather than removing it.
+
+⚠️ `UseForwardedHeaders` must stay **before** `UseRateLimiter` in
+`Program.cs`. Reversed, the address is rewritten after the decision that reads
+it, nothing errors, and the limits go on being per-site —
+`scripts/verify/forwarded-headers.mjs` asserts the ordering for exactly that
+reason.
+
+---
+
 ## 6. Troubleshooting
 
 ### The app loads but renders nothing, and the console mentions a specifier

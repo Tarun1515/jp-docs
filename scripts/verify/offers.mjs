@@ -10,7 +10,9 @@
                           argues the case, this proves the code agrees.
     3. 🔴 THE RACE        two parallel sends on ONE application, armed on the
                           same wall-clock instant, gate instants asserted. One
-                          live offer; the loser gets ALREADY_OFFERED.
+                          live offer; the loser is REFUSED — ALREADY_OFFERED
+                          if it reached the index, INVALID_TRANSITION if the
+                          winner had already moved the application (8-0).
     4. 🔴 THE 3C NEGATIVE a DIFFERENT 2601 must not wear this one's clothes.
     5. THE BOUNDARY       the generic status endpoint still refuses 7..10, and
                           the two vocabularies stay apart.
@@ -489,13 +491,48 @@ try {
     liveCount === '1' && allOffers === '1', `${allOffers} offer(s), ${liveCount} live`);
 
   const winners = [oa, ob].filter((r) => r.status === 1 && r.code === null).length;
-  const alreadies = [oa, ob].filter((r) => r.status === 1 && r.code === 'ALREADY_OFFERED').length;
+  /*
+    🔴 THE LOSER HAS TWO LEGITIMATE ANSWERS, AND THIS ASSERTION USED TO ALLOW
+    ONLY ONE. FOUND IN 8-0, ON A RUN THAT HAD NOTHING TO DO WITH OFFERS.
+
+    The winning send does two things in its transaction: it inserts the offer
+    AND it moves the application out of Selected. So what the loser meets
+    depends on which of those it reaches first:
+
+      loser reaches the INSERT      -> the unique index refuses -> ALREADY_OFFERED
+      loser re-reads the application
+        after the winner committed  -> not Selected any more    -> INVALID_TRANSITION
+
+    Both are correct refusals of the same thing, and the invariant that
+    actually matters is asserted two lines above and below: exactly ONE offer
+    exists, exactly one session inserted, and the loser was TOLD rather than
+    silently overwritten.
+
+    ⚠️ The old assertion encoded one interleaving as if it were the contract,
+    which made this suite fail roughly whenever the entry gap was wide enough
+    for the winner to commit first — 16 ms was enough. That is almost certainly
+    what G35 was: "offers.mjs failed once and nobody knew which assertion".
+    Now it is named, and the suite prints which interleaving it got.
+
+    🔴 WHAT IS STILL FORBIDDEN: a Status 0 with no code, a crash, or two
+    winners. The check below accepts exactly the two refusals the procedure is
+    allowed to give and nothing else.
+  */
+  const REFUSALS = ['ALREADY_OFFERED', 'INVALID_TRANSITION'];
+
+  const loser = [oa, ob].find((r) => r.code !== null && r.code !== 'NULL');
+
+  console.log(`     the loser was refused with ${loser?.code ?? 'NOTHING'}`
+    + ` (status ${loser?.status})`);
+
+  const alreadies = [oa, ob].filter((r) => REFUSALS.includes(String(r.code))).length;
 
   check('🔴 exactly one session actually inserted',
     winners === 1, `${winners} inserter(s)`);
 
-  check('🔴 …and the other got ALREADY_OFFERED at Status 1 — a success, because the offer stands',
-    alreadies === 1, `${alreadies} session(s) with ALREADY_OFFERED`);
+  check('🔴 …and the other was REFUSED — ALREADY_OFFERED or INVALID_TRANSITION, never silence',
+    alreadies === 1,
+    `${alreadies} refused session(s): ${[oa, ob].map((r) => r.code ?? 'inserted').join(' / ')}`);
 
   check('…and the application moved exactly once',
     appStatus(race.applicationId) === 7

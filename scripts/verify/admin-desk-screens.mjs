@@ -18,7 +18,9 @@
                    SAYS it is doing nothing; then the job is restored
     6. FAQ         switch one off -> the public /faqs response drops it, raw
                    bytes; switch it back on -> it returns
-    7. BLOCKS      the G44 notice is ON the screen, and the key is read-only
+    7. BLOCKS      the screen names the HOME_ prefix (G44 closed in 8-0), the
+                   claim is checked against jp-public's source, and the key is
+                   read-only once a block exists
                    once a block exists
     8. ENQUIRIES   waiting days, not a date; a note is required to resolve; the
                    reply is a mailto and nothing claims to send mail
@@ -757,7 +759,7 @@ try {
   await faqCtx.close();
 
   // =========================================================================
-  section('7. BLOCKS — the gap is ON the screen (G44)');
+  section('7. BLOCKS — and the screen names where a block renders (G44 closed)');
   // =========================================================================
 
   const { context: blkCtx, page: blk, errors: blkErrors } =
@@ -765,15 +767,26 @@ try {
 
   await blk.locator('.blk__item').first().waitFor({ timeout: 10_000 });
 
-  const warnText = (await blk.locator('.banner--warning').innerText()).replace(/\s+/g, ' ');
+  const warnText = (await blk.locator('.banner--info').innerText()).replace(/\s+/g, ' ');
 
   console.log(`\n    "${warnText.slice(0, 200)}"\n`);
 
-  check('🔴 the screen says no public page renders a block yet (G44)',
-    /no public page shows these yet/i.test(warnText),
-    'an editor who saw no change would conclude the save failed');
+  /*
+    🔴 THIS ASSERTION IS THE INVERSE OF THE ONE 7B SHIPPED, and the inversion
+    is the point. 7B asserted the screen SAID no public page rendered a block,
+    because none did. 8-0 gave them a consumer, so the screen now has to name
+    it — a banner still claiming nothing renders would be the stale-copy defect
+    this project keeps finding on its own surfaces.
+  */
+  check('🔴 the screen names WHERE a block renders — the HOME_ prefix (G44 closed)',
+    /keys beginning/i.test(warnText) && /home page/i.test(warnText),
+    warnText.slice(0, 110));
 
-  check('…and it says where the copy DOES go, so the claim is checkable',
+  check('🔴 …and no longer claims nothing renders, which stopped being true in 8-0',
+    !/no public page shows these yet/i.test(warnText),
+    'the 7B banner would now be false');
+
+  check('…and it still says where an UNRENDERED key goes, which is the honest half',
     warnText.includes('/api/public/content-blocks'), warnText.slice(0, 90));
 
   /* The claim is true: jp-public has the method and no caller. */
@@ -792,9 +805,21 @@ try {
     .filter((f) => /\.(ts|html)$/.test(f))
     .filter((f) => fs.readFileSync(f, 'utf8').includes('getContentBlocks'));
 
-  check('🔴 …and that notice is TRUE: one definition of getContentBlocks, zero callers',
-    publicService.includes('getContentBlocks') && publicSrc.length === 1,
-    `${publicSrc.length} file(s) mention it — the service itself`);
+  /*
+    🔴 AND THE CLAIM IS CHECKED AGAINST jp-public'S SOURCE, STILL — but for the
+    opposite fact. In 7B this walked the tree to prove the caller count was
+    ZERO. It now proves there IS one, and names it: the home page.
+
+    ⚠️ Kept as a source walk rather than deleted. If somebody removes the home
+    page's consumer, this fails and the banner above becomes a lie again — the
+    two are only ever true together.
+  */
+  const consumers = publicSrc.filter((f) => !f.includes('public-api.service'));
+
+  check('🔴 …and the claim is TRUE: getContentBlocks now has a caller, in the home page',
+    publicService.includes('getContentBlocks')
+      && consumers.some((f) => f.includes('pages/home/')),
+    `caller(s): ${consumers.map((f) => f.split('/src/')[1] ?? f).join(', ') || 'NONE'}`);
 
   await blk.locator('.blk__item').first().locator('button', { hasText: 'Edit' }).click();
   await blk.locator('#blk-key').waitFor({ timeout: 8000 });
@@ -1030,5 +1055,11 @@ try {
   }
 
   console.log('='.repeat(74));
-  process.exit(failed.length ? 1 : 0);
+  /*
+    ⚠️ exitCode, NOT process.exit() — the project's convention, and this suite
+    learned why. process.exit() while a fetch keep-alive handle was mid-close
+    killed Node with 0xC0000409 AFTER printing 9/9 PASSED, and the runner
+    reported it as "exited while reporting all green".
+  */
+  process.exitCode = failed.length ? 1 : 0;
 }

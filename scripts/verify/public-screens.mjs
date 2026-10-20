@@ -80,7 +80,8 @@ const scalar = (q) => sql(q)[0] ?? '';
 const cleanup = () => sql(`SET NOCOUNT ON; USE jp_app;
   DELETE FROM t_app_job_class_levels WHERE JobId IN (SELECT JobId FROM t_app_jobs WHERE JobTitle LIKE '${PROBE}%');
   DELETE FROM t_app_jobs WHERE JobTitle LIKE '${PROBE}%';
-  DELETE FROM t_app_contact_enquiries WHERE Email LIKE 'pubscreen%';`);
+  DELETE FROM t_app_contact_enquiries WHERE Email LIKE 'pubscreen%';
+  DELETE FROM t_app_cms_content_blocks WHERE BlockKey LIKE 'HOME_PUBSCREEN%';`);
 
 /**
  * Waits for the listing to finish searching.
@@ -753,6 +754,96 @@ try {
   await page.screenshot({ path: path.join(OUT, '7a-contact-failed.png'), fullPage: true });
 
   await page.unroute(`${APP}/public/contact`);
+
+  // =========================================================================
+  section('9b. 🔴 G44 — A CMS BLOCK REACHES THE HOME PAGE');
+  // =========================================================================
+
+  /*
+    🔴 THE ASSERTION THAT WOULD HAVE MADE G44 IMPOSSIBLE TO SHIP.
+
+    7B built the content-block editor and the anonymous endpoint behind it, and
+    nothing on the public site read a block. The admin screen said so, which
+    was honest; 8-0 gave it a consumer: keys beginning HOME_ render on the home
+    page.
+
+    ⚠️ CLIENT-SIDE, AFTER HYDRATION — 2.81's decision for this page. The home
+    page is prerendered, so a block read at render time would be baked at build
+    time and an admin's edit would need a redeploy. The consequence is asserted
+    here BOTH ways: present in the browser, absent from the server's own HTML.
+  */
+  sql(`SET NOCOUNT ON; USE jp_app;
+    INSERT INTO t_app_cms_content_blocks (BlockKey, BlockTitle, BlockContent, DisplayOrder, Is_Active)
+    VALUES ('HOME_PUBSCREEN_NOTICE', N'${PROBE} notice heading',
+            N'${PROBE} this copy came from the CMS, not the template.', 10, 1);`);
+
+  const served = await (await fetch(`${APP}/public/content-blocks`)).text();
+
+  check('premise: the anonymous endpoint serves the new block',
+    served.includes('HOME_PUBSCREEN_NOTICE'),
+    `${served.length} bytes of content-blocks`);
+
+  const homeCtx = await browser.newContext({ viewport: WIDE, deviceScaleFactor: 2 });
+  const home = await homeCtx.newPage();
+
+  await home.goto(`${SITE}/`, { waitUntil: 'domcontentloaded' });
+
+  /*
+    ⚠️ WAITS FOR THE NOTICE, not for a network heuristic. The band renders
+    after a client-side fetch resolves; a timeout here would be a guess about
+    how fast that is, and this project has already filed three failures caused
+    by reading a page mid-request.
+  */
+  await home.locator('.notice').first().waitFor({ timeout: 15_000 });
+
+  const noticeText = (await home.locator('.notice').first().innerText())
+    .replace(/\s+/g, ' ');
+
+  console.log(`\n    "${noticeText}"\n`);
+
+  check('🔴 the block renders on the home page — the editor has a consumer (G44 closed)',
+    noticeText.includes(`${PROBE} notice heading`)
+      && noticeText.includes('came from the CMS'),
+    noticeText.slice(0, 90));
+
+  /*
+    🔴 AND THE HONEST CONSEQUENCE, ASSERTED RATHER THAN GLOSSED: the server's
+    own HTML does NOT carry it. That is the cost of keeping this page
+    prerendered, it is written in the component, and a future change that
+    quietly moved the fetch server-side would show up right here.
+  */
+  const prerendered = await (await fetch(`${SITE}/`)).text();
+
+  check('🔴 …and the PRERENDERED html does not contain it — the documented trade-off',
+    !prerendered.includes(`${PROBE} notice heading`),
+    'notices arrive after hydration, so an admin edit needs no redeploy');
+
+  /*
+    ⚠️ The key contract, forced. A block OUTSIDE the HOME_ prefix is stored and
+    rendered nowhere — which is what the admin screen now says, instead of the
+    7B banner claiming nothing renders at all.
+  */
+  sql(`SET NOCOUNT ON; USE jp_app;
+    INSERT INTO t_app_cms_content_blocks (BlockKey, BlockTitle, BlockContent, DisplayOrder, Is_Active)
+    VALUES ('HOME_PUBSCREEN_OFFKEY', N'${PROBE} wrong prefix', N'${PROBE} should not appear.', 20, 1);
+    UPDATE t_app_cms_content_blocks SET BlockKey = 'PUBSCREEN_OFFKEY'
+     WHERE BlockKey = 'HOME_PUBSCREEN_OFFKEY';`);
+
+  await home.reload({ waitUntil: 'domcontentloaded' });
+  await home.locator('.notice').first().waitFor({ timeout: 15_000 });
+  await home.waitForTimeout(800);
+
+  const afterOffKey = (await home.locator('.page, body').first().innerText())
+    .replace(/\s+/g, ' ');
+
+  check('🔒 a block whose key is outside the HOME_ prefix renders NOWHERE',
+    !afterOffKey.includes(`${PROBE} wrong prefix`),
+    'the key is the contract, and the admin screen says which prefix renders');
+
+  sql(`SET NOCOUNT ON; USE jp_app;
+    DELETE FROM t_app_cms_content_blocks WHERE BlockKey = 'PUBSCREEN_OFFKEY';`);
+
+  await homeCtx.close();
 
   // =========================================================================
   section('10. 375 — the listing and the detail on a phone');
