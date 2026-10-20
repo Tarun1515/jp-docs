@@ -658,11 +658,49 @@ try {
   check('premise: the first approval at level 1 succeeded, so the RowVersion moved',
     firstPass.status === 1, firstPass.raw);
 
+  /*
+    =======================================================================
+    🔴 G10 — THE STATE BETWEEN THE LEVELS, WHICH IS WHY THIS PATH IS
+    REACHABLE AT ALL
+    =======================================================================
+
+    G10's complaint was that the suite never reached the RowVersion branch:
+    with ONE level configured, the first approval COMPLETES the request and a
+    second attempt stops at INVALID_STATUS in the precondition chain, before
+    the optimistic check is ever evaluated.
+
+    So the mid-flight state is the premise this whole block rests on, and it is
+    asserted rather than assumed: after approving level 1 of a TWO-level type
+    the request must still be open, waiting at level 2. If a future change
+    collapsed this type back to one level, the three assertions below would
+    still pass — on INVALID_STATUS instead of CONCURRENCY_CONFLICT for the
+    wrong reason — and G10 would quietly reopen.
+
+    ⚠️ CompletedOn, NOT A MESSAGE. 'open' here comes from CompletedOn IS NULL,
+    which is the column the product branches on; matching the procedure's
+    English would be testing display text (2.12).
+  */
+  const midFlight = state(staleReq.id);
+
+  console.log(`\n     after level 1: status ${midFlight.status}, level ${midFlight.level}, ${midFlight.completed}\n`);
+
+  check('🔴 G10: after level 1 the request is still OPEN — not completed',
+    midFlight.completed === 'open', `CompletedOn says ${midFlight.completed}`);
+
+  check('🔴 G10: …and it has MOVED to level 2, which is what makes the conflict path reachable',
+    midFlight.level === 2, `CurrentApprovalLevel ${midFlight.level}`);
+
+  check('🔴 G10: …and the RowVersion moved, so the caller\'s copy is now stale',
+    midFlight.rv !== staleReq.rv, `${staleReq.rv} -> ${midFlight.rv}`);
+
+  const trailBeforeStale = trail(staleReq.id).length;
+
   /* The SAME RowVersion again — now one behind the row. */
   const stale = act(staleReq.id, 1, adminA, staleReq.rv, String(ROLE_MODERATION_ADMIN));
 
   console.log(`\n     stale RowVersion -> ${stale.raw}`);
-  console.log(`     error log ${logBeforeStale} -> ${errorLogCount()}\n`);
+  console.log(`     error log ${logBeforeStale} -> ${errorLogCount()}`);
+  console.log(`     trail rows ${trailBeforeStale} -> ${trail(staleReq.id).length}\n`);
 
   check('🔴 a stale RowVersion is refused as CONCURRENCY_CONFLICT — the 50023 path, every run',
     stale.code === 'CONCURRENCY_CONFLICT', stale.raw);
@@ -670,6 +708,24 @@ try {
   check('🔴 …and THAT path wrote nothing to the error log — G31, not by luck',
     Number(errorLogCount()) === logBeforeStale,
     `${logBeforeStale} -> ${errorLogCount()} across a refused optimistic check`);
+
+  /*
+    🔴 G10's OTHER HALF: A REFUSED ACTION LEAVES NO FOOTPRINT.
+
+    The trail is what an auditor reads. A refused attempt that still wrote a
+    row would say somebody approved at level 2 when nobody did — and because
+    the UPDATE matched zero rows, the request itself is untouched, so the trail
+    and the request would disagree. That is worse than losing the attempt:
+    it is a record that is wrong.
+  */
+  check('🔴 G10: …and wrote NO trail row — a refusal is not an action',
+    trail(staleReq.id).length === trailBeforeStale,
+    `${trailBeforeStale} -> ${trail(staleReq.id).length} rows in t_mdm_request_approvals`);
+
+  check('🔴 G10: …and left the request exactly where it was',
+    state(staleReq.id).level === midFlight.level
+      && state(staleReq.id).rv === midFlight.rv,
+    `level ${state(staleReq.id).level}, RowVersion ${state(staleReq.id).rv}`);
 
   const negReq = submit(adminA, 'G31 negative');
 

@@ -38,9 +38,23 @@ const APIS = [
     name: 'JP.Sso.Api',
     url: 'http://localhost:5199/swagger/v1/swagger.json',
 
-    // Baseline recorded 2026-08-28 (Phase 4B). Auth, users, roles,
-    // permissions, menus, health.
-    minOperations: 21,
+    /*
+      Baseline recorded 2026-08-28 (Phase 4B): 21. Auth, users, roles,
+      permissions, menus, health.
+
+      🔴 RAISED TO 22 ON 2026-10-20 (PHASE 8A — G45), in the same change that
+      added the route, which is what the rule above asks for. The one is
+      `GET /api/users/{uid}/status-history`: every recorded status change on
+      an account, with the reason the administrator gave. Before 8A that reason
+      was accepted by the status endpoint and kept only for a suspension, so a
+      rejected school could not be told on what grounds.
+
+      ⚠️ 22 WAS MEASURED, not calculated — the run printed "22 found, floor 21"
+      before this line moved. This API has stood at 21 since 4B, which is why a
+      floor is worth having: nine phases of work happened without touching it,
+      and the one change that did is visible.
+    */
+    minOperations: 22,
   },
   {
     name: 'JP.App.Api',

@@ -24,6 +24,23 @@
        and a count that DROPPED is a failure even when every assertion passed.
 
   ----------------------------------------------------------------------------
+  🔴 AND SINCE 8A THIS IS THE REGRESSION ENTRY POINT — G9
+  ----------------------------------------------------------------------------
+  G9 asked for an E2E layer. The honest answer, written down in 8A rather than
+  deferred again, is that the suite ecosystem IS that layer: SQL suites prove
+  the procedures, HTTP suites prove the API and its refusals, and Playwright
+  suites drive the real screens in a real browser. What was missing was not
+  coverage — it was a SINGLE DOCUMENTED COMMAND that runs all of it, so that
+  "did you run the regression?" has one answer.
+
+  ⚠️ IT WAS NOT ONE COMMAND UNTIL 8A, AND THE GAP WAS INVISIBLE. The seven
+  T-SQL suites under database/<db>/99_tests/ were documented in HOW_TO_RUN as
+  seven sqlcmd lines to run by hand, and this runner knew nothing about them.
+  Anyone running "the regression" ran 34 suites and believed they had run 41.
+  They are in the manifest now, under sqlSuites, and they fail this run like
+  anybody else.
+
+  ----------------------------------------------------------------------------
   USAGE
   ----------------------------------------------------------------------------
       node scripts/verify/run.mjs                  # every suite in the manifest
@@ -46,7 +63,7 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { mkdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
-import { join, dirname } from 'node:path';
+import { join, dirname, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const execFileAsync = promisify(execFile);
@@ -86,6 +103,41 @@ const readCounts = (out) => {
   return null;
 };
 
+/**
+ * The T-SQL suites, which print neither of the shapes above.
+ *
+ * 🔴 BY COUNTING RESULT MARKERS, NOT BY READING THEIR SUMMARY LINE — and the
+ * reason is a trap this nearly walked into. 003_test_school_team.sql prints
+ * TWO summaries: "TOTAL 52 PASSED 52" and then a breakdown,
+ * "NEGATIVE CASES: 27 PASSED 27". The .at(-1) above takes the LAST match, so
+ * reading its summary would have pinned that suite at 27 — and twenty-five
+ * assertions could then stop running with nothing red.
+ *
+ * A line carrying the whole word PASS or FAIL is one assertion, in both
+ * layouts these files use (marker-first in jp_sso, marker-last in jp_app).
+ * "PASSED" and "FAILED" are different words and do not match, which is what
+ * keeps the summary lines themselves out of the count.
+ *
+ * ⚠️ CROSS-CHECKED, NOT TRUSTED: the suite's own TOTAL is also parsed, and a
+ * disagreement is reported rather than silently resolved in favour of either.
+ */
+const readSqlCounts = (out) => {
+  const lines = out.split(/\r?\n/);
+
+  const passed = lines.filter((l) => /(^|\s)PASS(\s|$)/.test(l)).length;
+  const failed = lines.filter((l) => /(^|\s)FAIL(\s|$)/.test(l)).length;
+
+  if (passed + failed === 0) return null;
+
+  const claimed = [...out.matchAll(/TOTAL\s+(\d+)\s+PASSED\s+(\d+)/g)].at(0);
+
+  return {
+    passed,
+    total: passed + failed,
+    claimed: claimed ? { total: Number(claimed[1]), passed: Number(claimed[2]) } : null,
+  };
+};
+
 const failLines = (out) =>
   [...out.matchAll(/^\s*FAIL\s{2}(.*)$/gm)].map((m) => m[1].trim());
 
@@ -114,18 +166,39 @@ for (const name of suites) {
   */
   const unpinned = expected === undefined;
 
-  const file = join(HERE, `${name}.mjs`);
+  /*
+    🔴 TWO KINDS OF SUITE, ONE RUN — G9.
+
+    A name listed under sqlSuites is a T-SQL file run through sqlcmd; anything
+    else is a .mjs run through node. The seven SQL suites were outside this
+    runner until 8A and were therefore outside "the regression".
+
+    ⚠️ -b IS LOAD BEARING. Without it sqlcmd reports a failure and carries on
+    through the remaining batches, so a suite that blew up halfway would still
+    print a cheerful summary for the batches that did run.
+  */
+  const sqlFile = manifest.sqlSuites?.[name];
+
+  const file = sqlFile
+    ? join(HERE, '..', '..', '..', 'jp-backend', 'database', sqlFile.split('/').join(sep))
+    : join(HERE, `${name}.mjs`);
+
   const log = join(LOGS, `${name}.log`);
 
   let out = '';
   let code = 0;
 
   try {
-    const r = await execFileAsync(process.execPath, [file], {
-      cwd: join(HERE, '..', '..'),
-      maxBuffer: 64 * 1024 * 1024,
-      timeout: 40 * 60 * 1000,
-    });
+    const r = sqlFile
+      ? await execFileAsync('sqlcmd',
+        ['-S', 'localhost\\TARUN', '-E', '-I', '-b', '-f', '65001', '-i', file],
+        { maxBuffer: 64 * 1024 * 1024, timeout: 40 * 60 * 1000 })
+      : await execFileAsync(process.execPath, [file], {
+        cwd: join(HERE, '..', '..'),
+        maxBuffer: 64 * 1024 * 1024,
+        timeout: 40 * 60 * 1000,
+      });
+
     out = `${r.stdout}${r.stderr}`;
   } catch (error) {
     /*
@@ -139,11 +212,24 @@ for (const name of suites) {
 
   writeFileSync(log, out);
 
-  const counts = readCounts(out);
-  const fails = failLines(out);
+  const counts = sqlFile ? readSqlCounts(out) : readCounts(out);
+
+  const fails = sqlFile
+    ? [...out.matchAll(/^.*(^|\s)FAIL(\s|$).*$/gm)].map((m) => m[0].trim().slice(0, 120))
+    : failLines(out);
 
   let state = 'pass';
   const notes = [];
+
+  /*
+    ⚠️ A T-SQL suite's own TOTAL is compared with the markers counted here, and
+    a disagreement is a NOTE rather than a silent choice. They have disagreed
+    once already — see readSqlCounts — and the next time they do, the reason
+    will matter more than whichever number is bigger.
+  */
+  if (sqlFile && counts?.claimed && counts.claimed.total !== counts.total) {
+    notes.push(`counted ${counts.total} marker(s), the suite says TOTAL ${counts.claimed.total}`);
+  }
 
   if (!counts) {
     state = 'nosummary';

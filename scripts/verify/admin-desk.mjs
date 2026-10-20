@@ -97,6 +97,7 @@ const dropAdmin = (email) => sql(`SET NOCOUNT ON; USE jp_sso;
   DECLARE @id bigint = (SELECT UserId FROM t_sso_users WHERE Email = '${email}');
 
   DELETE FROM t_sso_user_roles WHERE UserId = @id;
+  DELETE FROM t_sso_user_status_history WHERE UserId = @id;
   DELETE FROM t_sso_user_credentials WHERE UserId = @id;
   DELETE FROM t_sso_user_tokens WHERE UserId = @id;
   DELETE FROM t_sso_user_login_attempts WHERE UserId = @id;

@@ -320,25 +320,31 @@ try {
     accountRows > 0, `${accountRows} row(s) on page 1`);
 
   /*
-    🔴 THE REASON FIELD APPEARS WHERE THE REASON IS KEPT. A suspension's
-    remark is written to t_sso_user_lockouts; on an approve or a reactivate the
-    same parameter is accepted and discarded (G45). So the panel must ask on
-    one and say so on the other — collecting a note the product throws away is
-    the contact form's `role` field that 7A deleted.
+    🔴 THE REASON FIELD IS ON EVERY TRANSITION NOW — G45 CLOSED IN 8A.
+
+    This block used to say the opposite, and it was right at the time: a
+    suspension's remark went to t_sso_user_lockouts and an approve's was
+    accepted and discarded, so the screen asked on one and said so on the
+    other. 8A added t_sso_user_status_history — append-only, every transition,
+    with the administrator and the instant — so the field belongs everywhere
+    and the panel shows what was recorded before.
   */
   /*
-    🔴 THE SIGNED-IN ADMINISTRATOR'S OWN ROW OFFERS NO SUSPEND — G46's
-    mitigation, asserted rather than assumed.
+    🔴 THE SIGNED-IN ADMINISTRATOR'S OWN ROW OFFERS NO SUSPEND.
 
-    Nothing on the server stops an administrator suspending themselves, and if
-    they are the last SUPER_ADMIN nobody can administer the platform
-    afterwards. The screen declines to offer it and labels the row "you",
-    because a row with no actions and no explanation reads as a bug.
+    ⚠️ WHEN THIS WAS WRITTEN IT WAS THE ONLY DEFENCE, AND IT IS NOT ANY MORE.
+    8-0 found that nothing on the server stopped an administrator suspending
+    themselves or the last active administrator, so the screen declined to
+    offer it and this comment said plainly that hiding a button is
+    presentation, not protection. 8A closed G46 in USP_UpdateUserStatus — both
+    refusals, forced three ways in security-pass.mjs section 7b, including the
+    middle case that proves the guard is not simply refusing everything.
 
-    ⚠️ THIS IS NOT THE FIX AND THE ASSERTION SAYS SO. Hiding a button is
-    presentation; the server-side gate is G46, for 8A. What this guards is that
-    the product stops handing somebody the foot-gun in the meantime — and it
-    fails the day the row starts offering it again.
+    So this assertion is now what it should have been from the start: the
+    screen agreeing with a server that already refuses. It stays because a row
+    with no actions and no explanation reads as a bug, and because the day
+    somebody re-adds the button, the refusal the user sees should not be the
+    first they hear of it.
   */
   const meRow = usr.locator('.table tbody tr', { hasText: SUPER });
 
@@ -350,9 +356,9 @@ try {
   check('🔴 …and their own row is labelled "you"',
     /\byou\b/i.test(meText), meText.slice(0, 90));
 
-  check('🔒 …and offers NO suspend action on themselves (G46 mitigation)',
+  check('🔒 …and offers NO suspend action on themselves (G46)',
     await meRow.locator('.btn--danger').count() === 0,
-    'the server does not refuse this yet — the screen does not offer it');
+    'the server refuses it too since 8A — see security-pass.mjs 7b');
 
   const suspendable = usr.locator('.table tbody tr').filter({ has: usr.locator('.btn--danger') });
 
@@ -369,11 +375,156 @@ try {
     check('…and it says the reason is kept, which is why it is required',
       /reason below is kept/i.test(panel), panel.slice(0, 100));
 
+    /*
+      ⚠️ AND IT NO LONGER OVERSTATES WHAT A SUSPENSION DOES — G48.
+
+      The panel used to say the account's sessions end. Measured in 8A, they do
+      not: suspension revokes refresh tokens, so no new token can be obtained,
+      but an access token already in a browser works until it expires — up to
+      an hour. The copy says so, and this assertion exists so that it keeps
+      saying so.
+    */
+    check('⚠️ G48: …and it does not pretend the open session ends',
+      /keep working for up to/i.test(panel),
+      panel.includes('keep working for up to')
+        ? 'the hour-wide window is on the screen'
+        : 'THE SCREEN IMPLIES THE SESSION ENDS — it does not (G48)');
+
     await usr.locator('.usr__panel .btn--ghost').click();
     await usr.waitForTimeout(400);
   } else {
     check('premise: an active account exists to suspend',
       false, 'no suspendable row — the assertions above did not run');
+  }
+
+  /*
+    =======================================================================
+    🔴 G45 — THE REASON ON A TRANSITION THAT USED TO DISCARD IT, AND THE
+    HISTORY THAT NOW HOLDS IT
+    =======================================================================
+
+    Two things are checked, on a disposable account so nothing real is
+    touched:
+
+      the FIELD   appears on a reactivate, which before 8A showed "this change
+                  is saved without a note";
+
+      the TRAIL   renders a recorded change — the move, the administrator and
+                  the reason text — read back through the API the screen uses,
+                  not injected into the DOM.
+
+    ⚠️ THE HISTORY ROW IS WRITTEN BY THE REAL PROCEDURE, not inserted
+    directly. An INSERT would prove the screen can render a row; running
+    USP_UpdateUserStatus proves the row exists at all, which is the half of
+    G45 that was missing.
+  */
+  const G45_EMAIL = 'g45.screen@yopmail.com';
+
+  const dropG45 = () => sql(`SET NOCOUNT ON; USE jp_sso;
+    DECLARE @id bigint = (SELECT UserId FROM t_sso_users WHERE Email = '${G45_EMAIL}');
+    DELETE FROM t_sso_user_status_history WHERE UserId = @id;
+    DELETE FROM t_sso_user_lockouts WHERE UserId = @id;
+    DELETE FROM t_sso_user_tokens WHERE UserId = @id;
+    DELETE FROM t_sso_user_roles WHERE UserId = @id;
+    DELETE FROM t_sso_users WHERE UserId = @id;`);
+
+  const G45_REASON = 'Board affiliation certificate names a different address.';
+
+  try {
+    dropG45();
+
+    sql(`SET NOCOUNT ON; USE jp_sso;
+      INSERT INTO t_sso_users (UserTypeId, StatusId, Email, IsEmailVerified, IsMobileVerified)
+      VALUES (2, 1, '${G45_EMAIL}', 1, 0);`);
+
+    const g45Uid = scalar(`SET NOCOUNT ON; USE jp_sso;
+      SELECT LOWER(CAST(UserUid AS varchar(50))) FROM t_sso_users WHERE Email = '${G45_EMAIL}';`);
+
+    const g45Rv = scalar(`SET NOCOUNT ON; USE jp_sso;
+      SELECT CAST([RowVersion] AS varchar(10)) FROM t_sso_users WHERE Email = '${G45_EMAIL}';`);
+
+    /* A real rejection, through the procedure, with a reason. */
+    const moved = sql(`SET NOCOUNT ON; USE jp_sso;
+      DECLARE @actor bigint = (SELECT UserId FROM t_sso_users WHERE Email = '${SUPER}');
+      EXEC USP_UpdateUserStatus @UserUid = '${g45Uid}', @NewStatusId = 3,
+           @RowVersion = ${g45Rv}, @ActionByUserId = @actor,
+           @Remarks = N'${G45_REASON}';`).find((l) => /^\d\|/.test(l)) ?? '';
+
+    check('premise: a rejection with a reason was recorded by the procedure',
+      /^1\|/.test(moved), moved.slice(0, 60));
+
+    const stored = scalar(`SET NOCOUNT ON; USE jp_sso;
+      SELECT CAST(COUNT(*) AS varchar(4)) FROM t_sso_user_status_history h
+        JOIN t_sso_users u ON u.UserId = h.UserId
+       WHERE u.Email = '${G45_EMAIL}' AND h.Reason IS NOT NULL;`);
+
+    check('🔴 G45: the reason is in the history table, not discarded',
+      stored === '1', `${stored} row(s) with a reason`);
+
+    /* Now the screen: search for it, open Reactivate, read the panel. */
+    /*
+      ⚠️ ENTER IS REQUIRED, AND THE SCREEN IS RIGHT ABOUT THAT. The search box
+      reloads on (keyup.enter) and (search) only — no debounce, no request per
+      keystroke. Filling the box and waiting found nothing, and the first read
+      of that was "the account is not on the screen" rather than "the test
+      never asked for it".
+    */
+    await usr.fill('#usr-search', G45_EMAIL);
+    await usr.press('#usr-search', 'Enter');
+    await usr.waitForTimeout(1500);
+
+    const g45Row = usr.locator('.table tbody tr', { hasText: G45_EMAIL });
+
+    check('premise: the account is findable on the screen',
+      await g45Row.count() === 1, G45_EMAIL);
+
+    if (await g45Row.count() === 1) {
+      /*
+        ⚠️ BY NAME, NOT .first(). A rejected account shows Reactivate, but
+        "the first button in the row" is a locator that still passes if the
+        row grows a different action first — and then this block would be
+        asserting G45 against whatever panel happened to open.
+      */
+      const reactivate = g45Row.first().getByRole('button', { name: /Reactivate/i });
+
+      check('premise: the rejected account offers Reactivate',
+        await reactivate.count() === 1, `${await reactivate.count()} matching button(s)`);
+
+      await reactivate.click();
+      await usr.locator('.usr__panel').waitFor({ timeout: 8000 });
+      await usr.waitForTimeout(700);
+
+      const g45Panel = (await usr.locator('.usr__panel').innerText()).replace(/\s+/g, ' ');
+
+      check('🔴 G45: the reason field is offered on a NON-suspend transition',
+        await usr.locator('#usr-remarks').count() === 1,
+        `panel: ${usr.url().includes('/users') ? 'accounts' : '?'} — before 8A this said "saved without a note"`);
+
+      check('🔴 …and the old "only a suspension records a reason" copy is gone',
+        !/only a suspension records a reason/i.test(g45Panel),
+        g45Panel.slice(0, 90));
+
+      check('🔴 G45: the panel shows what was recorded before',
+        /Previously/i.test(g45Panel), g45Panel.slice(0, 120));
+
+      check('🔴 …including the reason text itself, read back through the API',
+        g45Panel.includes(G45_REASON),
+        g45Panel.includes(G45_REASON) ? G45_REASON : g45Panel.slice(0, 160));
+
+      check('🔴 …and who did it, which is the question the trail answers',
+        g45Panel.includes(SUPER), g45Panel.slice(0, 160));
+
+      check('🔴 …and the move, named on both sides',
+        /Pending approval/i.test(g45Panel) && /Rejected/i.test(g45Panel),
+        g45Panel.slice(0, 160));
+    }
+  } finally {
+    dropG45();
+
+    check('exit: the G45 probe account and its history are gone',
+      scalar(`SET NOCOUNT ON; USE jp_sso;
+        SELECT CAST(COUNT(*) AS varchar(4)) FROM t_sso_users WHERE Email = '${G45_EMAIL}';`) === '0',
+      'nothing left behind');
   }
 
   check('no console error on the accounts screen',

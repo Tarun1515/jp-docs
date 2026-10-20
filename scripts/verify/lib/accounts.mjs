@@ -148,3 +148,59 @@ export const secret = (email) => {
 
 /** Every email the file knows, for a suite that wants to check its premises. */
 export const knownAccounts = () => [...parse().keys()];
+
+/**
+ * Secrets that are no longer any account's password but must never reappear
+ * in a repository — read from the RETIRED SECRETS list in the same gitignored
+ * file.
+ *
+ * 🔴 WHY A RETIRED SECRET IS STILL A SECRET. G36 took one shared password out
+ * of 32 files. The superadmin's password was regenerated afterwards, so that
+ * old value now opens nothing — and a scan built only from live passwords
+ * would stop looking for it, which is precisely when somebody pastes it back
+ * in from an old branch and nothing complains.
+ *
+ * ⚠️ THE LIST LIVES IN THE GITIGNORED FILE, NOT IN THIS ONE. The check that
+ * looks for these used to hold the value as a literal in its own source, and
+ * therefore found itself the moment it was committed. A thing that must not be
+ * in the repository cannot be written down in the repository, not even by the
+ * code looking for it.
+ *
+ * @returns {string[]} possibly empty — a machine without the file has nothing
+ * to scan for, and that is reported by the caller rather than treated as a
+ * clean result.
+ */
+export const retiredSecrets = () => {
+  if (!fs.existsSync(FILE)) {
+    return [];
+  }
+
+  const lines = fs.readFileSync(FILE, 'utf8').split(/\r?\n/);
+  const out = [];
+
+  let inside = false;
+
+  for (const line of lines) {
+    if (/^#{1,3}\s+RETIRED SECRETS/i.test(line)) {
+      inside = true;
+      continue;
+    }
+
+    /* Any following heading ends the section. */
+    if (inside && /^#{1,3}\s/.test(line)) {
+      break;
+    }
+
+    if (!inside) {
+      continue;
+    }
+
+    const m = line.match(/^\s*[-*]\s+`([^`]+)`/);
+
+    if (m && m[1].length >= 8) {
+      out.push(m[1]);
+    }
+  }
+
+  return out;
+};

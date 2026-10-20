@@ -37,7 +37,7 @@ import path from 'node:path';
 import { createRequire } from 'node:module';
 import { execFileSync } from 'node:child_process';
 import { session as loginSession } from './lib/login.mjs';
-import { secret } from './lib/accounts.mjs';
+import { secret, knownAccounts, retiredSecrets } from './lib/accounts.mjs';
 
 const require = createRequire(import.meta.url);
 const { chromium } = require(
@@ -52,6 +52,17 @@ const BACKEND = 'D:/Projects/jp-backend';
 const ARGS = ['-S', 'localhost\\TARUN', '-E', '-I', '-b', '-f', '65001', '-h', '-1', '-W', '-s', '|'];
 
 const SUPER = 'superadmin@teacherportal.local';
+
+/* Every sibling repository, because a password does not respect a folder. */
+const REPOS = [
+  'D:/Projects/jp-docs',
+  'D:/Projects/jp-backend',
+  'D:/Projects/jp-shared',
+  'D:/Projects/jp-public',
+  'D:/Projects/jp-school',
+  'D:/Projects/jp-teacher',
+  'D:/Projects/jp-admin',
+];
 const OWNER = 'principal@greenwood.edu.in';
 
 const results = [];
@@ -478,6 +489,216 @@ try {
     'production gets a fixed generic message');
 
   // =========================================================================
+  section('7b. 🔒 G46 — an administrator cannot lock everybody out, including themselves');
+  // =========================================================================
+
+  /*
+    🔴 TWO GUARDS ADDED IN 8A, BOTH FORCED HERE.
+
+    8-0 found that nothing stopped an administrator suspending their own
+    account, or the last active administrator being suspended — which leaves a
+    platform nobody can administer, recoverable only through SeedAdmin or
+    direct SQL. The Accounts screen stopped offering it on your own row and
+    said in writing that this was a mitigation rather than the fix. This is
+    where the fix is checked.
+
+    ⚠️ THE MIDDLE CASE IS THE ONE THAT MATTERS. A guard that refuses every
+    suspension would pass the two negatives and be useless, so the suite
+    proves an administrator CAN still be suspended when another one exists.
+  */
+  const probeEmail = 'secpass.admin@yopmail.com';
+
+  const makeAdmin = () => sql(`SET NOCOUNT ON; USE jp_sso;
+    DECLARE @src bigint = (SELECT UserId FROM t_sso_users WHERE Email = '${SUPER}');
+
+    INSERT INTO t_sso_users (UserTypeId, StatusId, Email, IsEmailVerified, IsMobileVerified)
+    VALUES (1, 2, '${probeEmail}', 1, 0);
+
+    DECLARE @new bigint = SCOPE_IDENTITY();
+
+    INSERT INTO t_sso_user_credentials (UserId, PasswordHash, PasswordSalt, HashAlgorithmId, Iterations, IsCurrent)
+    SELECT @new, PasswordHash, PasswordSalt, HashAlgorithmId, Iterations, 1
+      FROM t_sso_user_credentials WHERE UserId = @src AND IsCurrent = 1;
+
+    INSERT INTO t_sso_user_roles (UserId, RoleId)
+    SELECT @new, RoleId FROM t_sso_roles
+     WHERE RoleCode = 'SUPER_ADMIN' AND OrganizationUid IS NULL AND Is_Deleted = 0;
+
+    SELECT CAST(@new AS varchar(20));`)[0];
+
+  const dropAdmin = () => sql(`SET NOCOUNT ON; USE jp_sso;
+    DECLARE @id bigint = (SELECT UserId FROM t_sso_users WHERE Email = '${probeEmail}');
+
+    DELETE FROM t_sso_user_status_history WHERE UserId = @id;
+    DELETE FROM t_sso_user_lockouts WHERE UserId = @id;
+    DELETE FROM t_sso_user_tokens WHERE UserId = @id;
+    DELETE FROM t_sso_user_login_attempts WHERE UserId = @id;
+    DELETE FROM t_sso_user_credentials WHERE UserId = @id;
+    DELETE FROM t_sso_user_roles WHERE UserId = @id;
+    DELETE FROM t_sso_users WHERE UserId = @id;`);
+
+  const statusCall = (uid, status, actor) => sql(`SET NOCOUNT ON; USE jp_sso;
+    DECLARE @rv int = (SELECT [RowVersion] FROM t_sso_users WHERE UserUid = '${uid}');
+
+    EXEC USP_UpdateUserStatus @UserUid = '${uid}', @NewStatusId = ${status},
+         @RowVersion = @rv, @ActionByUserId = ${actor}, @Remarks = N'secpass probe';`)
+    .find((l) => /^\d\|/.test(l)) ?? '';
+
+  dropAdmin();
+
+  const superId = scalar(`SET NOCOUNT ON; USE jp_sso;
+    SELECT CAST(UserId AS varchar(20)) FROM t_sso_users WHERE Email = '${SUPER}';`);
+
+  const superUid = scalar(`SET NOCOUNT ON; USE jp_sso;
+    SELECT LOWER(CAST(UserUid AS varchar(50))) FROM t_sso_users WHERE Email = '${SUPER}';`);
+
+  /* ---- 1. yourself ---------------------------------------------------- */
+  const selfTry = statusCall(superUid, 4, superId);
+
+  check('🔒 G46: an administrator cannot change their OWN status',
+    /BUSINESS_RULE_VIOLATED/.test(selfTry) && /your own account/i.test(selfTry),
+    selfTry.slice(0, 90));
+
+  /* ---- 2. the middle case: it still works when another admin exists --- */
+  const probeId = makeAdmin();
+
+  const suspendedByPeer = statusCall(superUid, 4, probeId);
+
+  check('🔴 …but another administrator CAN suspend one, when a second exists',
+    /^1\|/.test(suspendedByPeer), suspendedByPeer.slice(0, 70));
+
+  /* Put the superadmin back before anything else runs. */
+  /*
+    🔴 AND THE SUPERADMIN'S OWN HISTORY ROWS, which this section creates.
+
+    G46's middle case suspends the REAL superadmin (to prove the guard is not
+    simply refusing everything) and puts it back. Since G45, both of those
+    moves write a row against a permanent account — so without this the suite
+    would leave two rows behind on every run, for ever, in an append-only
+    table that nothing is allowed to clean up later.
+
+    ⚠️ BY Reason, not by a date window. 'secpass probe' is this suite's own
+    marker, and matching on time would delete a real administrator's recorded
+    reason the first time somebody actioned an account while a suite ran.
+  */
+  sql(`SET NOCOUNT ON; USE jp_sso;
+    UPDATE t_sso_users SET StatusId = 2 WHERE Email = '${SUPER}';
+    DELETE FROM t_sso_user_lockouts WHERE Remarks = N'secpass probe';
+    DELETE FROM t_sso_user_status_history WHERE Reason = N'secpass probe';`);
+
+  /* ---- 3. the last one standing --------------------------------------- */
+  sql(`SET NOCOUNT ON; USE jp_sso;
+    UPDATE t_sso_users SET StatusId = 4 WHERE Email = '${probeEmail}';`);
+
+  const lastTry = statusCall(superUid, 4, probeId);
+
+  check('🔒 G46: …and the LAST active administrator cannot be suspended by anybody',
+    /BUSINESS_RULE_VIOLATED/.test(lastTry) && /last active administrator/i.test(lastTry),
+    lastTry.slice(0, 100));
+
+  dropAdmin();
+
+  const adminsLeft = scalar(`SET NOCOUNT ON; USE jp_sso;
+    SELECT CAST(COUNT(*) AS varchar(4)) FROM t_sso_users
+     WHERE UserTypeId = 1 AND StatusId = 2 AND Is_Deleted = 0;`);
+
+  const superStatus = scalar(`SET NOCOUNT ON; USE jp_sso;
+    SELECT CAST(StatusId AS varchar(4)) FROM t_sso_users WHERE Email = '${SUPER}';`);
+
+  check('exit: the superadmin is ACTIVE and the probe admin is gone',
+    superStatus === '2' && adminsLeft === '1',
+    `${adminsLeft} active admin(s), superadmin status ${superStatus}`);
+
+  /*
+    🔴 AND THE WINDOW THIS SUITE REFUSES TO HIDE — G48.
+
+    Suspension revokes refresh tokens, so a suspended account cannot obtain a
+    NEW token. The access token it already holds keeps working until it
+    expires: measured on a disposable admin, HTTP 200 before suspension and
+    HTTP 200 after it, with StatusId 4 in the database in between.
+
+    That is the standard stateless-JWT trade-off and it is sixty minutes wide
+    here (section 6). It is asserted as the CURRENT behaviour rather than
+    quietly left out, because an administrator pressing Suspend believes they
+    have stopped somebody now — and the next person to read this file should
+    find the window named, not discover it.
+
+    ⚠️ The Accounts screen's copy was corrected in the same change to say
+    "cannot sign in" rather than implying the open session ends.
+  */
+  const windowAdmin = makeAdmin();
+
+  const windowUid = scalar(`SET NOCOUNT ON; USE jp_sso;
+    SELECT LOWER(CAST(UserUid AS varchar(50))) FROM t_sso_users WHERE Email = '${probeEmail}';`);
+
+  const windowLogin = await call(`${SSO}/auth/login`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ loginId: probeEmail, password: secret(SUPER) }),
+  });
+
+  const windowToken = windowLogin.body?.data?.accessToken;
+
+  const beforeSuspend = windowToken
+    ? await call(`${SSO}/users?pageSize=1`, { headers: { authorization: `Bearer ${windowToken}` } })
+    : { http: 0 };
+
+  /*
+    🔴 THE PREMISE IS ASSERTED SEPARATELY, BECAUSE IT FAILED ONCE AND LIED.
+
+    Run twice inside a minute, this login trips LoginPerIp (5/60s). The token
+    came back undefined, both probes returned 401, and the assertion below
+    reported "a suspension does NOT close an open session" — a sentence about
+    session lifetime, produced by a suite that never had a session. The wrong
+    failure is worse than no failure: it sends the next reader to the auth
+    middleware to look for a bug that is in the rate limiter.
+  */
+  check('premise: the probe account could sign in and use its token while ACTIVE',
+    beforeSuspend.http === 200,
+    windowToken
+      ? `HTTP ${beforeSuspend.http} while active`
+      : `no token — login returned ${windowLogin.http} ${windowLogin.body?.code ?? ''} (LoginPerIp is 5/60s; the suite was probably run twice inside a minute)`);
+
+  statusCall(windowUid, 4, superId);
+
+  const afterSuspend = windowToken
+    ? await call(`${SSO}/users?pageSize=1`, { headers: { authorization: `Bearer ${windowToken}` } })
+    : { http: 0 };
+
+  console.log(`\n    same token: ${beforeSuspend.http} while active, `
+    + `${afterSuspend.http} while suspended (status 4 in the database)\n`);
+
+  /*
+    ⚠️ AND THIS ASSERTION PASSES EITHER WAY, ON PURPOSE.
+
+    Written as "both are 200" it asserted the BUG, so the day somebody closes
+    G48 with a per-request status check this suite would go red for the fix.
+    A regression suite that fails when the product improves gets edited in a
+    hurry by whoever is mid-change, and that is how a real assertion gets
+    deleted.
+
+    What is actually load bearing is that the window is MEASURED and its
+    current width is printed, so the answer is in the output rather than in
+    somebody's memory. The line below says which way it landed today.
+  */
+  const windowOpen = beforeSuspend.http === 200 && afterSuspend.http === 200;
+
+  check(windowOpen
+    ? '⚠️ G48: a suspension does NOT close an open session — recorded, not hidden'
+    : '✅ G48 looks CLOSED: the token is refused as soon as the account is suspended',
+    beforeSuspend.http === 200 && [200, 401, 403].includes(afterSuspend.http),
+    windowOpen
+      ? 'the access token stays valid until exp — up to 60 minutes (G48, still open)'
+      : `HTTP ${afterSuspend.http} after suspension — if this is deliberate, close G48 in PROJECT_MEMORY`);
+
+  dropAdmin();
+
+  check('exit: the session-window probe account is gone',
+    scalar(`SET NOCOUNT ON; USE jp_sso;
+      SELECT CAST(COUNT(*) AS varchar(4)) FROM t_sso_users WHERE Email = '${probeEmail}';`) === '0',
+    'nothing left behind');
+
+  // =========================================================================
   section('8. 🔒 2.56 — the file grep and the dependency guard, one final time');
   // =========================================================================
 
@@ -562,20 +783,113 @@ try {
   check('🔒 local-accounts.md is still gitignored (G0)',
     ignored === 'local-accounts.md', ignored || 'NOT IGNORED');
 
-  const literals = execFileSync('git', ['grep', '-c', '-F', 'Greenwood#2027!'], {
-    cwd: 'D:/Projects/jp-docs', encoding: 'utf8',
-  }).trim();
+  /*
+    🔴 THIS CHECK WAS ITSELF THE LEAK, AND THAT IS WHY IT NOW LOOKS LIKE THIS.
 
-  check('🔒 …and no seeded password is back in the repository (G36)',
-    literals === '', literals || 'zero occurrences');
-} catch (error) {
-  /* git grep exits 1 when it finds nothing — which is the passing case. */
-  if (error?.status === 1 && /git/.test(String(error.message))) {
-    check('🔒 …and no seeded password is back in the repository (G36)',
-      true, 'zero occurrences (git grep found none)');
-  } else {
-    check('the suite ran to completion', false, String(error).slice(0, 300));
+    It used to run `git grep -F '<the password>'` — which means the only way
+    it knew what to look for was to hold a copy. G36 took 95 literals out of
+    32 files; this file quietly became the 96th.
+
+    ⚠️ IT PASSED FOR AS LONG AS IT WAS UNTRACKED. `git grep` searches tracked
+    files, so while the suite was a new file it could not see itself. The
+    moment it was committed (14ef907) it started failing, naming its own line
+    number. A guard that has to hold the secret to look for it is not a guard.
+
+    Two things changed:
+
+      the needle   comes from the gitignored accounts file at run time, so no
+                   source file contains it;
+
+      the search   happens in this process over `git ls-files`, not through
+                   `git grep`, so the password is never passed as a command
+                   line argument either — process arguments are readable by
+                   other processes on the same machine.
+
+    🔴 AND THE NEEDLE IS CHECKED BEFORE IT IS USED. An empty or trivial secret
+    would make this assertion pass against a repository full of passwords,
+    which is the worst failure available to it: silence that reads as safety.
+  */
+  /*
+    🔴 EVERY SECRET, NOT THE ONE I HAPPENED TO THINK OF.
+
+    The first version of this looked for a single hard-coded password, and
+    measuring it showed two separate holes rather than one:
+
+      it was 15 characters, the superadmin's is 20 — the value it hunted had
+      been rotated out by SeedAdmin, so it was looking for something that
+      opens nothing while the eight live fixture passwords went unchecked;
+
+      and it still mattered, because a retired password is exactly what gets
+      pasted back in off an old branch.
+
+    So both: every password the gitignored file currently holds, and every one
+    it records as retired. Ten needles where there was one.
+  */
+  const needles = [...new Set([...knownAccounts().map((e) => secret(e)), ...retiredSecrets()])]
+    .filter((n) => typeof n === 'string' && n.length >= 8);
+
+  const live = knownAccounts().length;
+  const retired = retiredSecrets().length;
+
+  check('🔒 the leak check has real needles to look for (it can pass vacuously)',
+    needles.length >= 2 && retired >= 1,
+    `${needles.length} distinct needle(s) — ${live} live account(s) + ${retired} retired`
+    + (retired ? '' : ' — NO RETIRED LIST, so the G36 password is no longer hunted'));
+
+  const scanned = [];
+  const leaking = [];
+
+  for (const repo of REPOS) {
+    if (!fs.existsSync(repo)) continue;
+
+    const tracked = execFileSync('git', ['ls-files', '-z'], {
+      cwd: repo, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024,
+    }).split('\0').filter(Boolean);
+
+    for (const rel of tracked) {
+      const full = path.join(repo, rel);
+
+      let stat;
+      try { stat = fs.statSync(full); } catch { continue; }
+
+      /* Skip what cannot sensibly hold a pasted password, and huge blobs. */
+      if (!stat.isFile() || stat.size > 4 * 1024 * 1024) continue;
+      if (/\.(png|jpe?g|gif|ico|woff2?|ttf|eot|pdf|zip|dll|exe|pdb|bak)$/i.test(rel)) continue;
+
+      scanned.push(rel);
+
+      let text;
+      try { text = fs.readFileSync(full, 'utf8'); } catch { continue; }
+
+      for (const needle of needles) {
+        if (!text.includes(needle)) continue;
+
+        const line = text.slice(0, text.indexOf(needle)).split('\n').length;
+
+        /*
+          ⚠️ THE FINDING NAMES THE FILE AND THE LINE, NEVER THE VALUE. This
+          output is pasted into build notes and chat; printing the password
+          would move the leak rather than report it.
+        */
+        leaking.push(`${path.basename(repo)}/${rel.replace(/\\/g, '/')}:${line}`);
+      }
+    }
   }
+
+  console.log(`\n    scanned ${scanned.length} tracked file(s) across ${REPOS.filter((r) => fs.existsSync(r)).length} repositories\n`);
+
+  check('🔒 …and no seeded password is back in any repository (G36)',
+    leaking.length === 0,
+    leaking.length ? `FOUND: ${leaking.join(' · ')}` : `${needles.length} needle(s), zero occurrences in ${scanned.length} tracked files`);
+} catch (error) {
+  /*
+    ⚠️ THE git-grep-EXITS-1 SPECIAL CASE USED TO LIVE HERE, and it was load
+    bearing in the wrong direction: "git grep found nothing" and "git grep
+    could not run" arrive as the same exit code, so a broken command was
+    reported as a clean repository. The scan is in-process now and a failure
+    to read is a failure.
+  */
+  check('the suite ran to completion', false, String(error).slice(0, 300));
 } finally {
   if (browser) await browser.close();
 

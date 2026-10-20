@@ -1056,13 +1056,199 @@ Wait for `Now listening on: http://localhost:5199`, then check
 
 ---
 
-## 7. Re-running the Phase 1 checks
+## 7. The regression — one command
+
+This is **the** way to check that the product still works. Not a selection of
+suites, not the ones that seem relevant to what you changed: all of them, in
+order, with the output kept.
+
+```powershell
+cd D:\Projects\jp-docs
+node scripts/verify/run.mjs
+```
+
+That runs every suite in `scripts/verify/suite-counts.json` — the Node suites
+(SQL via sqlcmd, HTTP against both APIs, and Playwright against the real
+screens) **and** the seven T-SQL suites under
+`jp-backend/database/<db>/99_tests`. Each suite's full output is written to
+`jp-docs/.verify-logs/<suite>.log`, pass or fail.
+
+### What it needs running first
+
+| What | Where | Why |
+|---|---|---|
+| SQL Server | `localhost\TARUN` | every suite |
+| JP.Sso.Api | `:5199` | the HTTP and screen suites |
+| JP.App.Api | `:5299` | the HTTP and screen suites |
+| jp-shared | `:4999` | the screen suites load it over federation |
+| jp-admin · jp-school · jp-teacher | `:4200` · `:4300` · `:4400` | the screen suites |
+| jp-public | `:4500` | the public-screen suites |
+| `local-accounts.md` | `jp-docs/` | the seeded passwords (gitignored, G0) |
+
+### 🔴 Restart the App API first
+
+`public-contract` asserts the contact form's rate limit, which is **3 per hour
+per process**. A regression run inside an hour of a previous one fails it on a
+correct product. Restarting JP.App.Api resets the counter — and that is a
+documented precondition of the suite, not a workaround.
+
+### Reading the result
+
+```
+   ok  jobs-consume             27/27
+ shrank admin-desk              58/61   3 fewer assertions than the manifest
+```
+
+**`shrank` matters as much as `fail`.** A suite whose assertion count drops
+while every assertion passes has stopped testing something — a skip branch, a
+loop that found nothing, a section that returned early. 6C-0 found
+`team-contract` had quietly gone from 49 checks to 48 and nothing was red.
+
+When you have **added** assertions and the suite is green:
+
+```powershell
+node scripts/verify/run.mjs <suite> --update
+```
+
+Never `--update` to make a drop go away. The diff is meant to be read.
+
+### A single suite
+
+```powershell
+node scripts/verify/run.mjs offers invites
+```
+
+### 🔴 Why this is the E2E system — G9
+
+G9 asked for an end-to-end layer and stayed open for six phases. The answer
+written down in 8A is that **this ecosystem is that layer**, and what was
+missing was never the coverage:
+
+- the **SQL** suites prove the procedures, including the refusals and the
+  concurrency branches, inside transactions that roll back;
+- the **HTTP** suites prove the API, its gates and its error codes, against
+  both running APIs;
+- the **Playwright** suites drive the real screens in a real browser at 1440
+  and 375, assert what is on them, and keep screenshots.
+
+A separate Cypress or Playwright "E2E project" on top of that would re-walk the
+same paths through a third harness, and the most likely outcome is two systems
+each believed to be covered by the other.
+
+⚠️ **It was not one command until 8A, and nobody could have known.** The seven
+T-SQL suites were documented here as seven `sqlcmd` lines to run by hand and
+`run.mjs` knew nothing about them, so anyone who ran "the regression" ran 34
+suites and believed they had run 41. Putting them in immediately found two
+assertions in `001_test_sso_procedures.sql` that had been stale since 7B —
+they asserted a permission count of 25 against a catalogue of 26. A test nobody
+runs is not a test; it is a note about what used to be true.
+
+### 🔴 And what this command does NOT prove — read before trusting it
+
+It runs against **the database on this machine**, which has been built up
+procedure by procedure over nine phases. It does not prove that database can be
+**rebuilt**, and in 8A it could not: `run_all.sql` was missing eleven files
+from phases 7A, 7B and 8-0, so a fresh instance would have had no public
+content tables, no moderation tables and none of those procedures — with every
+suite green throughout, because the suites test the database and the database
+was right.
+
+`build-manifest` is in the run now and asserts that every `.sql` file on disk
+is named by `run_all.sql`. **A full fresh-instance build is a separate
+rehearsal** — see section 2 — and belongs in a deployment check, not here.
+
+---
+
+## 7b. 🔴 The fresh-instance rehearsal — does the build still build?
+
+Everything in section 7 runs against **this** database, which has been built up
+procedure by procedure over nine phases. That proves the product works. It does
+not prove the product can be **created**, and those are different claims.
+
+This rehearsal answers the second one, on a SQL Server that has nothing on it.
+
+```powershell
+# LocalDB ships with SQL Server and Visual Studio — a second, empty instance.
+sqllocaldb start MSSQLLocalDB
+
+cd D:\Projects\jp-backend
+sqlcmd -S "(localdb)\MSSQLLocalDB" -E -b -f 65001 -i database\run_all.sql
+```
+
+Expect `BUILD COMPLETE` and every build guard silent. Then check it built the
+**same** thing, rather than merely finishing:
+
+```powershell
+# object inventory, both instances — the two lists must be identical
+$q = "SELECT 'jp_sso' AS Db, type_desc, COUNT(*) N FROM jp_sso.sys.objects
+      WHERE is_ms_shipped = 0 AND type IN ('U','P','FN','IF','TF','V','TT')
+      GROUP BY type_desc"
+sqlcmd -S localhost\TARUN -E -b -h -1 -W -Q $q
+sqlcmd -S "(localdb)\MSSQLLocalDB" -E -b -h -1 -W -Q $q
+```
+
+And that the fresh database actually works — the seven T-SQL suites run against
+it directly, since they roll back and need no fixtures:
+
+```powershell
+cd D:\Projects\jp-backend\database
+foreach ($f in 'jp_sso\99_tests\001_test_sso_procedures.sql',
+               'jp_sso\99_tests\002_test_error_log.sql',
+               'jp_sso\99_tests\003_test_menus.sql',
+               'jp_mdm\99_tests\001_test_approval_engine.sql',
+               'jp_app\99_tests\001_test_school_branch.sql',
+               'jp_app\99_tests\002_test_teacher.sql',
+               'jp_app\99_tests\003_test_school_team.sql') {
+  Write-Host $f
+  sqlcmd -S "(localdb)\MSSQLLocalDB" -E -I -b -f 65001 -i $f | Select-String 'TOTAL|passed'
+}
+```
+
+Clean up when you are done, so a stale copy cannot be mistaken for a current
+one:
+
+```powershell
+foreach ($db in 'jp_app','jp_mdm','jp_sso') {
+  sqlcmd -S "(localdb)\MSSQLLocalDB" -E -b -Q `
+    "ALTER DATABASE $db SET SINGLE_USER WITH ROLLBACK IMMEDIATE; DROP DATABASE $db;"
+}
+```
+
+### 🔴 What this found the first time it was run, in 8A
+
+Measured, not hypothetical — and none of it was visible from a green regression:
+
+| What | Why no suite could see it |
+|---|---|
+| **Eleven files missing from `run_all.sql`** — 7A's public content and reads, 7B's moderation tables, log, PULLED status, CMS and reports, 8-0's three analytics procedures, 7B's `ENQUIRY.MANAGE` seed | each phase deployed its own files by hand with `sqlcmd`; the suites test the database, and the database was right |
+| **A seed ordering bug** — `008_seed_moderation_desk` ran *after* `005_seed_menus`, whose guard asserts every PermissionCode its menu rows name already exists. The build died: `unknown PermissionCode(s): ENQUIRY.MANAGE` | on a machine where both already exist, order is unobservable |
+| **A build guard that could not tell a projection from a filter** — 024's ViewCount guard failed the whole build over 025, which merely *shows* the column to a moderator | 024 was deployed in 7A when 025 did not exist; a guard over `sys.sql_modules` sees the DATABASE, so its verdict depends on what else is deployed |
+| **A test with an unstated premise** — `002_test_teacher` borrowed `TOP (1) SchoolId`, which is NULL on a fresh database, so the contact-lock assertion failed in the wrong direction | there has been a school on this machine since 3B |
+
+Three of those four would have surfaced on the client's server, at install time,
+with nobody able to say why. Now `build-manifest` is in the regression and
+asserts that every `.sql` on disk is in the build — but **only this rehearsal
+proves the order**, because deferred name resolution means a procedure compiles
+happily against a table that does not exist yet.
+
+⚠️ **A fresh DATABASE is not a fresh MACHINE.** This rehearsal covers the
+database. It does not install .NET, Node, the SDKs or the npm dependencies, and
+it does not run the bootstrap that seeds the test accounts. A full new-machine
+run is section 2 followed by section 7.
+
+---
+
+## 7c. Re-running the Phase 1 checks by hand
+
+These are the individual commands. Section 7 runs all of this and more; keep
+these for when you want one thing in isolation.
 
 ```powershell
 # backend — expect 0 warnings, 0 errors
 cd D:\Projects\jp-backend ; dotnet build JP.sln
 
 # database — expect 73, 17 and 31 assertions, all passing
+# (these three, and the four others, are in the runner since 8A — section 7)
 cd D:\Projects\jp-backend\database
 sqlcmd -S localhost\TARUN -d jp_sso -E -b -f 65001 -I -i jp_sso\99_tests\001_test_sso_procedures.sql
 sqlcmd -S localhost\TARUN -d jp_sso -E -b -f 65001 -I -i jp_sso\99_tests\002_test_error_log.sql
