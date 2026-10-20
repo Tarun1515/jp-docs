@@ -2851,9 +2851,28 @@ uska fixture **doosri suite ke leftover par conditional** tha, aur crashed
 (`Team Suite Annexe`), banti **har baar** hai, aur entry par apna leftover khud
 hataati hai. 49 → 50 (ek naya premise).
 
-### G36. Shared local password 17 committed script mein hai — 🟡 OPEN (6C-0, 2026-10-11)
+### G36. Shared local password 17 committed script mein hai — ✅ BAND (8-0, 2026-10-20)
 
-`local-accounts.md` **gitignored hai** (theek), par `Greenwood#2027!`
+> ✅ **BAND 8-0 MEIN.** Tab tak 17 nahi, **32 file mein 95 literal** ho chuke the —
+> har nayi suite pichli wali ka constant block copy karti thi. Ab sab
+> `scripts/verify/lib/accounts.mjs` se aate hain, jo gitignored
+> `local-accounts.md` padhta hai (ya `JP_LOCAL_ACCOUNTS` path se).
+>
+> 🔴 **File missing ho to LOUD failure hai, khaali password nahi** — warna suite
+> "login failed" likhti aur aadmi SSO API dekhne chala jaata.
+>
+> ⚠️ `signin-check.mjs` ka apna reader bhi hata — ek hi gitignored file ke
+> do reader wahi drift thi. Aur us file ke comment mein likha hua password bhi
+> gaya: **prose mein likha password bhi repo mein likha password hai.**
+>
+> ⚠️ Rewrite ki do apni galtiyan, dono naap kar pakdi gayin — niche 2.86 mein.
+>
+> 🟢 History rewrite **nahi** kiya: ye local seeded accounts hain, teenon DB local
+> hain, aur `JP.Tools.SeedAdmin` hi kisi asli admin ka raasta hai. Handover se
+> pehle in accounts ke password **rotate** karna chahiye — wo ek seed change hai,
+> history surgery nahi.
+
+`local-accounts.md` **gitignored hai** (theek), par school owner ka password
 `git grep` par **17 committed file** mein milta hai — `scripts/verify/*.mjs` aur
 `scripts/seed-school-viewer.mjs`.
 
@@ -9500,6 +9519,68 @@ markup render kare wo editor ke saath aaya XSS hole hai.
 
 ---
 
+#### 🔴 2.86 — G36: PASSWORD REPO SE NIKLA, AUR REWRITE KI DO GALTIYAN
+
+G36 ne 17 file likhi thi. 8-0 tak **32 file mein 95 literal** the — har nayi
+suite pichli wali ka constant block copy karti thi, to gap khud badhta raha.
+
+Ab ek hi raasta hai: `scripts/verify/lib/accounts.mjs` → gitignored
+`local-accounts.md` (ya `JP_LOCAL_ACCOUNTS` se doosra path).
+
+```
+RyaBs 0 · Greenwood 0 · HrLead 0 · StMarys 0 · Viewer 0 · Seeded#Teacher 0
+48 file parse · 38/38 suite clean, 765 s
+```
+
+🔴 **File missing ho to LOUD failure, khaali password nahi.** `secret()`
+throw karta hai aur file + account ka naam leta hai. Jo suite `undefined`
+se login karti wo "login failed" likhti aur aadmi **SSO API** dekhne chala
+jaata — is project ne wahi misdirection kai baar likhi hai.
+
+⚠️ `signin-check.mjs` ka **apna** reader bhi hata (6C-0 ne banaya tha).
+Ek hi gitignored file ke do reader wahi drift thi jo ek copy kiye hue constant
+block se shuru hoti hai. Aur us file ke **comment mein likha hua password**
+bhi gaya — *prose mein likha password bhi repo mein likha password hai*, aur
+PROJECT_MEMORY ki do jagah bhi isi wajah se badli.
+
+---
+
+**Rewrite ki do galtiyan, dono naap kar pakdi gayin:**
+
+🔴 **1. Windows path check chup-chaap galat tha.** Import specifier
+`file.includes('scripts/verify/')` se chuna gaya tha — par
+`path.join` Windows par **backslash** deta hai, to wo check **hamesha
+false** tha aur har verify file ko galat specifier mila
+(`./verify/lib/accounts.mjs`).
+
+⚠️ **Aur ye `node --check` se nahi pakda jaata:** galat specifier
+**parse ho jaata hai**, sirf module resolution par fail hota hai. 48 file
+"parse" hui jabki **31 tooti hui** thin. Pakda isse ki script ne jo likha wo
+**grep kar ke dekha**, script par bharosa nahi kiya:
+
+```
+grep "from '.*accounts.mjs'" | sort | uniq -c
+  1 import { secret } from './lib/accounts.mjs';
+ 32 import { secret } from './verify/lib/accounts.mjs';     <- galat
+```
+
+*Sabak: jo script 32 file badalti hai, uska output 32 file mein padh kar
+dekho — "ok 95 replaced" us script ka apna dava hai.*
+
+⚠️ **2. Duplicate import** usi ek file mein jiske paas pehle se reader tha.
+`node --check` ne ise pakda (`Identifier 'secret' has already been
+declared`) — yani do check ne do alag galti pakdi, aur dono zaroori thin.
+
+---
+
+🟢 **History rewrite NAHI kiya, aur wajah likhi hui hai:** ye local seeded
+accounts hain, teenon DB local hain, aur kisi asli administrator ka ek hi
+raasta `JP.Tools.SeedAdmin` hai. ⚠️ **Handover se pehle in accounts ke
+password rotate karna chahiye** — wo ek seed change hai, history surgery nahi,
+aur tab ye 95 literal history mein bekaar ho jaayenge.
+
+---
+
 #### 🔴 2.85.6 — DO SUITE MEIN EK HI CHHUPA HUA FLAKE, AUR WO G35 THA
 
 8-0 ka kaam khatam karte waqt do suite **ek hi tarah** se fail hui, aur dono
@@ -10802,7 +10883,7 @@ rakha nahi gaya, aur uske baad chaar run saaf 57/57. Wajah **guess nahi likhi** 
 galat wajah likh kar gap band karna, gap khula rakhne se bura hai. Us batch ke
 baad saari suite log file mein chali.
 
-🟡 **G36 open:** `Greenwood#2027!` 17 committed script mein hai.
+✅ **G36 band (8-0):** shared local password 32 file se nikla — 95 literal.
 `local-accounts.md` gitignored hai, par value history mein pehle se hai — to wo
 niyam likha hua hai aur toota hua hai. Local seed ke account hain, isliye 🟡.
 

@@ -21,11 +21,12 @@
 */
 import { execFileSync } from 'node:child_process';
 import { token as loginToken } from './lib/login.mjs';
+import { secret } from './lib/accounts.mjs';
 
 const SSO = 'http://localhost:5199/api';
 const APP = 'http://localhost:5299/api';
 
-const OWNER = { id: 'principal@greenwood.edu.in', pw: 'Greenwood#2027!' };
+const OWNER = { id: 'principal@greenwood.edu.in', pw: secret('principal@greenwood.edu.in') };
 
 const sql = (q) =>
   execFileSync('sqlcmd', ['-S', 'localhost\\TARUN', '-E', '-I', '-b', '-h', '-1', '-W', '-Q', q], {

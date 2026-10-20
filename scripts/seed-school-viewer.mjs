@@ -35,6 +35,7 @@
 */
 import fs from 'node:fs';
 import path from 'node:path';
+import { secret } from './verify/lib/accounts.mjs';
 
 const SSO = 'http://localhost:5199/api';
 const APP = 'http://localhost:5299/api';
@@ -51,11 +52,11 @@ const MAIL_DROP = 'D:/Projects/jp-backend/JP.App.Api/App_Data/mail-drop';
 // 🔴 The owner of the school the jobs suite exercises (SchoolId 4). The Viewer
 // has to be in THAT school or it signs in and sees an empty list, which would
 // pass a "no New job button" assertion while proving nothing.
-const OWNER = { id: 'principal@greenwood.edu.in', pw: 'Greenwood#2027!' };
+const OWNER = { id: 'principal@greenwood.edu.in', pw: secret('principal@greenwood.edu.in') };
 
 // Recorded in jp-docs/local-accounts.md (gitignored) and referenced from
 // HOW_TO_RUN §4. Keep all three in step.
-const VIEWER = { id: 'viewer@greenwood.edu.in', pw: 'Viewer#2026!', name: 'Priya Menon' };
+const VIEWER = { id: 'viewer@greenwood.edu.in', pw: secret('viewer@greenwood.edu.in'), name: 'Priya Menon' };
 
 const ROLE_VIEWER = 4;   // SchoolRoles.Viewer -> jp_sso SCHOOL_VIEWER
 

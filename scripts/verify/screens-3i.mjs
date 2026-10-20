@@ -25,6 +25,7 @@ import { createRequire } from 'node:module';
 
 import { execFileSync } from 'node:child_process';
 import { session as loginSession } from './lib/login.mjs';
+import { secret } from './lib/accounts.mjs';
 
 const require = createRequire(import.meta.url);
 const { chromium } = require(
@@ -36,9 +37,9 @@ const SCHOOL_APP = 'http://localhost:4300';
 const TEACHER_APP = 'http://localhost:4400';
 const OUT = 'D:/Projects/jp-docs/design-screens';
 
-const SCHOOL = { id: 'principal@greenwood.edu.in', pw: 'Greenwood#2027!' };
-const TEACHER_EMPTY = { id: 'imran.qureshi.86007@yopmail.com', pw: 'Seeded#Teacher2026!' };
-const TEACHER_FULL = { id: 'rohit.kulkarni.86002@yopmail.com', pw: 'Seeded#Teacher2026!' };
+const SCHOOL = { id: 'principal@greenwood.edu.in', pw: secret('principal@greenwood.edu.in') };
+const TEACHER_EMPTY = { id: 'imran.qureshi.86007@yopmail.com', pw: secret('imran.qureshi.86007@yopmail.com') };
+const TEACHER_FULL = { id: 'rohit.kulkarni.86002@yopmail.com', pw: secret('rohit.kulkarni.86002@yopmail.com') };
 
 const WIDE = { width: 1440, height: 1000 };
 const PHONE = { width: 375, height: 812 };

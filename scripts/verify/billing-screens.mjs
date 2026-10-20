@@ -32,6 +32,7 @@ import path from 'node:path';
 import { createRequire } from 'node:module';
 import { execFileSync } from 'node:child_process';
 import { session as loginSession, invalidate } from './lib/login.mjs';
+import { secret } from './lib/accounts.mjs';
 
 const require = createRequire(import.meta.url);
 const { chromium } = require(
@@ -49,10 +50,10 @@ const ARGS = ['-S', 'localhost\\TARUN', '-E', '-I', '-b', '-f', '65001', '-h', '
 const WIDE = { width: 1440, height: 1100 };
 const PHONE = { width: 375, height: 812 };
 
-const ADMIN = { id: 'superadmin@teacherportal.local', pw: 'RyaBs*-L?G9*-xTKM$R4' };
-const OWNER = { id: 'principal@greenwood.edu.in', pw: 'Greenwood#2027!' };
-const VIEWER = { id: 'viewer@greenwood.edu.in', pw: 'Viewer#2026!' };
-const TEACHER = { id: 'rohit.kulkarni.86002@yopmail.com', pw: 'Seeded#Teacher2026!' };
+const ADMIN = { id: 'superadmin@teacherportal.local', pw: secret('superadmin@teacherportal.local') };
+const OWNER = { id: 'principal@greenwood.edu.in', pw: secret('principal@greenwood.edu.in') };
+const VIEWER = { id: 'viewer@greenwood.edu.in', pw: secret('viewer@greenwood.edu.in') };
+const TEACHER = { id: 'rohit.kulkarni.86002@yopmail.com', pw: secret('rohit.kulkarni.86002@yopmail.com') };
 
 const FIXTURE_PLAN = 'BILLSCREEN_PRO';
 const JOB_POST = 1;

@@ -29,12 +29,13 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { session as loginSession, token as loginToken } from './lib/login.mjs';
+import { secret } from './lib/accounts.mjs';
 
 const SSO = 'http://localhost:5199/api';
 const APP = 'http://localhost:5299/api';
 
-const OWNER = { id: 'principal@greenwood.edu.in', pw: 'Greenwood#2027!' };
-const OTHER_SCHOOL = { id: 'head@stmarys.edu.in', pw: 'StMarys#2026!' };
+const OWNER = { id: 'principal@greenwood.edu.in', pw: secret('principal@greenwood.edu.in') };
+const OTHER_SCHOOL = { id: 'head@stmarys.edu.in', pw: secret('head@stmarys.edu.in') };
 
 const MAIL_DROP = 'D:/Projects/jp-backend/JP.App.Api/App_Data/mail-drop';
 
@@ -487,7 +488,7 @@ check('🔴 …and the refusal says their access was REMOVED, not "sign out and 
 // ---------------------------------------------------------------------------
 console.log('\n=== 8. G15 — THE QUEUE CAN FINALLY ASK "WHAT IS NOBODY WORKING ON?" ===');
 
-const admin = await login('superadmin@teacherportal.local', 'RyaBs*-L?G9*-xTKM$R4');
+const admin = await login('superadmin@teacherportal.local', secret('superadmin@teacherportal.local'));
 
 const anyone = await j(`${APP}/approvals?requestTypeId=1&pageSize=5`, { headers: head(admin) });
 const unassigned = await j(`${APP}/approvals?requestTypeId=1&unassignedOnly=true&pageSize=5`, { headers: head(admin) });

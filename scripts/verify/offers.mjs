@@ -44,6 +44,7 @@
 import { execFile, execFileSync } from 'node:child_process';
 import { promisify } from 'node:util';
 import { token as loginToken } from './lib/login.mjs';
+import { secret } from './lib/accounts.mjs';
 
 const execFileAsync = promisify(execFile);
 
@@ -53,8 +54,8 @@ const ARGS = ['-S', SERVER, '-E', '-I', '-b', '-f', '65001', '-h', '-1', '-W', '
 const SSO = 'http://localhost:5199/api';
 const APP = 'http://localhost:5299/api';
 
-const OWNER = { id: 'principal@greenwood.edu.in', pw: 'Greenwood#2027!' };
-const VIEWER = { id: 'viewer@greenwood.edu.in', pw: 'Viewer#2026!' };
+const OWNER = { id: 'principal@greenwood.edu.in', pw: secret('principal@greenwood.edu.in') };
+const VIEWER = { id: 'viewer@greenwood.edu.in', pw: secret('viewer@greenwood.edu.in') };
 /*
   🔴 A DIFFERENT SCHOOL'S OWNER, NOT THE HR LEAD.
 
@@ -68,8 +69,8 @@ const VIEWER = { id: 'viewer@greenwood.edu.in', pw: 'Viewer#2026!' };
   it can only be the scope. The permission half is proved separately, by the
   Viewer, who is in the SAME school and holds neither.
 */
-const OTHER_SCHOOL = { id: 'head@stmarys.edu.in', pw: 'StMarys#2026!' };
-const TEACHER = { id: 'rohit.kulkarni.86002@yopmail.com', pw: 'Seeded#Teacher2026!' };
+const OTHER_SCHOOL = { id: 'head@stmarys.edu.in', pw: secret('head@stmarys.edu.in') };
+const TEACHER = { id: 'rohit.kulkarni.86002@yopmail.com', pw: secret('rohit.kulkarni.86002@yopmail.com') };
 
 const TEMP_INDEX = 'UQ_TEMP_6A_OneOfferPerTeacher';
 

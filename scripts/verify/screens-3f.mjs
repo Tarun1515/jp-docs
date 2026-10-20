@@ -22,6 +22,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
 import { session as loginSession } from './lib/login.mjs';
+import { secret } from './lib/accounts.mjs';
 
 // Playwright is installed for the CLI rather than as a dependency of this repo,
 // so it is resolved from the npx cache instead of being added to package.json —
@@ -36,7 +37,7 @@ const SSO = 'http://localhost:5199/api';
 const SCHOOL = 'http://localhost:4300';
 const OUT = 'D:/Projects/jp-docs/screenshots/3f';
 
-const OWNER = { id: 'principal@greenwood.edu.in', pw: 'Greenwood#2027!' };
+const OWNER = { id: 'principal@greenwood.edu.in', pw: secret('principal@greenwood.edu.in') };
 
 const WIDE = { width: 1440, height: 1000 };
 const PHONE = { width: 375, height: 812 };

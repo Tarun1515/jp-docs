@@ -19,14 +19,15 @@
 import fs from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { token as loginToken } from './lib/login.mjs';
+import { secret } from './lib/accounts.mjs';
 
 const SSO = 'http://localhost:5199/api';
 const APP = 'http://localhost:5299/api';
 
 // HOW_TO_RUN §4.
-const SCHOOL = { id: 'principal@greenwood.edu.in', pw: 'Greenwood#2027!' };
-const TEACHER = { id: 'imran.qureshi.86007@yopmail.com', pw: 'Seeded#Teacher2026!' };
-const RICH_TEACHER = { id: 'rohit.kulkarni.86002@yopmail.com', pw: 'Seeded#Teacher2026!' };
+const SCHOOL = { id: 'principal@greenwood.edu.in', pw: secret('principal@greenwood.edu.in') };
+const TEACHER = { id: 'imran.qureshi.86007@yopmail.com', pw: secret('imran.qureshi.86007@yopmail.com') };
+const RICH_TEACHER = { id: 'rohit.kulkarni.86002@yopmail.com', pw: secret('rohit.kulkarni.86002@yopmail.com') };
 
 const sql = (q) =>
   execFileSync('sqlcmd', ['-S', 'localhost\\TARUN', '-E', '-I', '-b', '-h', '-1', '-W', '-Q', q], {

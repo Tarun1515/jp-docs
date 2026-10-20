@@ -35,15 +35,16 @@ import { execFileSync } from 'node:child_process';
 import { promisify } from 'node:util';
 import { execFile } from 'node:child_process';
 import { session as loginSession, token as loginToken } from './lib/login.mjs';
+import { secret } from './lib/accounts.mjs';
 
 const execFileAsync = promisify(execFile);
 
 const APP = 'http://localhost:5299/api';
 const ARGS = ['-S', 'localhost\\TARUN', '-E', '-I', '-b', '-f', '65001', '-h', '-1', '-W', '-s', '|'];
 
-const ADMIN = { id: 'superadmin@teacherportal.local', pw: 'RyaBs*-L?G9*-xTKM$R4' };
-const OWNER = { id: 'principal@greenwood.edu.in', pw: 'Greenwood#2027!' };
-const TEACHER = { id: 'rohit.kulkarni.86002@yopmail.com', pw: 'Seeded#Teacher2026!' };
+const ADMIN = { id: 'superadmin@teacherportal.local', pw: secret('superadmin@teacherportal.local') };
+const OWNER = { id: 'principal@greenwood.edu.in', pw: secret('principal@greenwood.edu.in') };
+const TEACHER = { id: 'rohit.kulkarni.86002@yopmail.com', pw: secret('rohit.kulkarni.86002@yopmail.com') };
 
 const FIXTURE_PLAN = 'BILLING_SUITE_PRO';
 const JOB_POST = 1;

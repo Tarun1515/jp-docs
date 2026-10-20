@@ -67,17 +67,18 @@
 */
 import { execFileSync } from 'node:child_process';
 import { token as loginToken } from './lib/login.mjs';
+import { secret } from './lib/accounts.mjs';
 
 const SSO = 'http://localhost:5199/api';
 const APP = 'http://localhost:5299/api';
 
 // School 4 (Nalanda Vidyalaya) — the school the teacher will apply to.
-const OWNER = { id: 'principal@greenwood.edu.in', pw: 'Greenwood#2027!' };
+const OWNER = { id: 'principal@greenwood.edu.in', pw: secret('principal@greenwood.edu.in') };
 // School 2 (Greenwood Dwarka) — a DIFFERENT organisation, with its own job.
-const OTHER = { id: 'hr.lead@greenwood.edu.in', pw: 'HrLead#2026!' };
+const OTHER = { id: 'hr.lead@greenwood.edu.in', pw: secret('hr.lead@greenwood.edu.in') };
 // A teacher who already has a resume, so the apply is about consent and
 // nothing else.
-const TEACHER = { id: 'rohit.kulkarni.86002@yopmail.com', pw: 'Seeded#Teacher2026!' };
+const TEACHER = { id: 'rohit.kulkarni.86002@yopmail.com', pw: secret('rohit.kulkarni.86002@yopmail.com') };
 
 const ARGS = ['-S', 'localhost\\TARUN', '-E', '-I', '-b', '-f', '65001', '-h', '-1', '-W', '-s', '|'];
 
@@ -435,8 +436,8 @@ try {
     the invite code did. This section needs somebody who has applied to NOBODY,
     so the only thing that can unlock them is the invitation.
   */
-  const INVITEE = { id: 'anita.deshmukh21338@yopmail.com', pw: 'Seeded#Teacher2026!' };
-  const IGNORER = { id: 'imran.qureshi.86007@yopmail.com', pw: 'Seeded#Teacher2026!' };
+  const INVITEE = { id: 'anita.deshmukh21338@yopmail.com', pw: secret('anita.deshmukh21338@yopmail.com') };
+  const IGNORER = { id: 'imran.qureshi.86007@yopmail.com', pw: secret('imran.qureshi.86007@yopmail.com') };
 
   const inviteeToken = await login(INVITEE.id, INVITEE.pw);
   const ignorerToken = await login(IGNORER.id, IGNORER.pw);

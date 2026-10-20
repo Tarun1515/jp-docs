@@ -32,6 +32,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
 import { session as loginSession } from './lib/login.mjs';
+import { secret } from './lib/accounts.mjs';
 
 const require = createRequire(import.meta.url);
 const { chromium } = require(
@@ -44,7 +45,7 @@ const TEACHER = 'http://localhost:4400';
 const OUT = 'D:/Projects/jp-docs/screenshots/3h';
 const SSO_MAIL_DROP = 'D:/Projects/jp-backend/JP.Sso.Api/App_Data/mail-drop';
 
-const PASSWORD = 'Seeded#Teacher2026!';
+const PASSWORD = secret('rohit.kulkarni.86002@yopmail.com');
 
 const WIDE = { width: 1440, height: 1000 };
 const PHONE = { width: 375, height: 812 };

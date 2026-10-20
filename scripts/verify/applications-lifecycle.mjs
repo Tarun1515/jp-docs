@@ -46,16 +46,17 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, unlinkSync } from 'node:fs';
 import { join } from 'node:path';
 import { token as loginToken } from './lib/login.mjs';
+import { secret } from './lib/accounts.mjs';
 
 const SSO = 'http://localhost:5199/api';
 const APP = 'http://localhost:5299/api';
 const UPLOADS = 'D:\\Projects\\jp-backend\\JP.App.Api\\App_Data\\uploads';
 
-const OWNER = { id: 'principal@greenwood.edu.in', pw: 'Greenwood#2027!' };   // school 4, Owner
-const HR = { id: 'hr.lead@greenwood.edu.in', pw: 'HrLead#2026!' };          // school 2, jp_sso role HR
-const VIEWER = { id: 'viewer@greenwood.edu.in', pw: 'Viewer#2026!' };       // school 4, branch-bound Viewer
-const T_A = { id: 'rohit.kulkarni.86002@yopmail.com', pw: 'Seeded#Teacher2026!' };
-const T_B = { id: 'imran.qureshi.86007@yopmail.com', pw: 'Seeded#Teacher2026!' };
+const OWNER = { id: 'principal@greenwood.edu.in', pw: secret('principal@greenwood.edu.in') };   // school 4, Owner
+const HR = { id: 'hr.lead@greenwood.edu.in', pw: secret('hr.lead@greenwood.edu.in') };          // school 2, jp_sso role HR
+const VIEWER = { id: 'viewer@greenwood.edu.in', pw: secret('viewer@greenwood.edu.in') };       // school 4, branch-bound Viewer
+const T_A = { id: 'rohit.kulkarni.86002@yopmail.com', pw: secret('rohit.kulkarni.86002@yopmail.com') };
+const T_B = { id: 'imran.qureshi.86007@yopmail.com', pw: secret('imran.qureshi.86007@yopmail.com') };
 
 const ARGS = ['-S', 'localhost\\TARUN', '-E', '-I', '-b', '-f', '65001', '-h', '-1', '-W', '-s', '|'];
 

@@ -38,6 +38,7 @@ import path from 'node:path';
 import { createRequire } from 'node:module';
 import { execFileSync } from 'node:child_process';
 import { session as loginSession, token as loginToken } from './lib/login.mjs';
+import { secret } from './lib/accounts.mjs';
 
 const require = createRequire(import.meta.url);
 const { chromium } = require(
@@ -54,7 +55,7 @@ const WIDE = { width: 1440, height: 1000 };
 const PHONE = { width: 375, height: 812 };
 
 /** SCHOOL_OWNER — holds both TEACHER_SEARCH.VIEW and .INVITE. */
-const OWNER = { id: 'principal@greenwood.edu.in', pw: 'Greenwood#2027!' };
+const OWNER = { id: 'principal@greenwood.edu.in', pw: secret('principal@greenwood.edu.in') };
 
 /**
  * 🔴 HR — holds TEACHER_SEARCH.VIEW and NOT .INVITE.
@@ -63,10 +64,10 @@ const OWNER = { id: 'principal@greenwood.edu.in', pw: 'Greenwood#2027!' };
  * can test all three without inventing an account: searching is free, inviting
  * costs, and a school may let somebody browse without letting them spend.
  */
-const HR = { id: 'hr.lead@greenwood.edu.in', pw: 'HrLead#2026!' };
+const HR = { id: 'hr.lead@greenwood.edu.in', pw: secret('hr.lead@greenwood.edu.in') };
 
 /** SCHOOL_VIEWER — holds neither. */
-const VIEWER = { id: 'viewer@greenwood.edu.in', pw: 'Viewer#2026!' };
+const VIEWER = { id: 'viewer@greenwood.edu.in', pw: secret('viewer@greenwood.edu.in') };
 
 const results = [];
 const check = (name, pass, detail) => {

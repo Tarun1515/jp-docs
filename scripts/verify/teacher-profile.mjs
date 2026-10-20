@@ -19,6 +19,7 @@
 */
 import { execFileSync } from 'node:child_process';
 import { token as loginToken } from './lib/login.mjs';
+import { secret } from './lib/accounts.mjs';
 
 const SSO = 'http://localhost:5199/api';
 const APP = 'http://localhost:5299/api';
@@ -377,7 +378,7 @@ check('🔴 GET /teacher/resume/file returns the PDF', resumeFile.status === 200
 // ---------------------------------------------------------------------------
 console.log('\n=== 6. 🔴 A SCHOOL CANNOT REACH ANY OF IT ===');
 
-const school = await login('principal@greenwood.edu.in', 'Greenwood#2027!');
+const school = await login('principal@greenwood.edu.in', secret('principal@greenwood.edu.in'));
 
 const schoolTriesPhoto = await j(`${APP}/teacher/photo/file`, { headers: head(school) });
 const schoolTriesResume = await j(`${APP}/teacher/resume/file`, { headers: head(school) });

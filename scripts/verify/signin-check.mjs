@@ -12,6 +12,7 @@ const PROJECTS = path.resolve(DOCS, '..');
   reason this file had not run — see the note under the password below.
 */
 import { createRequire } from 'node:module';
+import { secret } from './lib/accounts.mjs';
 
 const require = createRequire(import.meta.url);
 const { chromium } = require(
@@ -39,8 +40,8 @@ await page.fill('#loginId', 'principal@greenwood.edu.in');
   account is gone.
 
   The value is in local-accounts.md, which is gitignored:
-      $env:JP_SCHOOL_PASSWORD = '...'   # PowerShell
-      JP_SCHOOL_PASSWORD='...' node …   # bash
+      (and if that file lives elsewhere on this machine, point
+       JP_LOCAL_ACCOUNTS at it — see lib/accounts.mjs)
 */
 /*
   🔴 READ FROM local-accounts.md — WHICH IS GITIGNORED — RATHER THAN DEMANDED
@@ -53,27 +54,31 @@ await page.fill('#loginId', 'principal@greenwood.edu.in');
   signs in through the real form, and the only one that would notice if the
   sign-in screen broke. A canary that cannot start is not a canary.
 
-  ⚠️ And the env var was protecting nothing. `Greenwood#2027!` is committed in
-  SEVENTEEN other scripts in this repository — the rule was abandoned
-  everywhere else and only this file was still paying for it. The corpus-wide
-  fix is its own gap (G36); this reads the gitignored file, which is what the
-  comment above always intended.
+  ⚠️ And the env var was protecting nothing: the same password was committed in
+  seventeen other scripts in this repository, so the rule had been abandoned
+  everywhere except here, where it cost something and bought nothing.
+
+  🔴 G36 CLOSED THAT IN 8-0, and this file lost its bespoke reader with it. By
+  then the corpus was worse than seventeen — 95 literals across 32 files — and
+  every one of them now goes through `lib/accounts.mjs`. Two readers of the
+  same gitignored file was the same drift one copied constant block at a time.
+
+  ⚠️ The literal that used to be quoted in this very comment is gone too. A
+  password in prose is a password in the repository; a reader looking for how
+  this works does not need the value to understand the argument.
 */
-const ACCOUNTS = path.resolve(DOCS, 'local-accounts.md');
-
+/*
+  ⚠️ ONE READER, SHARED — see the note above. `secret()` throws a message
+  naming the file and the account rather than returning null, so a missing
+  entry cannot turn into a login attempt with `undefined` and a failure
+  reported against the SSO API.
+*/
 const passwordFor = (loginId) => {
-  if (process.env.JP_SCHOOL_PASSWORD) return process.env.JP_SCHOOL_PASSWORD;
-
-  let table = '';
-  try { table = fs.readFileSync(ACCOUNTS, 'utf8'); } catch { return null; }
-
-  const row = table.split(/\r?\n/).find((l) => l.includes(loginId));
-  if (!row) return null;
-
-  /* | `login` | `password` | … — the second backticked cell on that row. */
-  const cells = [...row.matchAll(/`([^`]+)`/g)].map((m) => m[1]);
-
-  return cells[1] ?? null;
+  try {
+    return secret(loginId);
+  } catch {
+    return null;
+  }
 };
 
 const password = passwordFor('principal@greenwood.edu.in');
@@ -81,7 +86,7 @@ const password = passwordFor('principal@greenwood.edu.in');
 if (!password) {
   console.error(
     `Could not find principal@greenwood.edu.in in ${ACCOUNTS}.\n`
-    + 'That file is gitignored — see HOW_TO_RUN §4 — or set JP_SCHOOL_PASSWORD.',
+    + 'That file is gitignored — see HOW_TO_RUN §4 — or point JP_LOCAL_ACCOUNTS at it.',
   );
   process.exit(1);
 }

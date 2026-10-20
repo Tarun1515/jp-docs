@@ -92,6 +92,7 @@ import fs from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { session as loginSession, token as loginToken } from './lib/login.mjs';
+import { secret } from './lib/accounts.mjs';
 
 const require = createRequire(import.meta.url);
 const { chromium } = require(
@@ -104,17 +105,17 @@ const SCHOOL_APP = 'http://localhost:4300';
 const TEACHER_APP = 'http://localhost:4400';
 const OUT = 'D:/Projects/jp-docs/design-screens';
 
-const OWNER = { id: 'principal@greenwood.edu.in', pw: 'Greenwood#2027!' };
-const HR = { id: 'hr.lead@greenwood.edu.in', pw: 'HrLead#2026!' };
-const VIEWER = { id: 'viewer@greenwood.edu.in', pw: 'Viewer#2026!' };
+const OWNER = { id: 'principal@greenwood.edu.in', pw: secret('principal@greenwood.edu.in') };
+const HR = { id: 'hr.lead@greenwood.edu.in', pw: secret('hr.lead@greenwood.edu.in') };
+const VIEWER = { id: 'viewer@greenwood.edu.in', pw: secret('viewer@greenwood.edu.in') };
 
 // 🔴 UNVERIFIED, and with a resume. Chosen deliberately: this suite proves in
 // the UI what 5A proved at the procedure — the badge is a signal, never a gate
 // (2.9, a locked stance).
-const TEACHER_A = { id: 'rohit.kulkarni.86002@yopmail.com', pw: 'Seeded#Teacher2026!' };
+const TEACHER_A = { id: 'rohit.kulkarni.86002@yopmail.com', pw: secret('rohit.kulkarni.86002@yopmail.com') };
 
 // No resume, 0% profile. The RESUME_REQUIRED path, and the scope negative.
-const TEACHER_B = { id: 'imran.qureshi.86007@yopmail.com', pw: 'Seeded#Teacher2026!' };
+const TEACHER_B = { id: 'imran.qureshi.86007@yopmail.com', pw: secret('imran.qureshi.86007@yopmail.com') };
 
 const WIDE = { width: 1440, height: 1100 };
 const PHONE = { width: 375, height: 812 };

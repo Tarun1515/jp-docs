@@ -52,6 +52,7 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { session as loginSession } from './lib/login.mjs';
+import { secret } from './lib/accounts.mjs';
 
 const require = createRequire(import.meta.url);
 const { chromium } = require(
@@ -64,13 +65,13 @@ const SCHOOL_APP = 'http://localhost:4300';
 const ADMIN_APP = 'http://localhost:4200';
 const OUT = 'D:/Projects/jp-docs/design-screens';
 
-const ADMIN = { id: 'superadmin@teacherportal.local', pw: 'RyaBs*-L?G9*-xTKM$R4' };
-const OWNER = { id: 'principal@greenwood.edu.in', pw: 'Greenwood#2027!' };
-const HR = { id: 'hr.lead@greenwood.edu.in', pw: 'HrLead#2026!' };
+const ADMIN = { id: 'superadmin@teacherportal.local', pw: secret('superadmin@teacherportal.local') };
+const OWNER = { id: 'principal@greenwood.edu.in', pw: secret('principal@greenwood.edu.in') };
+const HR = { id: 'hr.lead@greenwood.edu.in', pw: secret('hr.lead@greenwood.edu.in') };
 
 // 🔴 A REAL seeded SCHOOL_VIEWER, in the OWNER's school, holding JOB.VIEW ·
 // APPLICANT.VIEW · REPORT.VIEW. See the header, and local-accounts.md.
-const VIEWER = { id: 'viewer@greenwood.edu.in', pw: 'Viewer#2026!' };
+const VIEWER = { id: 'viewer@greenwood.edu.in', pw: secret('viewer@greenwood.edu.in') };
 
 const WIDE = { width: 1440, height: 1100 };
 const PHONE = { width: 375, height: 812 };

@@ -41,12 +41,13 @@
 */
 import { execFileSync } from 'node:child_process';
 import { token as loginToken } from './lib/login.mjs';
+import { secret } from './lib/accounts.mjs';
 
 const APP = 'http://localhost:5299/api';
 
 const ARGS = ['-S', 'localhost\\TARUN', '-E', '-I', '-b', '-f', '65001', '-h', '-1', '-W', '-s', '|'];
 
-const OWNER = { id: 'principal@greenwood.edu.in', pw: 'Greenwood#2027!' };
+const OWNER = { id: 'principal@greenwood.edu.in', pw: secret('principal@greenwood.edu.in') };
 /*
   ⚠️ NOT A COLLEAGUE — HR OWNS A DIFFERENT SCHOOL IN THE SAME ORGANISATION.
 
@@ -60,16 +61,16 @@ const OWNER = { id: 'principal@greenwood.edu.in', pw: 'Greenwood#2027!' };
   assertion about per-school scoping would still pass — because the two
   accounts look related in every way except the one that matters.
 */
-const HR = { id: 'hr.lead@greenwood.edu.in', pw: 'HrLead#2026!' };
+const HR = { id: 'hr.lead@greenwood.edu.in', pw: secret('hr.lead@greenwood.edu.in') };
 
 /** Read-only, same school, same campus as the principal. */
-const VIEWER = { id: 'viewer@greenwood.edu.in', pw: 'Viewer#2026!' };
-const OTHER_SCHOOL = { id: 'head@stmarys.edu.in', pw: 'StMarys#2026!' };
+const VIEWER = { id: 'viewer@greenwood.edu.in', pw: secret('viewer@greenwood.edu.in') };
+const OTHER_SCHOOL = { id: 'head@stmarys.edu.in', pw: secret('head@stmarys.edu.in') };
 
 /** 90%, has a resume — the only documented teacher who can actually apply. */
-const TEACHER_A = { id: 'rohit.kulkarni.86002@yopmail.com', pw: 'Seeded#Teacher2026!' };
-const TEACHER_B = { id: 'anita.deshmukh21338@yopmail.com', pw: 'Seeded#Teacher2026!' };
-const TEACHER_C = { id: 'imran.qureshi.86007@yopmail.com', pw: 'Seeded#Teacher2026!' };
+const TEACHER_A = { id: 'rohit.kulkarni.86002@yopmail.com', pw: secret('rohit.kulkarni.86002@yopmail.com') };
+const TEACHER_B = { id: 'anita.deshmukh21338@yopmail.com', pw: secret('anita.deshmukh21338@yopmail.com') };
+const TEACHER_C = { id: 'imran.qureshi.86007@yopmail.com', pw: secret('imran.qureshi.86007@yopmail.com') };
 
 const results = [];
 const check = (name, pass, detail) => {

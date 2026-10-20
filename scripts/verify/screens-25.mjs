@@ -26,6 +26,7 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { session as loginSession } from './lib/login.mjs';
+import { secret } from './lib/accounts.mjs';
 
 const require = createRequire(import.meta.url);
 const { chromium } = require(
@@ -37,7 +38,7 @@ const APP = 'http://localhost:5299/api';
 const ADMIN_APP = 'http://localhost:4200';
 const OUT = 'D:/Projects/jp-docs/design-screens';
 
-const ADMIN = { id: 'superadmin@teacherportal.local', pw: 'RyaBs*-L?G9*-xTKM$R4' };
+const ADMIN = { id: 'superadmin@teacherportal.local', pw: secret('superadmin@teacherportal.local') };
 
 const WIDE = { width: 1440, height: 1100 };
 const PHONE = { width: 375, height: 812 };

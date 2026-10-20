@@ -39,6 +39,7 @@
 */
 import { execFileSync } from 'node:child_process';
 import { session as loginSession, token as loginToken } from './lib/login.mjs';
+import { secret } from './lib/accounts.mjs';
 
 const APP = 'http://localhost:5299/api';
 
@@ -49,11 +50,11 @@ const APP = 'http://localhost:5299/api';
   ended up never starting. A verification script has to stand on the documented
   fixtures or it is not verification, it is a note to self.
 */
-const OWNER = { id: 'principal@greenwood.edu.in', pw: 'Greenwood#2027!' };
-const TEACHER_A = { id: 'rohit.kulkarni.86002@yopmail.com', pw: 'Seeded#Teacher2026!' };
+const OWNER = { id: 'principal@greenwood.edu.in', pw: secret('principal@greenwood.edu.in') };
+const TEACHER_A = { id: 'rohit.kulkarni.86002@yopmail.com', pw: secret('rohit.kulkarni.86002@yopmail.com') };
 
 /** The 0% profile — the least entangled teacher, for the contact-lock section. */
-const TEACHER_LOCKED = { id: 'imran.qureshi.86007@yopmail.com', pw: 'Seeded#Teacher2026!' };
+const TEACHER_LOCKED = { id: 'imran.qureshi.86007@yopmail.com', pw: secret('imran.qureshi.86007@yopmail.com') };
 
 const sql = (q) =>
   execFileSync('sqlcmd', ['-S', 'localhost\\TARUN', '-E', '-I', '-b', '-f', '65001', '-h', '-1', '-W', '-Q', q], {

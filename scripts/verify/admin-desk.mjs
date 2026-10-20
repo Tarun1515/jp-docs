@@ -33,13 +33,14 @@
 */
 import { execFileSync } from 'node:child_process';
 import { token as loginToken, invalidate } from './lib/login.mjs';
+import { secret } from './lib/accounts.mjs';
 
 const APP = 'http://localhost:5299/api';
 
 const ARGS = ['-S', 'localhost\\TARUN', '-E', '-I', '-b', '-f', '65001', '-h', '-1', '-W', '-s', '|'];
 
-const SUPER = { id: 'superadmin@teacherportal.local', pw: 'RyaBs*-L?G9*-xTKM$R4' };
-const OWNER = { id: 'principal@greenwood.edu.in', pw: 'Greenwood#2027!' };
+const SUPER = { id: 'superadmin@teacherportal.local', pw: secret('superadmin@teacherportal.local') };
+const OWNER = { id: 'principal@greenwood.edu.in', pw: secret('principal@greenwood.edu.in') };
 
 const stamp = `${Date.now()}`.slice(-7);
 const VERIFIER = { id: `verify.deskv.${stamp}@yopmail.com`, pw: SUPER.pw };
@@ -454,7 +455,7 @@ try {
       SELECT u.Email FROM jp_sso.dbo.t_sso_users u
        INNER JOIN jp_app.dbo.t_app_teachers t ON t.UserUid = u.UserUid
        WHERE t.TeacherId = ${teacherId};`),
-    pw: 'Seeded#Teacher2026!',
+    pw: secret('rohit.kulkarni.86002@yopmail.com'),
   }).catch(() => null);
 
   /* Restore the live job so the reported entity is reachable. */

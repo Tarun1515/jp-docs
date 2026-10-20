@@ -42,6 +42,7 @@
 import { execFile, execFileSync } from 'node:child_process';
 import { promisify } from 'node:util';
 import { token as loginToken } from './lib/login.mjs';
+import { secret } from './lib/accounts.mjs';
 
 const execFileAsync = promisify(execFile);
 
@@ -50,11 +51,11 @@ const APP = 'http://localhost:5299/api';
 
 const ARGS = ['-S', 'localhost\\TARUN', '-E', '-I', '-b', '-f', '65001', '-h', '-1', '-W', '-s', '|'];
 
-const ADMIN = { id: 'superadmin@teacherportal.local', pw: 'RyaBs*-L?G9*-xTKM$R4' };
-const OWNER = { id: 'principal@greenwood.edu.in', pw: 'Greenwood#2027!' };
-const OTHER_SCHOOL = { id: 'head@stmarys.edu.in', pw: 'StMarys#2026!' };
-const TEACHER_A = { id: 'anita.deshmukh21338@yopmail.com', pw: 'Seeded#Teacher2026!' };
-const TEACHER_B = { id: 'imran.qureshi.86007@yopmail.com', pw: 'Seeded#Teacher2026!' };
+const ADMIN = { id: 'superadmin@teacherportal.local', pw: secret('superadmin@teacherportal.local') };
+const OWNER = { id: 'principal@greenwood.edu.in', pw: secret('principal@greenwood.edu.in') };
+const OTHER_SCHOOL = { id: 'head@stmarys.edu.in', pw: secret('head@stmarys.edu.in') };
+const TEACHER_A = { id: 'anita.deshmukh21338@yopmail.com', pw: secret('anita.deshmukh21338@yopmail.com') };
+const TEACHER_B = { id: 'imran.qureshi.86007@yopmail.com', pw: secret('imran.qureshi.86007@yopmail.com') };
 
 /*
   ⚠️ A THIRD TEACHER, AND THE REASON IS A FIXTURE NOBODY SHOULD HAVE TO
@@ -69,7 +70,7 @@ const TEACHER_B = { id: 'imran.qureshi.86007@yopmail.com', pw: 'Seeded#Teacher20
   RESUME_REQUIRED is the product refusing exactly as designed. The suite was
   asking the wrong person.
 */
-const TEACHER_C = { id: 'rohit.kulkarni.86002@yopmail.com', pw: 'Seeded#Teacher2026!' };
+const TEACHER_C = { id: 'rohit.kulkarni.86002@yopmail.com', pw: secret('rohit.kulkarni.86002@yopmail.com') };
 
 const results = [];
 const check = (name, pass, detail) => {

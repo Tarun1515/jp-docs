@@ -43,6 +43,7 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { session as loginSession } from './lib/login.mjs';
+import { secret } from './lib/accounts.mjs';
 
 const require = createRequire(import.meta.url);
 const { chromium } = require(
@@ -54,12 +55,12 @@ const APP = 'http://localhost:5299/api';
 const ADMIN_APP = 'http://localhost:4200';
 const OUT = 'D:/Projects/jp-docs/design-screens';
 
-const ADMIN = { id: 'superadmin@teacherportal.local', pw: 'RyaBs*-L?G9*-xTKM$R4' };
-const OWNER = { id: 'principal@greenwood.edu.in', pw: 'Greenwood#2027!' };
+const ADMIN = { id: 'superadmin@teacherportal.local', pw: secret('superadmin@teacherportal.local') };
+const OWNER = { id: 'principal@greenwood.edu.in', pw: secret('principal@greenwood.edu.in') };
 
 // 🔴 Holds TEACHER_SEARCH.VIEW. Searching is not the same permission as
 // inviting, and a Viewer must see exactly the same columns as an Owner.
-const VIEWER = { id: 'viewer@greenwood.edu.in', pw: 'Viewer#2026!' };
+const VIEWER = { id: 'viewer@greenwood.edu.in', pw: secret('viewer@greenwood.edu.in') };
 
 const WIDE = { width: 1440, height: 1100 };
 
