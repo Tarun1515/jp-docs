@@ -165,8 +165,27 @@ const APIS = [
       ⚠️ 137 WAS MEASURED, not calculated. 119 + 18 agrees, and both were
       computed — the same discipline 7A recorded after a menu count was once
       "fixed" by adding one to a stale number.
+
+      🔴 RAISED TO 139 ON 2026-10-20 (PHASE 8-0), AND ONE OF THE TWO IS A SLIP
+      WORTH NAMING.
+
+        GET /admin/desk/analytics   8-0's analytics screen, one read across
+                                    three databases
+        GET /admin/desk/jobs        added LATE IN 7B, when the moderation desk
+                                    turned out to need a way to find a job —
+                                    and the floor was NOT raised with it
+
+      ⚠️ THE SECOND ONE DID NOT FAIL ANYTHING, WHICH IS THE PROBLEM. A floor is
+      a minimum: 138 operations against a floor of 137 passes, so the new route
+      simply had no protection. Nothing was wrong with the route; what was
+      missing was the assertion that it still exists tomorrow.
+
+      🔴 So the rule is sharper than "raise the floor when it fails": raise it
+      in the commit that adds the route, because the suite cannot tell you that
+      you forgot. The anonymous CEILING below is the one that catches an
+      addition, and it only covers /api/public.
     */
-    minOperations: 137,
+    minOperations: 139,
   },
 ];
 
@@ -456,6 +475,31 @@ try {
   const enquiries = doc?.paths?.['/api/admin/desk/enquiries']?.get;
   const submitReport = doc?.paths?.['/api/reports']?.post;
   const ownModeration = doc?.paths?.['/api/jobs/{jobUid}/moderation']?.get;
+
+  /*
+    🔴 PHASE 8-0 — the analytics read, and what it must NOT carry.
+
+    One endpoint across three databases, behind REPORT.VIEW and an admin user
+    type. The response shape is asserted here because "how many, never who" is
+    enforced in three places — two SQL build guards and a service gate — and a
+    swagger schema that grew an email would mean all three had been edited.
+  */
+  const analytics = doc?.paths?.['/api/admin/desk/analytics']?.get;
+
+  check('the analytics read is documented (Phase 8-0)',
+    !!analytics, analytics ? 'present' : 'MISSING');
+
+  const analyticsSchema = JSON.stringify(doc?.components?.schemas?.AdminAnalyticsDto ?? {})
+    + JSON.stringify(doc?.components?.schemas?.RegistrationCountDto ?? {})
+    + JSON.stringify(doc?.components?.schemas?.ApprovalCountDto ?? {})
+    + JSON.stringify(doc?.components?.schemas?.QueueWaitDto ?? {});
+
+  const identityLeak = ['email', 'mobile', 'userUid', 'requestNo', 'entityUid', 'requestorUserId']
+    .filter((f) => analyticsSchema.toLowerCase().includes(f.toLowerCase()));
+
+  check('🔒 …and its schemas carry NO identity — how many, never who',
+    identityLeak.length === 0,
+    identityLeak.length ? `LEAKED: ${identityLeak.join(', ')}` : 'counts and waits only');
 
   check('the pull and restore operations are documented (Phase 7B)',
     !!pull && !!restore, pull && restore ? 'both present' : 'MISSING');

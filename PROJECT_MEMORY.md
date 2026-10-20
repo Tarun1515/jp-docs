@@ -2081,6 +2081,67 @@ ab hai. Baaki wajah apne paon par khadi hai: har option apna **count** carry
 karti hai, jiske liye tab strip mein jagah nahi. Comment theek kar diya — toota
 hua reason likha chhod dena usi class ki galti hai jo G27 thi.
 
+### G46. Ek administrator khud ko suspend kar sakta hai, aur aakhiri admin ko bhi — 🟡 OPEN (8-0, 2026-10-20)
+
+8-0 mein Accounts screen banate waqt nikla. `USP_UpdateUserStatus` aur
+`UserService.UpdateStatusAsync` **dono** mein:
+
+```
+self-action guard  : nahi hai
+last-admin guard   : nahi hai
+```
+
+Matlab ek admin apne hi account ko SUSPENDED kar sakta hai. Agar wo **akela
+SUPER_ADMIN** hai, to platform ke paas koi administrator nahi bachta —
+verification queue, payments, moderation, sab band. Nikalne ka raasta
+`JP.Tools.SeedAdmin` ya seedha SQL hai, yani ek **deployment** ka kaam.
+
+🔴 **Screen ne apni taraf se mana kar diya, par wo FIX NAHI hai.** Apni row par
+suspend **offer hi nahi hota** aur row par "you" likha hota hai (kyunki bina
+action aur bina wajah wali row bug jaisi padhti hai). Par is project ka locked
+position hai: *button chhupana presentation hai, protection API ka kaam* — to
+ye sirf foot-gun haath mein dene se rokta hai.
+
+⚠️ **Suite isi tarah assert karti bhi hai** (`admin-analytics.mjs`): "server
+abhi refuse nahi karta — screen offer nahi karti". Jis din row dobara offer
+karegi, wo assertion failegi.
+
+**Band kaise hoga** (8A ka security pass):
+1. `USP_UpdateUserStatus` mein: `@UserId = @ActionByUserId` par refusal
+   (apne aap par koi status change nahi).
+2. Aur **aakhiri active SUPER_ADMIN** ko SUSPENDED/REJECTED karne par refusal —
+   count 1 hone par mana, kyunki ye wo galti hai jiska recovery deploy maangta hai.
+3. Dono ke liye forced negative, aur screen ka mitigation rehne do (do layer
+   bure nahi hain jab neeche wala asli ho).
+
+---
+
+### G45. Suspension ke alawa kisi bhi status change ka reason store hi nahi hota — 🟡 OPEN (8-0, 2026-10-20)
+
+`USP_UpdateUserStatus` `@Remarks` leti hai, aur use **sirf** tab likhti
+hai jab naya status SUSPENDED (4) ho — `t_sso_user_lockouts` mein, admin ke
+naam aur wajah ke saath (taaki *"main sign in kyun nahi kar pa raha"* ka ek hi
+jawab ho).
+
+Approve, reject, reactivate — teenon par parameter **accept hota hai aur phenk
+diya jaata hai**. Koi status-history table nahi hai.
+
+🔴 **8-0 ne isi wajah se screen par reason field sirf wahan rakha jahan wo
+bachta hai** (suspend aur unlock), aur baaki par saaf likha hai: *"This change
+is saved without a note — only a suspension records a reason today."*
+
+⚠️ Jo cheez collect kar ke phenk di jaaye wo 7A ke contact form ka `role`
+field hai, jise 7A ne **hata diya** tha bajaye kahin na store karne ke. Yahan
+field hata nahi sakte (server parameter leta hai), to screen **bol** deti hai.
+
+**Band kaise hoga:** ek `t_sso_user_status_history` (UserId, FromStatusId,
+ToStatusId, Remarks, ActionByUserId, ActionOn — append-only, jaise 034 ka
+moderation log), aur screen par reason har transition par. ⚠️ Ye schema addition
+hai aur *audit trail kya hona chahiye* ka faisla maangta hai — isi liye 8-0 ne
+guess nahi kiya, number diya.
+
+---
+
 ### G44. CMS content blocks ka likha hua kahin render nahi hota — ✅ BAND (8-0, 2026-10-20)
 
 > ✅ **BAND 8-0 MEIN.** Blocks ko consumer mil gaya: `HOME_` se shuru hone wali key jp-public ke home page par render hoti hai, **browser mein hydration ke baad** (2.81 ka isi page ke liye liya faisla — page prerendered hai, to render-time read build-time par bake ho jaata). Trade-off **dono taraf** assert hota hai: browser mein maujood, prerendered HTML mein gayab. Admin screen ka banner ab yeh **naam leke** kehta hai ki kaun si key kahan dikhti hai, aur suite jp-public ka source chal kar confirm karti hai ki caller maujood hai (7B mein wahi walk zero caller saabit karta tha). ⚠️ Isi kaam mein homepage ka Phase 4 placeholder pakda gaya jo *"listings go live with the next release"* keh raha tha — `/jobs` 7A se live hai.
@@ -9519,6 +9580,91 @@ markup render kare wo editor ke saath aaya XSS hole hai.
 
 ---
 
+#### 🔴 2.87 — ADMIN CONSOLE KA BACHA HUA HISSA: ACCOUNTS AUR ANALYTICS
+
+§3 do cheezein maangta tha jo 1D se coming-soon par khadi thin. 8-0 ne pehle
+**dekha ki kya missing hai**, phir banaya — aur jawab dono ke liye alag tha.
+
+**Accounts: backend pehle se POORA tha.** `GET /api/users` 2E se search
+term, user type, status, date range, sort aur paging leta hai — aur `@Search`
+proc **aur** repository **dono** mein maujood tha. `PUT /users/{uid}/status`
+RowVersion check karta hai. To is item ka bakaya **screen** tha, endpoint nahi.
+*Agar maine ye dekhe bina likhna shuru kar diya hota, main ek maujood parameter
+ka doosra raasta bana deta.*
+
+**Analytics: teen nayi proc, ek per database (2.2).** Registrations jp_sso,
+approvals jp_mdm, jobs/applications/invites jp_app — aur **service** teeno
+jawab jodta hai, kyonki is product mein ek bhi cross-database join nahi hai aur
+ye screen pehla nahi banega.
+
+🔴 **Har figure COUNT hai, koi counter nahi padha jaata — aur teen guard isko
+pakadte hain.** Wajah ek phase purani hai: 7B ki moderation queue
+`t_app_jobs.ApplicationCount` padh rahi thi (jise 016 likhne se aur 017
+padhne se mana karta hai, hamesha zero) aur har advert "0 applied" dikhata tha.
+*Analytics screen wahi jagah hai jahan ye galti dikhti hi nahi — galat number
+sahi number jaisa lagta hai.* To:
+
+| Guard | Kahan | Kya rokta hai |
+|---|---|---|
+| 027 | jp_app | `ApplicationCount`/`ViewCount` padhna |
+| 010 | jp_sso | Email/Mobile/UserUid project karna |
+| 011 | jp_mdm | Requestor/approver/entity/RequestNo project karna |
+
+⚠️ **027 ka guard FILE todkar saabit hua, haath se deploy kar ke nahi** — file
+pehle proc ko `CREATE OR ALTER` karti hai, phir guard chalati hai, to
+haath se chadhaayi hui tooti version guard chalne se pehle overwrite ho jaati
+hai. *"File on disk is not the database"* ka doosra sira.
+
+🔴 **Aur suite khud dobara ginti hai.** `admin-analytics.mjs` apni SQL se
+wahi figures nikaal kar compare karti hai — proc ko proc se compare karna kuch
+saabit nahi karta, kyunki poora risk yahi hai ki proc ka source galat ho.
+
+🔒 **REPORT.VIEW kaafi nahi hai, aur ye naap kar dekha gaya.** Holder set:
+
+```
+MODERATION_ADMIN, SCHOOL_OWNER, SCHOOL_VIEWER, SENIOR_HR, SUPER_ADMIN, VERIFICATION_ADMIN
+```
+
+School Viewer ke paas **hai** (apni reports ke liye). To service **admin user
+type** bhi maangta hai, aur teen negative force hote hain: owner 403, **Viewer
+403** (jiske paas permission hai — isi se refusal ka matlab banta hai), teacher
+403.
+
+🔒 **Response ke raw bytes padhe jaate hain:** koi email, school name, uid,
+RequestNo nahi — 7235 byte, sirf counts aur waits. Aur swagger suite
+`AdminAnalyticsDto` ke schema par wahi assert karti hai, kyonki schema mein
+email aa jaana matlab teeno jagah edit ho chuki hain.
+
+🔴 **Jo screen ne pehli hi run mein bataya:** sabse purana khula school
+registration **82 din** se waiting hai. Yehi wo number hai jiske liye screen hai
+— *"4 pending"* theek lagta hai, *"oldest 82 days"* nahi. Threshold (7 din)
+screen mein ek hi jagah likha hai aur screen **khud kehti hai** ki wo uska apna
+faisla hai, koi agreed SLA nahi.
+
+⚠️ **Do nayi gap isi kaam se nikli:** **G45** (suspension ke alawa kisi status
+change ka reason store nahi hota — isi liye reason field sirf wahan hai jahan
+bachta hai) aur **G46** (admin khud ko, aur aakhiri admin ko, suspend kar sakta
+hai — screen mana karti hai, server nahi).
+
+⚠️ **Swagger floor 137 → 139, aur ek slip ka naam:** `/admin/desk/jobs` 7B
+ke aakhir mein joda gaya tha aur **floor nahi badha** — floor minimum hai, to
+138 vs 137 pass ho gaya aur naye route ko koi protection mili hi nahi. *Niyam
+sakht hua: floor usi commit mein badhao jo route jodta hai, kyunki suite bata
+nahi sakti ki tum bhool gaye.*
+
+⚠️ Menu row **"Users" → "Accounts"** (route `/users` waisa hi) — screen,
+heading aur copy teeno accounts kehte hain, aur sidebar ka doosra shabd wahi
+drift hai jo `SCHOOL_BRANCHES` ("Campuses", route `/branches`) record
+karta hai.
+
+⚠️ **AdminDeskController ka ek purana orphan bhi theek hua:** 7B mein
+`SearchJobs` ko `[HttpPost(".../pull")]` se **pehle** daala gaya tha,
+to Pull ka doc comment uske attribute se alag ho kar agle method ko describe
+karne laga. Teesri baar isi pattern se — *member ko kisi maujood member se
+pehle daalna uski documentation adopt kar leta hai, aur kuch fail nahi hota.*
+
+---
+
 #### 🔴 2.86 — G36: PASSWORD REPO SE NIKLA, AUR REWRITE KI DO GALTIYAN
 
 G36 ne 17 file likhi thi. 8-0 tak **32 file mein 95 literal** the — har nayi
@@ -10970,11 +11116,13 @@ parameter optional kar ke (API start hi nahi hui), SQL guard ko probe proc se,
 G31 ko trail table par inject kiye gaye fault se, aur G44 ko prerendered bytes
 dono taraf padh kar.
 
-⚠️ **Khula kya hai, naam se:** **G36** (shared password 17 script mein —
-`lib/accounts.mjs` + 18 suite ka mechanical kaam), **admin console ka bacha hua
-hissa** (users screen — backend **pehle se poora** hai, `@Search` proc aur
-repository dono mein; plus analytics ka derived-count proc + screen), aur
-**§2A sweep**. Teeno 8-0 ke andar hi hone hain.
+✅ **Uske baad band hue:** **G36** (95 literal, 32 file — 2.86) aur **admin
+console ka bacha hua hissa** (Accounts + Analytics — 2.87).
+
+⚠️ **Khula kya hai, naam se:** **§2A sweep** (baaki 🟡 ko trigger aur owner ke
+saath ek line mein restate karna) — 8-0 ka saatvan item. Aur is kaam se do nayi
+gap nikli jo **8A** ki hain: **G45** (status change ka reason store nahi hota)
+aur **G46** (self-suspend aur last-admin guard nahi hai).
 
 ---
 
