@@ -563,3 +563,58 @@ them — it is to make each suite ARRANGE the state it is testing, which is what
 ```
 billing 47/47 · jobs-consume 27/27 · entitlement-engine 34/34 · sr-registration 11/11
 ```
+
+---
+
+## SR-5 — startup experience ✅
+
+`scripts/start-all.mjs` and `scripts/stop-all.mjs`.
+
+**Order is the feature.** jp-shared first, then the four hosts — not a
+preference: the hosts load `jp-shared/ui` as an **import map** entry resolved
+in the browser at runtime, not bundled. If :4999 is not answering when a host
+page loads, that host is broken until reloaded and will not recover on its
+own. That is the "four blank tabs in front of a client" failure.
+
+**It kills whatever holds a port first.** A stale `ng serve` from a previous
+session answers, so everything looks fine while it serves code from before
+your last change. *"It answers" is not "it is yours."*
+
+**stop-all kills by PORT, not by image name.** `taskkill /IM node.exe` would
+take the editor's language servers with it — a bad trade somebody only notices
+afterwards. Seven ports, each named before it is killed, and the result is
+**verified**: `taskkill` returns before the socket is released, so "I stopped
+it" followed by a port still answering is how the next `start-all` silently
+reuses a stale server.
+
+### 🔴 The spawn bug, which produced seven empty logs
+
+The first version used `detached: true` + `shell: true` + piped stdio, then
+`unref()`. Result: **seven 0-byte log files and seven 180-second timeouts**,
+while `npx ng serve` run by hand in the same directory worked perfectly.
+
+On Windows, detaching a shell-spawned child into its own process group and
+unref-ing it severs the pipes before anything is written — so the output
+vanished and every service looked like it had failed to start.
+
+Fixed by giving the child a **file descriptor** instead of a pipe: it inherits
+the handle and writes to the file directly, with no parent-side plumbing to
+sever. `detached` was dropped entirely — node does not kill its children when
+it exits, so the services outlive the script regardless, and detaching bought
+nothing but the bug.
+
+⚠️ The timeouts are split by kind: 60s for an API, 180s for a dev server. One
+timeout for both would either give up on Angular's first compile or make a
+failed API take a minute to report.
+
+⚠️ `ready` is a PATH, not just the port. A port opens before Angular has
+finished compiling, so waiting on the socket reports ready while the page is
+still a 404.
+
+### And one process lesson, recorded in stop-all's header
+
+The demo fixture from the **20 October** client demo was still live on **25
+October** — five days — so `run_all.sql` would have failed on the
+priced-public-plan guard, and the catalogue the product resolved against was
+the demo's. The teardown script is correct; the process around it is not. *A
+fixture that must be torn down by hand eventually is not.*

@@ -1,0 +1,39 @@
+ WARN  Sharing mapped paths with wildcards (*) needs either the ignoreUnusedDeps feature or 'includeSecondaries: { resolveGlob: true }'. Dropped: jp-shared/*.
+ INFO  [Federation SSE] Local reloader initialized with endpoint /@angular-architects/native-federation:build-notifications
+ INFO  Building federation artifacts
+ NOTE  Skip packages you don't want to share in your federation config
+ INFO  Bundling external npm packages with bundle type 'browser-shared'
+ INFO  Checksum of browser-shared matched, re-using cached externals.
+❯ Building...
+✔ Building...
+Initial chunk files | Names                      |  Raw size
+styles.css          | styles                     |  61.42 kB | 
+main.js             | main                       | 326 bytes | 
+polyfills.js        | polyfills                  | 152 bytes | 
+
+                    | Initial total              |  61.90 kB
+
+Lazy chunk files    | Names                      |  Raw size
+chunk-DRJS6Z24.js   | registration-component     | 128.77 kB | 
+chunk-GQAU456U.js   | school-profile-component   | 108.92 kB | 
+chunk-LL3W3Y52.js   | applicant-detail-component |  96.57 kB | 
+chunk-VKWT7Y5U.js   | teacher-search-component   |  69.71 kB | 
+chunk-M7PA3RUT.js   | team-component             |  66.91 kB | 
+chunk-SR6GNEER.js   | branches-component         |  59.32 kB | 
+chunk-LHQVK6UR.js   | job-form-component         |  58.78 kB | 
+chunk-7D2RSBKR.js   | dashboard-component        |  53.65 kB | 
+chunk-CIAX36PB.js   | applicant-list-component   |  46.58 kB | 
+chunk-JXTACCP7.js   | account-status-component   |  43.27 kB | 
+chunk-76LNLMPA.js   | job-list-component         |  31.63 kB | 
+chunk-7RXU4A3I.js   | offers-component           |  25.19 kB | 
+chunk-YLOXJ4Y2.js   | bootstrap                  |  21.74 kB | 
+chunk-SIBJFNJG.js   | register-component         |  21.12 kB | 
+chunk-MVEDVHTJ.js   | login-component            |  16.11 kB | 
+...and 9 more lazy chunks files. Use "--verbose" to show all the files.
+
+Application bundle generation complete. [3.970 seconds] - 2026-10-25T02:46:16.107Z
+
+Watch mode enabled. Watching for file changes...
+NOTE: Raw file sizes do not reflect development server per-request transformations.
+[2m8:16:16 am[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m Re-optimizing dependencies because vite config has changed
+  [32m➜[39m  [1mLocal[22m:   [36mhttp://localhost:[1m4300[22m/[39m

@@ -1,0 +1,39 @@
+ WARN  Sharing mapped paths with wildcards (*) needs either the ignoreUnusedDeps feature or 'includeSecondaries: { resolveGlob: true }'. Dropped: jp-shared/*.
+ INFO  [Federation SSE] Local reloader initialized with endpoint /@angular-architects/native-federation:build-notifications
+ INFO  Building federation artifacts
+ NOTE  Skip packages you don't want to share in your federation config
+ INFO  Bundling external npm packages with bundle type 'browser-shared'
+ INFO  Checksum of browser-shared matched, re-using cached externals.
+❯ Building...
+✔ Building...
+Initial chunk files | Names                        |  Raw size
+styles.css          | styles                       |  61.42 kB | 
+main.js             | main                         | 326 bytes | 
+polyfills.js        | polyfills                    | 152 bytes | 
+
+                    | Initial total                |  61.90 kB
+
+Lazy chunk files    | Names                        |  Raw size
+chunk-GWAMXUAQ.js   | request-detail-component     | 125.94 kB | 
+chunk-ZTM736KT.js   | user-list-component          |  74.50 kB | 
+chunk-IILNGTOD.js   | verification-queue-component |  60.72 kB | 
+chunk-BZ2CK5JE.js   | job-moderation-component     |  55.69 kB | 
+chunk-URQYTAA3.js   | entitlement-matrix-component |  52.73 kB | 
+chunk-S6QSGLJA.js   | report-queue-component       |  48.16 kB | 
+chunk-THSA2H3T.js   | analytics-component          |  43.96 kB | 
+chunk-GSCXROUY.js   | featured-placement-component |  42.80 kB | 
+chunk-A4NRPQWY.js   | enquiry-queue-component      |  42.24 kB | 
+chunk-K7LYJWEN.js   | dashboard-component          |  41.61 kB | 
+chunk-R67SXQJB.js   | payments-queue-component     |  40.99 kB | 
+chunk-ZVYOGXGJ.js   | content-blocks-component     |  39.30 kB | 
+chunk-S5OJEUEK.js   | faq-admin-component          |  37.48 kB | 
+chunk-ZMEEHOQJ.js   | bootstrap                    |  16.99 kB | 
+chunk-3TXKF3AV.js   | login-component              |  14.80 kB | 
+...and 6 more lazy chunks files. Use "--verbose" to show all the files.
+
+Application bundle generation complete. [3.762 seconds] - 2026-10-25T02:46:03.201Z
+
+Watch mode enabled. Watching for file changes...
+NOTE: Raw file sizes do not reflect development server per-request transformations.
+[2m8:16:03 am[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m Re-optimizing dependencies because vite config has changed
+  [32m➜[39m  [1mLocal[22m:   [36mhttp://localhost:[1m4200[22m/[39m

@@ -1,0 +1,61 @@
+❯ Building...
+✔ Building...
+Browser bundles     
+Initial chunk files  | Names                  |  Raw size
+main.js              | main                   |  27.39 kB | 
+styles.css           | styles                 |  15.91 kB | 
+chunk-CA4EFS25.js    | -                      |   6.33 kB | 
+chunk-CQKY7TPI.js    | -                      |   2.60 kB | 
+chunk-VUJOFXKG.js    | -                      | 987 bytes | 
+chunk-ESFGYX3U.js    | -                      | 867 bytes | 
+
+                     | Initial total          |  54.09 kB
+
+Lazy chunk files     | Names                  |  Raw size
+chunk-4BZA5K3E.js    | job-list-component     |  48.91 kB | 
+chunk-FRZMGIQX.js    | job-detail-component   |  38.23 kB | 
+chunk-4MZTPID4.js    | contact-component      |  31.14 kB | 
+chunk-GDYBCBVL.js    | home-component         |  28.39 kB | 
+chunk-QP6PFZFU.js    | how-it-works-component |  16.11 kB | 
+chunk-XYGRVDMV.js    | faq-component          |  15.98 kB | 
+chunk-RLTRI3UX.js    | continue-component     |  15.93 kB | 
+chunk-ER6DW2UK.js    | privacy-component      |  13.89 kB | 
+chunk-4NONCGTC.js    | terms-component        |  13.75 kB | 
+chunk-J6ZIIIHV.js    | about-component        |  10.69 kB | 
+chunk-3OFBBFYO.js    | not-found-component    |   4.53 kB | 
+chunk-ZNV4MZGH.js    | -                      |   4.39 kB | 
+
+
+Server bundles      
+Initial chunk files  | Names                  |  Raw size
+main.server.mjs      | main.server            |  30.34 kB | 
+chunk-MG6TF5VZ.mjs   | -                      |   6.32 kB | 
+server.mjs           | server                 |   3.01 kB | 
+chunk-XTSRNJV5.mjs   | -                      |   2.59 kB | 
+chunk-54EZUNS5.mjs   | -                      | 972 bytes | 
+chunk-IT6IMWD5.mjs   | -                      | 853 bytes | 
+polyfills.server.mjs | polyfills.server       | 268 bytes | 
+
+Lazy chunk files     | Names                  |  Raw size
+chunk-G2J634MB.mjs   | job-list-component     |  48.90 kB | 
+chunk-3XB5ZPLV.mjs   | job-detail-component   |  38.22 kB | 
+chunk-OMFXJAH5.mjs   | contact-component      |  31.12 kB | 
+chunk-HBIP5HSS.mjs   | home-component         |  28.37 kB | 
+chunk-IEJXAQ4S.mjs   | how-it-works-component |  16.10 kB | 
+chunk-QBEHW3PG.mjs   | faq-component          |  15.97 kB | 
+chunk-22DX3AEO.mjs   | continue-component     |  15.91 kB | 
+chunk-F2HN5RU5.mjs   | privacy-component      |  13.88 kB | 
+chunk-TAVHRKAK.mjs   | terms-component        |  13.74 kB | 
+chunk-HTUF4GB7.mjs   | about-component        |  10.68 kB | 
+chunk-XBNL3QLH.mjs   | not-found-component    |   4.51 kB | 
+chunk-QESAS47R.mjs   | -                      |   4.38 kB | 
+
+Application bundle generation complete. [10.215 seconds] - 2026-10-25T02:47:01.222Z
+
+Watch mode enabled. Watching for file changes...
+NOTE: Raw file sizes do not reflect development server per-request transformations.
+[2m8:17:02 am[22m [36m[1m[vite][22m[39m [34m[2m(ssr)[22m[39m Re-optimizing dependencies because vite config has changed
+[2m8:17:02 am[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m Re-optimizing dependencies because vite config has changed
+  [32m➜[39m  [1mLocal[22m:   [36mhttp://localhost:[1m4500[22m/[39m
+[2m8:17:03 am[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [optimizer] bundling dependencies...
+[2m8:17:03 am[22m [36m[1m[vite][22m[39m [34m[2m(ssr)[22m[39m [optimizer] bundling dependencies...

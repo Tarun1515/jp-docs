@@ -1056,6 +1056,61 @@ Wait for `Now listening on: http://localhost:5199`, then check
 
 ---
 
+## 6b. Starting and stopping the whole stack
+
+Seven processes, in an order that matters. Two commands instead.
+
+```powershell
+cd D:\Projects\jp-docs
+node scripts/start-all.mjs      # everything, in order, with a status table
+node scripts/stop-all.mjs       # the other direction
+```
+
+| Flag | What it does |
+|---|---|
+| `--apis` (start) | just JP.Sso.Api and JP.App.Api |
+| `--web` (stop) | leaves the two APIs running |
+
+### 🔴 Why the order matters, and why the script kills first
+
+**jp-shared starts first.** The four Angular hosts load `jp-shared/ui` as an
+**import map** entry resolved in the browser at runtime — it is not bundled
+into them. If `:4999` is not answering when a host page loads, that host is
+broken until reloaded, and will not recover on its own. That is the "four
+blank tabs in front of a client" failure.
+
+**Whatever is already on a port is killed first.** A stale `ng serve` from a
+previous session answers, so everything looks fine — while it serves code from
+before your last change. *"It answers" is not "it is yours."*
+
+⚠️ `stop-all` kills by **port**, never by image name: `taskkill /IM node.exe`
+would take your editor's language servers with it. It also **verifies**
+afterwards, because `taskkill` returns before the socket is released, and "I
+stopped it" followed by a port that still answers is how the next start
+silently reuses a stale server.
+
+### Expected timings from cold
+
+```
+JP.Sso.Api   5199   up in 1s
+JP.App.Api   5299   up in 1s
+jp-shared    4999   up in 8s
+jp-admin     4200   up in 23s
+jp-school, jp-teacher, jp-public    ~30-60s each (first Angular compile)
+```
+
+A service showing **DOWN** in the table is one whose log in
+`jp-docs/.run-logs/` is worth reading — it will present as a broken page
+rather than as an error.
+
+⚠️ **Neither script touches SQL Server, LocalDB, or the demo fixture.** If you
+set the demo fixture up, tear it down in the same sitting with
+`scripts/demo/demo-teardown.sql` — on 2026-10-25 the fixture from the 20
+October client demo was still live, which would have failed a full
+`run_all.sql` on the priced-public-plan guard.
+
+---
+
 ## 7. The regression — one command
 
 This is **the** way to check that the product still works. Not a selection of
