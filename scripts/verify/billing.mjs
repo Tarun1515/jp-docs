@@ -653,9 +653,27 @@ try {
   section('6. 🔴 DOWNGRADE BELOW USED — refused, never negative');
   // =========================================================================
 
-  /* Put the owner back in force on the paid plan, quota 5, and use 3. */
+  /*
+    Put the owner back in force on the paid plan, quota 5, and use 3.
+
+    🔴 EVERY JOB_POST LEDGER ROW FOR THIS OWNER IS CLEARED, NOT ONLY THIS
+    SUITE'S. It used to clear only rows tagged `billing-suite%`, which was
+    right while JOB_POST was FREE and nothing else could write one. Since SR-4
+    a job publish CONSUMES, so any earlier suite that published against the
+    shared fixture owner leaves a row here — and the assertions below state
+    EXACT counts ("quota 5 and 3 used").
+
+    Measured: "used 4 of 5" where 3 was expected, in the full run only and
+    never alone. A suite that asserts an exact count has to own the state it
+    is counting.
+
+    ⚠️ The explanation lives HERE rather than inside the SQL string: a long
+    comment shipped to sqlcmd through -Q is prose travelling through a command
+    line for no benefit, and it broke this statement once already.
+  */
   sql(`SET NOCOUNT ON; USE jp_app;
-    DELETE FROM t_app_feature_ledger WHERE OwnerUid = '${owner}' AND Notes LIKE 'billing-suite%';
+    DELETE FROM t_app_feature_ledger
+     WHERE OwnerUid = '${owner}' AND FeatureId = ${JOB_POST};
     UPDATE t_app_subscriptions SET EndsOn = DATEADD(day, 30, SYSUTCDATETIME())
      WHERE OwnerUid = '${owner}' AND StatusId = 1 AND Is_Deleted = 0;`);
 

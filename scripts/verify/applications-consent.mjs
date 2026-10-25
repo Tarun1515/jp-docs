@@ -68,6 +68,7 @@
 import { execFileSync } from 'node:child_process';
 import { token as loginToken } from './lib/login.mjs';
 import { secret } from './lib/accounts.mjs';
+import { arrangeUngated, restoreCatalogue } from './lib/catalogue.mjs';
 
 const SSO = 'http://localhost:5199/api';
 const APP = 'http://localhost:5299/api';
@@ -194,6 +195,19 @@ const cleanup = () => sql(`SET NOCOUNT ON; USE jp_app;
   fixture and its teardown leaves rows behind, and the next run reads them as
   product behaviour.
 */
+/*
+  🔴 SR-4: THIS SUITE ARRANGES AN UNGATED ENGINE, AND USED TO INHERIT ONE.
+
+  It publishes jobs, and since SR-4 a publish CONSUMES — so it left ledger
+  rows against the shared fixture owner and the billing suites that run after
+  it found their counts off by one. Those suites pass alone and failed only
+  in the full run, which is the signature of contamination rather than a bug.
+
+  This suite is not testing entitlement; it needs to publish the way it
+  always could, so it asks for that state rather than assuming it.
+*/
+arrangeUngated();
+
 cleanup();
 
 const entryApps = scalar(`SET NOCOUNT ON; USE jp_app; SELECT COUNT(*) FROM t_app_applications;`);
@@ -628,6 +642,12 @@ try {
     !binds.some((b) => /subscription|plan|saved/i.test(b)),
     'no payment, no interest — only the teacher\'s own acts');
 } finally {
+  /*
+    🔴 AND THE CATALOGUE BACK, so the next suite does not inherit a
+    switched-off engine.
+  */
+  restoreCatalogue();
+
   // =========================================================================
   console.log('\n=== TEARDOWN ===');
   cleanup();

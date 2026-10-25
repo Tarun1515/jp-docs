@@ -47,6 +47,7 @@ import { existsSync, unlinkSync } from 'node:fs';
 import { join } from 'node:path';
 import { token as loginToken } from './lib/login.mjs';
 import { secret } from './lib/accounts.mjs';
+import { arrangeUngated, restoreCatalogue } from './lib/catalogue.mjs';
 
 const SSO = 'http://localhost:5199/api';
 const APP = 'http://localhost:5299/api';
@@ -186,6 +187,19 @@ const cleanup = () => sql(`SET NOCOUNT ON; USE jp_app;
    WHERE RefEntityTypeId = 3 AND RefEntityUid IS NOT NULL
      AND NOT EXISTS (SELECT 1 FROM t_app_offers o WHERE o.OfferUid = RefEntityUid);
 `);
+
+/*
+  🔴 SR-4: THIS SUITE ARRANGES AN UNGATED ENGINE, AND USED TO INHERIT ONE.
+
+  It publishes jobs, and since SR-4 a publish CONSUMES — so it left ledger
+  rows against the shared fixture owner and the billing suites that run after
+  it found their counts off by one. Those suites pass alone and failed only
+  in the full run, which is the signature of contamination rather than a bug.
+
+  This suite is not testing entitlement; it needs to publish the way it
+  always could, so it asks for that state rather than assuming it.
+*/
+arrangeUngated();
 
 cleanup();
 
@@ -832,6 +846,12 @@ try {
     (tStats.body?.data?.recent ?? []).every((x) => x.statusName !== 'Rejected'),
     (tStats.body?.data?.recent ?? []).map((x) => x.statusName).join(', '));
 } finally {
+  /*
+    🔴 AND THE CATALOGUE BACK, so the next suite does not inherit a
+    switched-off engine.
+  */
+  restoreCatalogue();
+
   // =========================================================================
   console.log('\n=== TEARDOWN ===');
   cleanup();

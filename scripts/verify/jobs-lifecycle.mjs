@@ -33,7 +33,7 @@
 import { execFileSync } from 'node:child_process';
 import { token as loginToken } from './lib/login.mjs';
 import { secret } from './lib/accounts.mjs';
-import { arrangeUngated, restoreCatalogue } from './lib/catalogue.mjs';
+import { arrangeUngated, restoreCatalogue, catalogueState, catalogueSummary } from './lib/catalogue.mjs';
 
 const SSO = 'http://localhost:5199/api';
 const APP = 'http://localhost:5299/api';
@@ -367,9 +367,15 @@ try {
   const maps = scalar(`SET NOCOUNT ON; USE jp_mdm;
     SELECT COUNT(*) FROM m_mdm_plan_features WHERE Is_Deleted=0;`);
 
-  check('🔴 shipped state on EXIT — no jobs, JOB_POST still FREE, no mappings',
-    left === '0' && mode === '1|1' && maps === '0',
-    `jobs ${left}, JOB_POST ${mode}, mappings ${maps}`);
+  /*
+    🔴 WAS "JOB_POST still FREE, no mappings" — 2.64's switched-off engine,
+    which this suite used to INHERIT. It now arranges that state itself at the
+    top and restoreCatalogue() puts the catalogue back here, so the state to
+    assert on exit is the catalogue.
+  */
+  check('🔴 shipped state on EXIT — no jobs, and the SR-4 catalogue back',
+    left === '0' && catalogueState().ok,
+    `jobs ${left}, ${catalogueSummary()}`);
 }
 
 const failed = results.filter((r) => !r.pass);
