@@ -10,3 +10,6 @@ local-accounts.md
 
 # Suite output kept by scripts/verify/run.mjs — G35 says keep it, git says not here.
 .verify-logs/
+
+# SR-5 runtime logs from start-all.mjs — process output, not source.
+.run-logs/
