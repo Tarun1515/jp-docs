@@ -33,6 +33,8 @@
   Run (both APIs up): node scripts/verify/swagger.mjs
 */
 
+import fs from 'node:fs';
+import path from 'node:path';
 const APIS = [
   {
     name: 'JP.Sso.Api',
@@ -198,8 +200,22 @@ const APIS = [
       in the commit that adds the route, because the suite cannot tell you that
       you forgot. The anonymous CEILING below is the one that catches an
       addition, and it only covers /api/public.
+
+      🔴 RAISED TO 143 ON 2026-10-25 (SCHOOL REVAMP SR-1/SR-2), in the same
+      change that added the routes. The four are GET /api/masters/tehsils —
+      the new cascade level — and the three on /api/address: availability,
+      suggest and resolve, the Places seam.
+
+      ⚠️ 143 WAS MEASURED, not calculated: the run printed "143 found, floor
+      139" before this line moved.
+
+      ⚠️ AND THE ANONYMOUS CEILING NOTED ABOVE WAS TOO NARROW, which SR-2
+      found by walking straight past it: three of those four new routes are
+      anonymous, and the ceiling only counts /api/public. It is now backed by
+      a source-level check of every anonymous controller — see the assertion
+      that follows the /api/public one.
     */
-    minOperations: 139,
+    minOperations: 143,
   },
 ];
 
@@ -436,11 +452,124 @@ try {
       .filter((verb) => ['get', 'post', 'put', 'patch', 'delete'].includes(verb))
       .map((verb) => `${verb.toUpperCase()} ${p}`));
 
-  check('🔴 the anonymous surface is EXACTLY six operations — a 7th is a new front door',
+  check('🔴 the /api/public surface is EXACTLY six operations — a 7th is a new front door',
     anonymousOps.length === 6,
     anonymousOps.length === 6
       ? '6, unchanged'
       : `${anonymousOps.length}: ${anonymousOps.join(', ')}`);
+
+  /*
+    =========================================================================
+    🔴 AND THE REAL ANONYMOUS SURFACE, WHICH THE ASSERTION ABOVE DOES NOT
+    MEASURE — FOUND IN SR-2
+    =========================================================================
+
+    The check above counts paths under /api/public. It was WRITTEN as "the
+    anonymous surface is exactly six", and those are not the same claim.
+
+    SR-2 added three genuinely anonymous operations at /api/address/* — a new
+    front door, open to the internet, costing money per call — and this suite
+    stayed green, because the new routes are not under /api/public. That is
+    exactly the failure the assertion exists to prevent, walking straight past
+    it.
+
+    ⚠️ AND IT WAS ALREADY WRONG BEFORE SR-2. Measured while fixing it:
+    /api/schools/{uid}/public carries [AllowAnonymous] on an [Authorize]
+    controller, and the health endpoints are anonymous too. The suite even has
+    an assertion NAMING the schools route as "not in that set" — true of the
+    /api/public set, and read for two phases as "not anonymous", which it
+    never was.
+
+    🔴 WHY THE SWAGGER DOCUMENT CANNOT ANSWER THIS. Measured: all 143
+    operations report security "inherit" against a single global Bearer
+    requirement. The generator is not configured to emit a per-operation
+    override for [AllowAnonymous], so the DOCUMENT genuinely does not know
+    which routes are open. The path prefix was a proxy for a fact swagger does
+    not carry.
+
+    So the ground truth is the source, and that is what this reads: every
+    [AllowAnonymous] in either API, plus every controller with no [Authorize]
+    at all — because PublicController has neither attribute and is open by
+    default, which a grep for [AllowAnonymous] alone would miss entirely.
+  */
+  const CONTROLLER_DIRS = [
+    'D:/Projects/jp-backend/JP.App.Api/Controllers',
+    'D:/Projects/jp-backend/JP.Sso.Api/Controllers',
+  ];
+
+  /*
+    Each entry is a file that is anonymous, wholly or in part, WITH the reason.
+    A new one appearing fails this suite — which is the conversation the
+    assertion exists to force.
+  */
+  const ANONYMOUS_ALLOWED = new Map([
+    ['PublicController.cs', 'the public job/school/FAQ/contact surface — no [Authorize] at all, anonymous by default (7A)'],
+    ['HealthController.cs', 'liveness, both APIs — a health probe cannot carry a token'],
+    ['AuthController.cs', 'sign in, register, forgot password — you cannot authenticate to authenticate'],
+    ['SchoolController.cs', 'ONE action: GET {uid}/public, what a teacher sees of a school (Phase 3)'],
+    ['AddressController.cs', 'SR-2: address autocomplete — registration is anonymous, so this must be. Rate limited per IP because it costs money per call.'],
+  ]);
+
+  const anonFiles = new Set();
+  const noAuthorize = new Set();
+
+  for (const dir of CONTROLLER_DIRS) {
+    if (!fs.existsSync(dir)) continue;
+
+    for (const name of fs.readdirSync(dir).filter((n) => n.endsWith('Controller.cs'))) {
+      /*
+        🔴 COMMENT LINES ARE STRIPPED FIRST, and this guard caught itself on
+        its very first run without it.
+
+        PublicController.cs has no [Authorize] attribute — it is the open
+        surface. But its header comment says "THE FIRST CONTROLLER IN THIS API
+        WITHOUT <c>[Authorize]</c>", and a plain text search matched that
+        prose, concluded the controller was protected, and dropped it from the
+        anonymous set. The suite then reported that PublicController had
+        "stopped being anonymous".
+
+        A text guard cannot tell code from prose about code — the same lesson
+        6.5A learned when a guard matched its own comment. Here the fix is
+        cheap and exact: attributes live on their own line, and C# comment
+        lines start with ///, // or *.
+      */
+      const text = fs.readFileSync(path.join(dir, name), 'utf8')
+        .split(/\r?\n/)
+        .filter((line) => !/^\s*(\/\/|\*|\/\*)/.test(line))
+        .join('\n');
+
+      if (/\[AllowAnonymous\]/.test(text)) {
+        anonFiles.add(name);
+      }
+
+      /*
+        ⚠️ A CONTROLLER WITH NEITHER ATTRIBUTE IS OPEN. This API has no global
+        authorization filter, so "no [Authorize]" means "anybody". That is how
+        PublicController works, and it is the case a grep for [AllowAnonymous]
+        cannot see.
+      */
+      if (!/\[Authorize[\]( ]/.test(text)) {
+        anonFiles.add(name);
+        noAuthorize.add(name);
+      }
+    }
+  }
+
+  const unexpected = [...anonFiles].filter((f) => !ANONYMOUS_ALLOWED.has(f));
+  const vanished = [...ANONYMOUS_ALLOWED.keys()].filter((f) => !anonFiles.has(f));
+
+  console.log(`\n    anonymous controllers: ${[...anonFiles].sort().join(', ')}`);
+  console.log(`    …of which open by having no [Authorize] at all: ${[...noAuthorize].sort().join(', ') || 'none'}\n`);
+
+  check('🔒 every anonymous controller is one of the five we know about',
+    unexpected.length === 0,
+    unexpected.length
+      ? `NEW FRONT DOOR: ${unexpected.join(', ')} — add it here WITH the reason, or put it behind [Authorize]`
+      : `${anonFiles.size} controller(s), each listed with its reason`);
+
+  check('🔒 …and none of the five stopped being anonymous without this list moving',
+    vanished.length === 0,
+    vanished.length ? `no longer anonymous: ${vanished.join(', ')} — remove it from the list` : 'all five still open, as recorded');
 
   /*
     ⚠️ /api/schools/{uid}/public matches a path grep for "public" and is NOT
