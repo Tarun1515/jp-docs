@@ -362,3 +362,204 @@ green.
 swagger floor (App API)  139 -> 143   measured: "143 found, floor 139"
 swagger suite             43 ->  45   two new assertions
 ```
+
+---
+
+## SR-3 — registration + profile rebuild (in progress)
+
+### Done
+
+**The chain carries what registration collects.** `PrincipalMobile` and SR-1's
+five address columns now thread form → draft → submit → registration record →
+provisioning → `t_app_schools`. New suite `sr-registration.mjs` (11/11) walks
+the whole thing rather than each step.
+
+🔴 **The suite was proven to catch the original bug.** With the SR-3 fix
+reverted in a scratch copy of the procedure, it fails with
+`PrincipalMobile = -, expected 9812345678`. Restored, it is 11/11 again. A
+guard never seen to fail is a guess.
+
+⚠️ **And it asserts the negative:** a school registered with no tehsil, no
+area, no coordinates and no principal mobile still provisions, and those five
+columns come back NULL rather than back-filled with a guess. "The matrix moves
+fields, never orphans data" is a promise that has to be checked.
+
+**The form.**
+
+| Change | Why |
+|---|---|
+| Group choice in plain words | It read "How many campuses? / Just the one / Several campuses". A trust running four schools does not think "I have several campuses"; it thinks "we are a group". Each option now says what it means for them. |
+| Principal + HR fields removed | Four optional fields on a step a stranger fills in before approval. Not used to decide approvals, so they belong in the profile. A line on the step says where they went. |
+| Tehsil in the cascade | Optional, hidden when the state has none — the same correct degradation district and city have had since 2.47. |
+| **Village or area** free-text box | The point of the whole address design: Haryana's ~6,800 villages are not a dropdown and never will be, so the school types the name and it is stored as a *place* rather than squeezed into an address line. |
+| Logo step | See below. |
+
+🔴 **The towns of the whole district load as soon as a district is picked**,
+not after a tehsil — because the tehsil step is optional. Waiting for it would
+mean a school that skips tehsil never sees a town, which is the shape of
+"optional" that is really "required and badly labelled".
+
+### The logo — a column that had no producer
+
+`t_app_schools.LogoPath` has existed since Phase 3 and **nothing ever wrote
+it**: the only logo endpoint resolves a SchoolId from the caller, and during
+registration there is no school yet. So every school page showed a blank where
+a logo should be, and no suite noticed because nothing was missing — a NULL
+column is not an error.
+
+`POST /api/approvals/draft/logo` stores the file through the **same validator
+as every other upload** (2.48: extension, magic bytes, size, generated storage
+name) and returns the path; the client sends it back on the next draft save, so
+the draft stays the single source of truth (2.50).
+
+⚠️ **It is its own step.** It is the only thing on the form that needs the user
+to go and find a file, which is the most likely place to stall. On its own step
+it is one ask with its own explanation — and the contact step got shorter in
+the same change, so the form is six steps and no longer than it was.
+
+⚠️ **The preview is the file in the browser's hand, not a fetch.** Uploads live
+under `App_Data`, which is not served statically and must never be — teacher
+resumes share that root. Previewing from the server would mean a new
+authenticated media route for a picture the browser already has. After a reload
+the preview is gone, and the template says "your image is saved" rather than
+showing a broken one.
+
+🔴 **Required, per the client's instruction — with the caution recorded.**
+FIELD_MATRIX §A1 asks them to confirm: a school registering from a phone at
+night that cannot find its logo file will stop here, so the ask is "a logo **or
+any photo** of the school". If they tick "optional", one block of validation
+changes.
+
+### `ui-combobox` — one searchable select (G27)
+
+In `jp-shared/ui`, taking the same `UiSelectOption[]` as `<ui-select>` so
+replacing a plain select is a tag change. SR-1 seeded 143 Haryana towns; a
+native `<select>` with 143 options is a list you can only use if you already
+know where N falls.
+
+Three details chosen deliberately: the active row starts on the **current
+value** (so reopening and pressing Enter cannot silently change it), blur does
+**not** clear the value (the query is scratch state), and Enter is only
+swallowed when the list is open with an active row (so a one-field form can
+still be submitted from the keyboard).
+
+### Still open in SR-3
+
+- Adopting `ui-combobox` at the call sites (the component and its export are
+  done; the replacements are not).
+- The profile's own principal/HR fields — the column exists and the chain
+  carries it; the profile form does not ask yet.
+- The multi-school dashboard CTA.
+- Teacher browse intelligent defaults.
+
+---
+
+## SR-4 — billing UX + real plan catalogue (BUILT AND PROVEN, NOT ACTIVATED)
+
+### 🔴 First, a correction to the brief's premise
+
+SR-4 describes *"UNLIMITED = Metered mapping with NULL QuotaPerPeriod = no
+limit — **an explicit engine change** with its own tests"*.
+
+**It is not an engine change. The engine already does this.**
+
+`036_entitlement_catalog.sql` has said since 2.5, on the column itself:
+
+> NULL = unlimited within the plan. 0 = explicitly none. ⚠️ These are NOT the
+> same and the procedure must not conflate them.
+
+and `013_entitlement.sql` (~line 695) implements exactly that — `IF
+@QuotaPerPeriod IS NULL` sets the source and skips the comparison entirely.
+What SR-4 needed was the **catalogue** and the **tests**, not engine work.
+
+### Measured, not read
+
+```
+the catalogue says:  JOB_POST METERED (3) · UNLIMITED quota NULL · included 1
+
+consuming JOB_POST eleven times on UNLIMITED:
+  allowed      : 11   (must be 11)
+  refusals     :  0   (must be 0)
+  ledger rows  : 11   (unlimited still RECORDS every consume)
+
+🔴 CONTROL — a FREE plan (quota 1):
+  first  -> 1 (allowed)
+  second -> 0 QUOTA_EXHAUSTED
+```
+
+The control is what makes the first block mean anything: if FREE also allowed
+the second, the test would prove nothing about NULL.
+
+⚠️ Four of my own setup errors were caught by running it, each by a precise
+refusal: wrong subscription status (`2` is EXPIRED, `1` is ACTIVE), a missing
+reference (`A metered consume must carry a reference to what it is for`), the
+wrong result-set shape, and `NEWID()` as an `EXEC` parameter value. The
+procedure's messages were right every time; my probe was wrong.
+
+### What is in the repo
+
+- `013_seed_school_plans.sql` — the three plans, the gating flips, the eight
+  mappings, with prices marked **PROVISIONAL** and the free-plan period
+  question pointed at FIELD_MATRIX §E.
+- 🔒 A build guard in it asserting **APPLICATION_VIEW stays FREE** — the hard
+  rule that a school's own data is never paywalled. Reading the applicants to
+  a job you already posted is not a consuming action, and a lapsed plan must
+  not take them away.
+
+### 🔴 WHY IT IS NOT ACTIVATED, AND WHAT THAT COSTS
+
+`013_seed_school_plans.sql` is **not wired into `run_all.sql`**, and the
+database is back at 2.64's shipped state — engine off, every feature FREE, no
+mappings, two plans. Three reasons, in order of weight:
+
+1. **The blast radius is product-wide and the suites encode the old world.**
+   Activating it immediately broke `billing` (47) and `jobs-consume` (27), and
+   not superficially:
+
+   | What broke | Why |
+   |---|---|
+   | `restoreShipped()` in **both** suites | They "restore shipped state" with `DELETE FROM m_mdm_plan_features` + every feature back to FREE. Under 2.64 that WAS the shipped state. With a real catalogue it is **a DELETE of the product's pricing, running twice per regression** — measured: one run left the catalogue at 0 mappings. |
+   | `billing`'s fixture | Inserts `(SCHOOL_FREE, JOB_POST)`, which the catalogue now seeds — unique-index collision, suite dead at its fixture. |
+   | `jobs-consume` scenario (a) | Tests FREE-mode behaviour and *assumed* the shipped default was FREE. |
+   | Entry/exit assertions in both | Assert "every feature FREE with no plan mappings (2.64)" as the premise. |
+
+   Every one of those is a legitimate, finishable change — and each needs its
+   reason written, per the standing instruction. That is the remaining work,
+   not a blocker.
+
+2. **The prices are not confirmed.** FIELD_MATRIX §E asks the client to tick
+   or correct them, and asks the one question we genuinely cannot answer: the
+   free plan's single job post — **per month, or ever?** Seeding a live
+   catalogue on numbers from a phone call, while the document asking them to
+   confirm those numbers is unsigned, is the exact failure 008 was written to
+   prevent.
+
+3. **A broken regression is worse than an unbuilt feature**, and a demo
+   environment that does not work is worse than both.
+
+**To activate** (one command, once the above is done and prices are
+confirmed):
+
+```
+sqlcmd -S localhost\TARUN -E -I -b -f 65001 \
+  -i database\jp_mdm\03_seed\013_seed_school_plans.sql
+```
+
+…plus adding it to `run_all.sql` after `011`, and flipping 011's guard from
+"no priced public plan" to "exactly these four" — that flip is written and was
+tested, then reverted with the rest.
+
+### ⚠️ The lesson this part produced
+
+**A suite that asserts a shipped DEFAULT is a suite that breaks when the
+default becomes a decision.** Three suites encode "the engine is off" as a
+premise, which was correct and documented for four phases, and is now the
+single biggest obstacle to turning the engine on. The fix is not to weaken
+them — it is to make each suite ARRANGE the state it is testing, which is what
+`jobs-consume` scenario (a) now does.
+
+### Verified after reverting
+
+```
+billing 47/47 · jobs-consume 27/27 · entitlement-engine 34/34 · sr-registration 11/11
+```
