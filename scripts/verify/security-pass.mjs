@@ -891,6 +891,34 @@ try {
   */
   check('the suite ran to completion', false, String(error).slice(0, 300));
 } finally {
+  /*
+    🔴 THE SUPERADMIN GOES BACK TO ACTIVE WHATEVER HAPPENED — AND THIS IS
+    HERE BECAUSE IT WAS NOT, AND IT TOOK THE WHOLE REGRESSION DOWN.
+
+    Section 7b suspends the real superadmin on purpose: G46's middle case,
+    proving the guard refuses the LAST admin rather than refusing everyone.
+    The restore sat immediately after it, inside the try — so a run that
+    died anywhere between the two left the account SUSPENDED.
+
+    Measured on 2026-10-25: StatusId 4, nine failed sign-ins and a live
+    lockout row. Every suite after it failed at login with "This account is
+    temporarily locked", which reads as an auth bug and is nothing of the
+    kind — five suites died at entry before anyone looked at the cause.
+
+    ⚠️ IT IS IDEMPOTENT AND UNCONDITIONAL. Checking "was it me who suspended
+    it" needs state that a crashed run does not have; setting ACTIVE on an
+    account that is already ACTIVE costs nothing.
+  */
+  sql(`SET NOCOUNT ON; USE jp_sso;
+    UPDATE t_sso_users
+       SET StatusId = 2, FailedAttemptCount = 0
+     WHERE Email = '${SUPER}' AND (StatusId <> 2 OR FailedAttemptCount > 0);
+
+    UPDATE t_sso_user_lockouts
+       SET UnlockedOn = SYSUTCDATETIME(), ModifiedOn = SYSUTCDATETIME()
+     WHERE UserId = (SELECT UserId FROM t_sso_users WHERE Email = '${SUPER}')
+       AND UnlockedOn IS NULL AND Is_Deleted = 0;`);
+
   if (browser) await browser.close();
 
   const failed = results.filter((r) => !r.pass);

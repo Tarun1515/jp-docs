@@ -33,7 +33,7 @@ import { createRequire } from 'node:module';
 import { execFileSync } from 'node:child_process';
 import { session as loginSession, token as loginToken } from './lib/login.mjs';
 import { secret } from './lib/accounts.mjs';
-import { arrangeUngated } from './lib/catalogue.mjs';
+import { arrangeUngated, restoreCatalogue } from './lib/catalogue.mjs';
 
 const require = createRequire(import.meta.url);
 const { chromium } = require(
@@ -491,6 +491,16 @@ try {
   check('the suite ran to completion', false, error.message);
   console.error(error);
 } finally {
+  /*
+    🔴 THE CATALOGUE BACK, FIRST THING ON THE WAY OUT.
+
+    This suite called arrangeUngated() at the top. Without this line it
+    leaves the engine switched off, and the next suite in the run inherits
+    it — failing for a reason that has nothing to do with itself. That is
+    the shape of every contamination incident in this project.
+  */
+  restoreCatalogue();
+
   if (browser) await browser.close().catch(() => {});
 
   section('7. EXIT — invitations gone, nobody left unlocked');
