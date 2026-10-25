@@ -53,6 +53,7 @@ import { execFileSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { session as loginSession } from './lib/login.mjs';
 import { secret } from './lib/accounts.mjs';
+import { restoreCatalogue, arrangeUngated, catalogueState, catalogueSummary } from './lib/catalogue.mjs';
 
 const require = createRequire(import.meta.url);
 const { chromium } = require(
@@ -130,6 +131,15 @@ const restoreShipped = () => {
   sql(`SET NOCOUNT ON; USE jp_mdm;
     UPDATE m_mdm_features SET GatingModeId=1, Is_Active=1 WHERE Is_Deleted=0;
     DELETE FROM m_mdm_plan_features;`);
+
+    /*
+      🔴 AND THE REAL CATALOGUE BACK. The delete above clears THIS
+      suite's mappings, which it must — but under 2.64 that WAS the
+      shipped state, so nine suites "restored" it by leaving the table
+      empty. SR-4 seeded a real catalogue, and leaving it empty became a
+      delete of the product's pricing running twice per suite.
+    */
+    restoreCatalogue();
 };
 
 let ownerSchool = 0;
@@ -181,6 +191,25 @@ const hrSession = await login(HR.id, HR.pw);
   retired.
 */
 let viewerSession = null;
+
+/*
+  🔴 SR-4: THIS SUITE ARRANGES AN UNGATED ENGINE, AND USED TO INHERIT ONE.
+
+  SR-4 made JOB_POST metered with a quota of 1 on the free plan — the
+  product the client asked for, and the plan the shared fixture school is
+  on. About nine suites publish jobs against that one school, so the first
+  consumes the month and every later one is refused.
+
+  This suite is not testing entitlement. It needs to publish a job the way
+  it always could, so it now ASKS for that state rather than assuming it.
+
+  ⚠️ Gating is still covered — by the suites whose subject it is: billing,
+  billing-screens, entitlement-http, entitlement-engine, jobs-consume and
+  screens-25 all arrange metered state themselves and assert it.
+
+  restoreCatalogue() on the way out puts the real catalogue back.
+*/
+arrangeUngated();
 
 try {
   viewerSession = await login(VIEWER.id, VIEWER.pw);
@@ -939,9 +968,18 @@ try {
       JOIN t_sso_permissions p ON p.PermissionId=rp.PermissionId
     WHERE r.RoleCode='HR' AND p.PermissionCode LIKE 'JOB.%' AND rp.Is_Deleted=0;`)[0];
 
-  check('🔴 shipped state on EXIT — FREE, no mappings, no jobs, HR grants intact',
-    mode === '1|1' && maps === '0' && jobs === '0' && hrGrants === '3',
-    `JOB_POST ${mode}, mappings ${maps}, jobs ${jobs}, HR JOB.* grants ${hrGrants}`);
+  /*
+    🔴 WAS "FREE, no mappings" — 2.64's switched-off engine. This suite now
+    ARRANGES that state for itself (see arrangeUngated at the top) and
+    restoreCatalogue() puts the real catalogue back, so the state to assert on
+    the way out is the catalogue — an empty mapping table here would mean the
+    suite ate the product's pricing.
+
+    ⚠️ The jobs and HR-grant checks are untouched and still load-bearing.
+  */
+  check('🔴 shipped state on EXIT — the SR-4 catalogue, no jobs, HR grants intact',
+    catalogueState().ok && jobs === '0' && hrGrants === '3',
+    `${catalogueSummary()}, jobs ${jobs}, HR JOB.* grants ${hrGrants}`);
 }
 
 const failed = results.filter((r) => !r.pass);

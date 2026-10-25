@@ -25,6 +25,7 @@ import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { token as loginToken } from './lib/login.mjs';
 import { secret } from './lib/accounts.mjs';
+import { restoreCatalogue, catalogueState, catalogueSummary } from './lib/catalogue.mjs';
 
 const SSO = 'http://localhost:5199/api';
 const APP = 'http://localhost:5299/api';
@@ -97,6 +98,15 @@ const restore = () => {
   sql(`SET NOCOUNT ON; USE jp_mdm;
     UPDATE m_mdm_features SET GatingModeId=${SHIPPED_MODE}, Is_Active=1 WHERE Is_Deleted=0;
     DELETE FROM m_mdm_plan_features;`);
+
+    /*
+      🔴 AND THE REAL CATALOGUE BACK. The delete above clears THIS
+      suite's mappings, which it must — but under 2.64 that WAS the
+      shipped state, so nine suites "restored" it by leaving the table
+      empty. SR-4 seeded a real catalogue, and leaving it empty became a
+      delete of the product's pricing running twice per suite.
+    */
+    restoreCatalogue();
   sql(`SET NOCOUNT ON; USE jp_app;
     DELETE FROM t_app_feature_ledger WHERE OwnerUid='${OWNER}';
     DELETE FROM t_app_subscriptions  WHERE OwnerUid='${OWNER}';`);
@@ -130,11 +140,32 @@ try {
       && m.gatingModes.map((g) => g.code).join(',') === 'FREE,BOOLEAN,METERED',
     m?.gatingModes?.map((g) => g.code).join(', '));
 
-  check('🔴 NO plan-feature mappings exist — shipping the engine gated nothing',
-    m?.mappings?.length === 0, `${m?.mappings?.length} mappings`);
+  /*
+    🔴 INVERTED IN SR-4. These two asserted 2.64's switched-off engine — no
+    mappings, every feature FREE — which was the shipped state for four phases
+    and is now the state that means somebody deleted the catalogue.
+  */
+  check('🔴 the SR-4 catalogue mappings exist — the engine ships gated',
+    m?.mappings?.length === 8, `${m?.mappings?.length} mappings (expect 8)`);
 
-  check('🔴 every feature ships FREE',
-    m?.features?.every((f) => f.gatingModeCode === 'FREE'),
+  /*
+    ⚠️ THREE ON, THREE OFF — and naming which is the point. SR-4 turned on
+    exactly what the plans are sold on; gating something nobody has priced is
+    how a customer hits a wall we cannot explain.
+
+    🔒 APPLICATION_VIEW staying FREE is the hard rule in this list: a school's
+    own data is never paywalled, so reading the applicants to a job you already
+    posted is not a consuming action and a lapsed plan cannot take them away.
+    013_seed_school_plans.sql has a build guard for it; this is the same claim
+    from outside.
+  */
+  check('🔴 the three sold features are gated, the other three are not',
+    m?.features?.find((f) => f.featureCode === 'JOB_POST')?.gatingModeCode === 'METERED'
+      && m?.features?.find((f) => f.featureCode === 'TEACHER_INVITE')?.gatingModeCode === 'METERED'
+      && m?.features?.find((f) => f.featureCode === 'TEACHER_SEARCH')?.gatingModeCode === 'BOOLEAN'
+      && m?.features?.find((f) => f.featureCode === 'APPLICATION_VIEW')?.gatingModeCode === 'FREE'
+      && m?.features?.find((f) => f.featureCode === 'JOB_FEATURED')?.gatingModeCode === 'FREE'
+      && m?.features?.find((f) => f.featureCode === 'TEACHER_PROFILE_BOOST')?.gatingModeCode === 'FREE',
     m?.features?.map((f) => `${f.featureCode}=${f.gatingModeCode}`).join(' '));
 
   feature = m.features.find((f) => f.featureCode === 'JOB_POST');
@@ -196,6 +227,31 @@ try {
   });
 
   const ref = (n) => `A5B2C7D1-0E44-4F19-9A3C-2510000${String(n).padStart(5, '0')}`;
+
+  /*
+    🔴 SR-4: THIS SUITE NOW OWNS ITS OWN PLAN-FEATURE ROW, EXPLICITLY.
+
+    It drives JOB_POST on SCHOOL_FREE — and SR-4's catalogue seeds exactly that
+    pair, METERED with a quota of 1. So two owners wrote the same row: the seed
+    and this suite. The symptoms were a FREE scenario that consumed, and a
+    quota scenario whose allowance had already been spent.
+
+    The seeded pair is cleared here, so from this point the only mappings on
+    JOB_POST/SCHOOL_FREE are the ones this suite makes. restoreCatalogue() in
+    restore() puts the real one back on the way out.
+
+    ⚠️ ONLY THIS PAIR. Deleting the whole table is what nine suites used to do
+    and is the habit SR-4 had to unpick.
+  */
+  sql(`SET NOCOUNT ON; USE jp_mdm;
+    DELETE FROM m_mdm_plan_features
+     WHERE PlanId = ${PLAN} AND FeatureId = ${feature.featureId};`);
+
+  /* And FREE because this scenario says so, not because the catalogue does. */
+  await j(`${APP}/entitlements/features/${feature.featureId}/gating`, {
+    method: 'PUT', headers: H(admin),
+    body: JSON.stringify({ gatingModeId: 1, isActive: true }),
+  });
 
   // FREE right now — allowed, and writes nothing.
   const free = await consume(ref(1));
@@ -646,9 +702,14 @@ try {
   const modeNow = sql(`SET NOCOUNT ON; USE jp_mdm;
     SELECT GatingModeId, Is_Active FROM m_mdm_features WHERE FeatureId=${feature?.featureId ?? 0};`)[0];
 
-  check('🔴 fixture removed and gating restored to FREE / active',
-    left === 0 && maps === 0 && modeNow === '1|1',
-    `ledger rows ${left}, live mappings ${maps}, JOB_POST mode|active ${modeNow}`);
+  /*
+    🔴 WAS "restored to FREE / active" — 2.64's switched-off engine. SR-4 ships
+    a catalogue, so the restored state is the catalogue, and an empty table
+    here would mean this suite ate the product's pricing.
+  */
+  check('🔴 fixture removed and the SR-4 catalogue restored',
+    left === 0 && catalogueState().ok,
+    `ledger rows ${left} (expect 0) · ${catalogueSummary()}`);
 }
 
 // ---------------------------------------------------------------------------

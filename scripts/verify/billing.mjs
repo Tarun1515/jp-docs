@@ -36,6 +36,7 @@ import { promisify } from 'node:util';
 import { execFile } from 'node:child_process';
 import { session as loginSession, token as loginToken } from './lib/login.mjs';
 import { secret } from './lib/accounts.mjs';
+import { restoreCatalogue, catalogueState, catalogueSummary } from './lib/catalogue.mjs';
 
 const execFileAsync = promisify(execFile);
 
@@ -101,6 +102,15 @@ const restore = () => {
     DELETE FROM t_mdm_receipt_number_series;
 
     DELETE FROM m_mdm_plans WHERE PlanCode LIKE 'BILLING_SUITE%';`);
+
+    /*
+      🔴 AND THE REAL CATALOGUE BACK. The delete above clears THIS
+      suite's mappings, which it must — but under 2.64 that WAS the
+      shipped state, so nine suites "restored" it by leaving the table
+      empty. SR-4 seeded a real catalogue, and leaving it empty became a
+      delete of the product's pricing running twice per suite.
+    */
+    restoreCatalogue();
 
   /*
     ⚠️ Scoped to the owner under test, resolved the SAME way the API resolves
@@ -198,15 +208,31 @@ try {
     a killed run of THIS suite left its fixture behind — and both need to be
     seen rather than built on.
   */
-  check('🔴 shipped state: TWO plans, and NO priced public plan (008 forbids it)',
-    shippedPlans === 2 && pricedPublic === 0,
-    `${shippedPlans} plans, ${pricedPublic} priced`);
+  /*
+    🔴 THIS PREMISE CHANGED IN SR-4, AND THE CHANGE IS THE POINT.
 
-  check('shipped state: every feature FREE with no plan mappings (2.64)',
-    scalar(`SET NOCOUNT ON; USE jp_mdm;
-      SELECT CAST((SELECT COUNT(*) FROM m_mdm_features WHERE GatingModeId <> 1 AND Is_Deleted = 0)
-                + (SELECT COUNT(*) FROM m_mdm_plan_features) AS varchar(8));`) === '0',
-    'nothing gated, nothing mapped');
+    It read "TWO plans, and NO priced public plan (008 forbids it)". That was
+    right while pricing was unknown — a number we ship gets quoted back at us.
+
+    The client asked for a working catalogue with placeholder prices on
+    2026-10-25, so it is now a CLOSED SET of four, and 011's build guard
+    changed shape in the same commit: from "no priced public plan" to "exactly
+    these four". That is STRICTER, not weaker — it fails on an unexpected plan
+    of any price, including this suite's own fixture left behind.
+  */
+  check('🔴 shipped state: the FOUR catalogue plans',
+    shippedPlans === 4,
+    `${shippedPlans} plans (expect 4), ${pricedPublic} priced public (expect 2, both SAMPLE PRICING)`);
+
+  /*
+    🔴 AND THIS ONE INVERTED, which is SR-4 in one line.
+
+    2.64 shipped the engine OFF and this asserted exactly that. SR-4 turns
+    three features on, so "nothing gated" is no longer the shipped state — it
+    is the BROKEN state, and asserting it would now fail on a correct product.
+  */
+  check('🔴 shipped state: the SR-4 catalogue is live',
+    catalogueState().ok, catalogueSummary());
 
   const owner = ownerUid();
   const adminToken = await loginToken(ADMIN);
@@ -231,13 +257,32 @@ try {
   */
   sql(`SET NOCOUNT ON; USE jp_mdm;
     UPDATE m_mdm_features SET GatingModeId = 3 WHERE FeatureId = ${JOB_POST};
+
+    /*
+      ⚠️ THE FIXTURE OWNS ITS ROWS SINCE SR-4. The catalogue seeds
+      (SCHOOL_FREE, JOB_POST), so a bare INSERT hits the unique index and the
+      suite dies at its fixture. Only these two pairs are cleared — the rest
+      of the catalogue is the seed's, and restoreCatalogue() rebuilds these
+      on the way out.
+    */
+    DELETE FROM m_mdm_plan_features
+     WHERE FeatureId = ${JOB_POST} AND PlanId IN (1, ${fixturePlanId});
+
     INSERT INTO m_mdm_plan_features (PlanId, FeatureId, IsIncluded, QuotaPerPeriod)
     VALUES (1, ${JOB_POST}, 1, 1), (${fixturePlanId}, ${JOB_POST}, 1, 10);`);
 
+  /*
+    ⚠️ SCOPED TO THIS SUITE'S OWN TWO PAIRS SINCE SR-4. It used to count
+    every mapping on JOB_POST and expect 2, which was true when the suite was
+    the only thing that had ever mapped it. The catalogue now maps JOB_POST on
+    STANDARD and UNLIMITED as well, so the total is 4 and says nothing about
+    whether THIS fixture was built.
+  */
   check('fixture: a paid plan and two quotas — free 1, pro 10',
     fixturePlanId > 0
     && scalar(`SET NOCOUNT ON; USE jp_mdm;
-        SELECT CAST(COUNT(*) AS varchar(4)) FROM m_mdm_plan_features WHERE FeatureId = ${JOB_POST};`) === '2',
+        SELECT CAST(COUNT(*) AS varchar(4)) FROM m_mdm_plan_features
+         WHERE FeatureId = ${JOB_POST} AND PlanId IN (1, ${fixturePlanId}) AND Is_Deleted = 0;`) === '2',
     `plan ${fixturePlanId}`);
 
   // =========================================================================
@@ -760,14 +805,28 @@ try {
       SELECT CAST(COUNT(*) AS varchar(6)) FROM m_mdm_plans
        WHERE Price > 0 AND IsPublic = 1 AND IsDefault = 0 AND Is_Deleted = 0;`));
 
-    check('🔴 exit: NO priced public plan is left — 011\'s build guard stays green',
-      left === 0, `${left} priced public plan(s)`);
+    /*
+      ⚠️ WAS "NO priced public plan is left". That was 008's rule and 011
+      enforced it; SR-4 replaced it with a closed set of four, two of which
+      are priced on purpose. What must be true after this suite is that ITS
+      OWN fixtures are gone — which is what 011's reshaped guard checks at
+      build time, and what this checks here.
+    */
+    const strays = Number(scalar(`SET NOCOUNT ON; USE jp_mdm;
+      SELECT CAST(COUNT(*) AS varchar(6)) FROM m_mdm_plans
+       WHERE PlanCode LIKE 'BILLING[_]SUITE%' AND Is_Deleted = 0;`));
 
-    check('exit: every feature FREE again, no mappings (2.64)',
-      scalar(`SET NOCOUNT ON; USE jp_mdm;
-        SELECT CAST((SELECT COUNT(*) FROM m_mdm_features WHERE GatingModeId <> 1 AND Is_Deleted = 0)
-                  + (SELECT COUNT(*) FROM m_mdm_plan_features) AS varchar(8));`) === '0',
-      'nothing gated, nothing mapped');
+    check('🔴 exit: this suite\'s own plan fixtures are gone — 011\'s guard stays green',
+      strays === 0, `${strays} BILLING_SUITE plan(s) left, ${left} priced catalogue plan(s) (expect 2)`);
+
+    /*
+      🔴 THE CATALOGUE A REGRESSION RUN MUST NOT EAT. This suite builds its own
+      mappings and restoreCatalogue() puts the real ones back — if that ever
+      stops working, the next suite in the run inherits an empty catalogue and
+      fails for a reason that has nothing to do with it.
+    */
+    check('🔴 exit: the SR-4 catalogue is back, intact',
+      catalogueState().ok, catalogueSummary());
 
     const o = ownerUid();
 

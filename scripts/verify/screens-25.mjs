@@ -27,6 +27,7 @@ import { execFileSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { session as loginSession } from './lib/login.mjs';
 import { secret } from './lib/accounts.mjs';
+import { restoreCatalogue, catalogueState, catalogueSummary } from './lib/catalogue.mjs';
 
 const require = createRequire(import.meta.url);
 const { chromium } = require(
@@ -94,6 +95,15 @@ const restore = () => {
   sql(`SET NOCOUNT ON; USE jp_mdm;
     UPDATE m_mdm_features SET GatingModeId=1, Is_Active=1 WHERE FeatureId IN (${FEATURE}, ${SEARCH});
     DELETE FROM m_mdm_plan_features WHERE FeatureId IN (${FEATURE}, ${SEARCH});`);
+
+    /*
+      🔴 AND THE REAL CATALOGUE BACK. The delete above clears THIS
+      suite's mappings, which it must — but under 2.64 that WAS the
+      shipped state, so nine suites "restored" it by leaving the table
+      empty. SR-4 seeded a real catalogue, and leaving it empty became a
+      delete of the product's pricing running twice per suite.
+    */
+    restoreCatalogue();
   sql(`SET NOCOUNT ON; USE jp_app;
     DELETE FROM t_app_feature_ledger WHERE OwnerUid='${OWNER}';
     DELETE FROM t_app_subscriptions  WHERE OwnerUid='${OWNER}';`);
@@ -116,6 +126,13 @@ restore();
 sql(`SET NOCOUNT ON; USE jp_mdm;
   UPDATE m_mdm_features SET GatingModeId=3, Is_Active=1 WHERE FeatureId=${FEATURE};
   UPDATE m_mdm_features SET GatingModeId=2, Is_Active=1 WHERE FeatureId=${SEARCH};
+  /*
+    ⚠️ THE FIXTURE OWNS ITS ROW SINCE SR-4. The catalogue may already map this
+    plan and feature, and a bare INSERT then hits the unique index. Only this
+    pair is cleared; restoreCatalogue() rebuilds it on the way out.
+  */
+  DELETE FROM m_mdm_plan_features WHERE PlanId = ${PLAN} AND FeatureId = ${FEATURE};
+
   INSERT INTO m_mdm_plan_features (PlanId, FeatureId, IsIncluded, QuotaPerPeriod)
   VALUES (${PLAN}, ${FEATURE}, 1, 500);`);
 sql(`SET NOCOUNT ON; USE jp_app;
@@ -384,9 +401,17 @@ try {
   const rows = Number(sql(`SET NOCOUNT ON; USE jp_app;
     SELECT COUNT(*) FROM t_app_feature_ledger WHERE OwnerUid='${OWNER}';`)[0]);
 
-  check('🔴 everything restored — JOB_POST back to FREE/active, no mappings, no ledger rows',
-    state === '1|1' && maps === 0 && rows === 0,
-    `mode|active ${state}, mappings ${maps}, ledger ${rows}`);
+  /*
+    🔴 WAS "JOB_POST back to FREE/active, no mappings" — 2.64's switched-off
+    engine. SR-4 ships a catalogue, so an empty mapping table is no longer the
+    restored state; it is the state that means this suite ate the pricing.
+
+    ⚠️ The ledger check is unchanged and still load-bearing: this suite's own
+    consumes must be gone whatever the catalogue looks like.
+  */
+  check('🔴 everything restored — the SR-4 catalogue back, no ledger rows left',
+    catalogueState().ok && rows === 0,
+    `${catalogueSummary()}, ledger ${rows}`);
 }
 
 // ---------------------------------------------------------------------------

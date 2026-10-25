@@ -33,6 +33,7 @@ import { createRequire } from 'node:module';
 import { execFileSync } from 'node:child_process';
 import { session as loginSession, invalidate } from './lib/login.mjs';
 import { secret } from './lib/accounts.mjs';
+import { restoreCatalogue, catalogueState, catalogueSummary } from './lib/catalogue.mjs';
 
 const require = createRequire(import.meta.url);
 const { chromium } = require(
@@ -99,6 +100,15 @@ const restore = () => {
 
     DELETE FROM m_mdm_plans WHERE PlanCode LIKE 'BILLSCREEN%';`);
 
+    /*
+      🔴 AND THE REAL CATALOGUE BACK. The delete above clears THIS
+      suite's mappings, which it must — but under 2.64 that WAS the
+      shipped state, so nine suites "restored" it by leaving the table
+      empty. SR-4 seeded a real catalogue, and leaving it empty became a
+      delete of the product's pricing running twice per suite.
+    */
+    restoreCatalogue();
+
   sql(`SET NOCOUNT ON; USE jp_app;
     DELETE FROM t_app_feature_ledger WHERE Notes LIKE 'billscreen%';
 
@@ -136,8 +146,14 @@ try {
     SELECT CAST(COUNT(*) AS varchar(6)) FROM m_mdm_plans
      WHERE Price > 0 AND IsPublic = 1 AND IsDefault = 0 AND Is_Deleted = 0;`));
 
-  check('🔴 shipped state: NO priced public plan (008 forbids seeding one)',
-    priced === 0, `${priced} priced public plan(s)`);
+  /*
+    🔴 INVERTED IN SR-4. 008 forbade priced public plans while pricing was
+    unknown; the catalogue now ships two on purpose, both named
+    "(SAMPLE PRICING)" until the real list arrives. What this asserts is the
+    catalogue, not the absence of prices.
+  */
+  check('🔴 shipped state: the SR-4 catalogue is live',
+    catalogueState().ok, catalogueSummary());
 
   /*
     🔒 The permission this phase added, asserted as a premise — the closed set
@@ -164,6 +180,16 @@ try {
   /* JOB_POST metered, so the panel has a real "used of allowed" to render. */
   sql(`SET NOCOUNT ON; USE jp_mdm;
     UPDATE m_mdm_features SET GatingModeId = 3 WHERE FeatureId = ${JOB_POST};
+    /*
+      ⚠️ THE FIXTURE OWNS ITS ROWS SINCE SR-4. The catalogue seeds
+      (SCHOOL_FREE, JOB_POST), so a bare INSERT hits the unique index and the
+      suite dies at its fixture. Only these two pairs are cleared — the rest
+      of the catalogue belongs to the seed, and restoreCatalogue() rebuilds
+      these on the way out.
+    */
+    DELETE FROM m_mdm_plan_features
+     WHERE FeatureId = ${JOB_POST} AND PlanId IN (1, ${fixturePlanId});
+
     INSERT INTO m_mdm_plan_features (PlanId, FeatureId, IsIncluded, QuotaPerPeriod)
     VALUES (1, ${JOB_POST}, 1, 3), (${fixturePlanId}, ${JOB_POST}, 1, 25);`);
 
@@ -754,17 +780,33 @@ try {
   try {
     restore();
 
-    check('🔴 exit: NO priced public plan is left — 011\'s build guard stays green',
-      scalar(`SET NOCOUNT ON; USE jp_mdm;
-        SELECT CAST(COUNT(*) AS varchar(6)) FROM m_mdm_plans
-         WHERE Price > 0 AND IsPublic = 1 AND IsDefault = 0 AND Is_Deleted = 0;`) === '0',
-      'none');
+    /*
+      ⚠️ WAS "NO priced public plan is left". That was 008's rule and 011
+      enforced it; SR-4 replaced it with a closed set of four, two of which
+      are priced on purpose. What must be true after this suite is that ITS
+      OWN fixtures are gone — which is what 011's reshaped guard checks at
+      build time, and what this checks here.
+    */
+    /*
+      ⚠️ THE QUESTION CHANGED WITH THE PRODUCT. This counted PRICED PUBLIC
+      plans and expected zero, which was 008's rule. The catalogue now ships
+      two priced plans on purpose, so counting them says nothing — what must
+      be true is that THIS suite's BILLSCREEN fixtures are gone.
+    */
+    const strays = scalar(`SET NOCOUNT ON; USE jp_mdm;
+      SELECT CAST(COUNT(*) AS varchar(6)) FROM m_mdm_plans
+       WHERE PlanCode LIKE 'BILLSCREEN%' AND Is_Deleted = 0;`);
 
-    check('exit: every feature FREE again, no mappings (2.64)',
-      scalar(`SET NOCOUNT ON; USE jp_mdm;
-        SELECT CAST((SELECT COUNT(*) FROM m_mdm_features WHERE GatingModeId <> 1 AND Is_Deleted = 0)
-                  + (SELECT COUNT(*) FROM m_mdm_plan_features) AS varchar(8));`) === '0',
-      'nothing gated, nothing mapped');
+    check('🔴 exit: this suite left no plan fixture behind',
+      strays === '0', `${strays} BILLSCREEN plan(s) left`);
+
+    /*
+      🔴 WAS "every feature FREE again, no mappings (2.64)". SR-4 ships a
+      catalogue, so an empty table is no longer the restored state — it is the
+      state that means this suite ate the product's pricing.
+    */
+    check('🔴 exit: the SR-4 catalogue is back, intact',
+      catalogueState().ok, catalogueSummary());
 
     check('exit: the school is back on the free plan, in force',
       scalar(`SET NOCOUNT ON; USE jp_app;

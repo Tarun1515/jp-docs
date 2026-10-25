@@ -43,6 +43,7 @@ import { execFile, execFileSync } from 'node:child_process';
 import { promisify } from 'node:util';
 import { token as loginToken } from './lib/login.mjs';
 import { secret } from './lib/accounts.mjs';
+import { restoreCatalogue } from './lib/catalogue.mjs';
 
 const execFileAsync = promisify(execFile);
 
@@ -137,6 +138,15 @@ const restoreShipped = () => sql(`SET NOCOUNT ON; USE jp_mdm;
    WHERE FeatureId = ${FEATURE} AND (GatingModeId <> 1 OR Is_Active <> 1);
 
   DELETE FROM m_mdm_plan_features WHERE FeatureId = ${FEATURE};`);
+
+  /*
+    🔴 AND THE REAL CATALOGUE BACK. The delete above clears THIS
+    suite's mappings, which it must — but under 2.64 that WAS the
+    shipped state, so nine suites "restored" it by leaving the table
+    empty. SR-4 seeded a real catalogue, and leaving it empty became a
+    delete of the product's pricing running twice per suite.
+  */
+  restoreCatalogue();
 
 /*
   ⚠️ THE ORDER OF THESE DELETES IS NOT COSMETIC.

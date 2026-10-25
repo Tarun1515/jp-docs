@@ -39,6 +39,7 @@ import { createRequire } from 'node:module';
 import { execFileSync } from 'node:child_process';
 import { session as loginSession, token as loginToken } from './lib/login.mjs';
 import { secret } from './lib/accounts.mjs';
+import { restoreCatalogue, arrangeUngated } from './lib/catalogue.mjs';
 
 const require = createRequire(import.meta.url);
 const { chromium } = require(
@@ -97,6 +98,15 @@ const restoreShipped = () => sql(`SET NOCOUNT ON; USE jp_mdm;
 
   DELETE FROM m_mdm_plan_features WHERE FeatureId = ${FEATURE};`);
 
+  /*
+    🔴 AND THE REAL CATALOGUE BACK. The delete above clears THIS
+    suite's mappings, which it must — but under 2.64 that WAS the
+    shipped state, so nine suites "restored" it by leaving the table
+    empty. SR-4 seeded a real catalogue, and leaving it empty became a
+    delete of the product's pricing running twice per suite.
+  */
+  restoreCatalogue();
+
 const cleanup = () => sql(`SET NOCOUNT ON; USE jp_app;
   DELETE FROM t_app_notifications
    WHERE RefEntityTypeId = 2
@@ -115,6 +125,25 @@ const cleanup = () => sql(`SET NOCOUNT ON; USE jp_app;
 const CONTACT_WORDS = ['contactemail', 'contactmobile', 'resumepath', '@yopmail.com'];
 
 let browser;
+
+/*
+  🔴 SR-4: THIS SUITE ARRANGES AN UNGATED ENGINE, AND USED TO INHERIT ONE.
+
+  SR-4 made JOB_POST metered with a quota of 1 on the free plan — the
+  product the client asked for, and the plan the shared fixture school is
+  on. About nine suites publish jobs against that one school, so the first
+  consumes the month and every later one is refused.
+
+  This suite is not testing entitlement. It needs to publish a job the way
+  it always could, so it now ASKS for that state rather than assuming it.
+
+  ⚠️ Gating is still covered — by the suites whose subject it is: billing,
+  billing-screens, entitlement-http, entitlement-engine, jobs-consume and
+  screens-25 all arrange metered state themselves and assert it.
+
+  restoreCatalogue() on the way out puts the real catalogue back.
+*/
+arrangeUngated();
 
 try {
   // =========================================================================

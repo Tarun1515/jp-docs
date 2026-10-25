@@ -45,6 +45,7 @@
 import { execFileSync } from 'node:child_process';
 import { token as loginToken } from './lib/login.mjs';
 import { secret } from './lib/accounts.mjs';
+import { restoreCatalogue, catalogueState, catalogueSummary } from './lib/catalogue.mjs';
 
 const SSO = 'http://localhost:5199/api';
 const APP = 'http://localhost:5299/api';
@@ -100,6 +101,15 @@ const restoreShipped = () => {
   sql(`SET NOCOUNT ON; USE jp_mdm;
     UPDATE m_mdm_features SET GatingModeId=1, Is_Active=1 WHERE Is_Deleted=0;
     DELETE FROM m_mdm_plan_features;`);
+
+    /*
+      🔴 AND THE REAL CATALOGUE BACK. The delete above clears THIS
+      suite's mappings, which it must — but under 2.64 that WAS the
+      shipped state, so nine suites "restored" it by leaving the table
+      empty. SR-4 seeded a real catalogue, and leaving it empty became a
+      delete of the product's pricing running twice per suite.
+    */
+    restoreCatalogue();
   sql(`SET NOCOUNT ON; USE jp_app;
     IF OBJECT_ID('dbo.trg_publish_failpoint') IS NOT NULL DROP TRIGGER dbo.trg_publish_failpoint;`);
 };
@@ -136,11 +146,23 @@ try {
   const feat = matrix.body?.data?.features?.find((f) => f.featureCode === 'JOB_POST');
 
   check('JOB_POST exists as a feature', !!feat, feat ? `id ${feat.featureId}` : 'missing');
-  check('…seeded FREE and active',
-    feat?.gatingModeCode === 'FREE' && feat?.isActive === true,
+  /*
+    🔴 THE ENTRY PREMISE INVERTED IN SR-4.
+
+    This read "seeded FREE and active, and no mappings exist" — 2.64's
+    switched-off engine, which was the shipped state for four phases. SR-4
+    seeded a real catalogue, so FREE is no longer what ships: JOB_POST is
+    METERED, and asserting otherwise would fail on a correct product.
+
+    ⚠️ The suite still arranges every state it tests, below. What changed is
+    only what it may ASSUME before it starts.
+  */
+  check('…seeded METERED and active (SR-4)',
+    feat?.gatingModeCode === 'METERED' && feat?.isActive === true,
     `${feat?.gatingModeCode}, active ${feat?.isActive}`);
-  check('…and no plan-feature mappings exist',
-    matrix.body?.data?.mappings?.length === 0, `${matrix.body?.data?.mappings?.length} mappings`);
+
+  check('…and the SR-4 catalogue is the one in place',
+    catalogueState().ok, catalogueSummary());
 
   // The school we act as, resolved the way the API does.
   const branches = await j(`${APP}/branches`, { headers: HO });
@@ -167,6 +189,26 @@ try {
 
   // =========================================================================
   console.log('\n=== 2. 🔴 THE CONSUME, WIRED ===');
+
+  /*
+    🔴 (a) ARRANGES FREE MODE EXPLICITLY SINCE SR-4, AND USED TO ASSUME IT.
+
+    This scenario is about what FREE mode does — publishing costs nothing — and
+    it got that state for free, because 2.64 shipped every feature FREE. SR-4
+    made METERED the shipped state, so the assumption stopped holding and the
+    scenario failed on a correct product: `consumed true, ledger 0 -> 1`.
+
+    ⚠️ ARRANGED THROUGH THE ADMIN API, like (b) below, rather than by direct
+    SQL — the suite's own standing choice, so what it exercises is the path the
+    admin screen uses.
+
+    The lesson SR-4 keeps producing: a test that depends on a shipped DEFAULT
+    is a test that breaks when the default becomes a decision.
+  */
+  await j(`${APP}/entitlements/features/${FEATURE}/gating`, {
+    method: 'PUT', headers: HA,
+    body: JSON.stringify({ gatingModeId: 1, isActive: true }),
+  });
 
   const ledgerAtStart = ledgerCount();
 
@@ -456,9 +498,18 @@ try {
   const trg = scalar(`SET NOCOUNT ON; USE jp_app;
     SELECT CASE WHEN OBJECT_ID('dbo.trg_publish_failpoint') IS NULL THEN 'gone' ELSE 'STILL THERE' END;`);
 
-  check('🔴 shipped state restored on EXIT — FREE, no mappings, no jobs, no trigger',
-    mode === '1|1' && maps === '0' && jobs === '0' && trg === 'gone',
-    `JOB_POST ${mode}, mappings ${maps}, jobs ${jobs}, trigger ${trg}`);
+  /*
+    🔴 THE EXPECTED EXIT STATE MOVED WITH THE PRODUCT. It was "FREE, no
+    mappings" — 2.64's switched-off engine. SR-4 ships a catalogue, so the
+    shipped state is METERED with the eight seeded mappings.
+
+    ⚠️ It did not get weaker: this suite's own fixture is a DIFFERENT quota on
+    the same feature, so leaving it behind still changes the mapping count and
+    still fails here.
+  */
+  check('🔴 shipped state restored on EXIT — the SR-4 catalogue, no jobs, no trigger',
+    mode === '3|1' && maps === '8' && jobs === '0' && trg === 'gone',
+    `JOB_POST ${mode} (expect 3|1), mappings ${maps} (expect 8), jobs ${jobs}, trigger ${trg}`);
 }
 
 const failed = results.filter((r) => !r.pass);
