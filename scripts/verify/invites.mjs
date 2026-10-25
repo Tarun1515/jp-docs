@@ -697,6 +697,20 @@ try {
   } catch (error) {
     console.error('  ⚠️ COULD NOT RESTORE THE SHIPPED STATE:', error.message);
   }
+
+  /*
+    🔴 LAST THING OUT, SO NOTHING UNDOES IT.
+
+    This suite already calls restoreCatalogue() inside its entry helper, and
+    that is not enough: the finally above runs the same helper's DELETE (or
+    arrangeUngated's) afterwards, leaving the catalogue short. Measured by
+    running the suite alone and counting the mappings — 6, 5 and 0 across the
+    three suites that had this shape.
+
+    The next regression would then start from a broken catalogue, and the
+    suite that fails is never this one.
+  */
+  restoreCatalogue();
 }
 
 const failed = results.filter((r) => !r.pass);

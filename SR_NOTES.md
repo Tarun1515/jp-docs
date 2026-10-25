@@ -686,3 +686,107 @@ product, and none would have been visible from reading code.
 ⚠️ It is the same shape as the very first thing this run found: the demo plan
 fixture still live after five days. *State that must be restored by hand
 eventually is not.*
+
+---
+
+## SR-4 ACTIVATED — 2026-10-25, on the client's instruction
+
+> *"price abhi kuch bhi daal do dummy, isme koi issue nahi hai"* — so the
+> catalogue is live with placeholder prices, and the mechanism is what matters.
+
+### 🔴 The placeholder is in the plan NAME, not only in a comment
+
+```
+Standard (SAMPLE PRICING)     ₹1,499 / month
+Unlimited (SAMPLE PRICING)    ₹3,999 / month
+```
+
+A comment in a seed file is read by developers; **a plan name is read by
+customers**. 008 forbade seeding paid tiers precisely because "a number we
+ship gets quoted back at us", and the name is what stops that while the
+figures are placeholders. A build guard fails if the marker disappears while
+the prices are still dummy — the one way this goes wrong is somebody tidying
+it out because it looks untidy on screen.
+
+### Menu → pricing → back (client request, 2026-10-25)
+
+> *"kuch menu ke click pr pricing aani chahiye / jaise hi user pay kre to wo hi
+> page khul jaana chahiye jaha se pricing pr gya tha"*
+
+`UpgradeService` is the single route to the plans, so "where they came from" is
+decided in one place. It reuses `ReturnUrlService`, which already runs every
+candidate through `safeInternalPath` — the guard funnel-e2e forces with a
+hostile returnUrl, and a second implementation would be a second place for an
+open redirect.
+
+The billing page offers the way back **twice**: before choosing (read the
+plans, decide later) and in the confirmation after. ⚠️ **Offered, never
+automatic** — navigating the instant the request lands would snatch the
+request number off the screen, and that number is what they quote when they
+ring about a payment nobody has confirmed yet.
+
+The jobs page gains a quota-wall banner that **leads with "your job is safe as
+a draft"**. The upsell is second: leading with it answers a question nobody
+asked. It is a banner, not a redirect, and only for `QUOTA_EXHAUSTED` — a
+validation failure or a lapsed subscription are different problems, and
+offering an upgrade for either is selling to somebody whose issue it does not
+fix.
+
+### 🔴 THE BLAST RADIUS — what turning the engine on actually cost
+
+Nothing here was visible from reading code. Each number was measured.
+
+| What | Scale |
+|---|---|
+| Suites that **deleted the catalogue** as their "restore shipped state" | **9** |
+| Suites asserting the switched-off engine as a premise | **6**, in two phrasings |
+| Suites that publish jobs and so now **consume** | **8** |
+| Suites that passed ALONE and failed only in the full run | **5** |
+
+🔴 **"Restore the shipped state" meant "delete everything".** Under 2.64 the
+engine shipped off — every feature FREE, not one mapping — so the two were the
+same statement. With a real catalogue it is a **delete of the product's
+pricing, running on entry and exit**. Measured: one run left the catalogue at
+0 mappings with JOB_POST back to FREE.
+
+🔴 **The second phrasing only appeared in the full run.** Six suites assert
+`consumed === false` in an HTTP response rather than counting rows in SQL, so
+grepping for the SQL phrasing missed them. They pass alone because the shared
+fixture school has a quota of **1** — the first job-publishing suite spends
+the month for everyone after it.
+
+**The fix is one helper, not fifteen edits.** `lib/catalogue.mjs` owns what the
+catalogue is, rebuilds it by **running the seed** (not re-typing eight
+mappings — a second copy is two places to update and one to forget), and
+offers `arrangeUngated()` for suites that are not about billing.
+
+⚠️ **Gating is still covered**, by the suites whose subject it is: billing,
+billing-screens, entitlement-http, entitlement-engine, jobs-consume and
+screens-25 all arrange metered state themselves and assert it.
+entitlement-http now also names `APPLICATION_VIEW` staying FREE from the
+outside — the hard rule the seed guards from the inside.
+
+### 🔴 And the one that took the whole regression down
+
+`security-pass` suspends the **real superadmin** on purpose: G46's middle case,
+proving the guard refuses the *last* admin rather than refusing everyone. The
+restore sat immediately after it, **inside the try** — so a run that died
+between the two left the account suspended.
+
+Measured: `StatusId 4`, nine failed sign-ins, a live lockout row. **Five
+suites then died at entry** with *"This account is temporarily locked"*, which
+reads as an auth bug and is nothing of the kind.
+
+The restore is now in the `finally`, unconditional and idempotent. Checking
+"was it me who suspended it?" needs state a crashed run does not have, and
+setting ACTIVE on an active account costs nothing.
+
+### The lesson, stated once
+
+> **A test that depends on a shipped DEFAULT is a test that breaks when the
+> default becomes a decision.**
+
+Three phases of suites encoded "the engine is off" as a premise. That was
+correct and documented for four phases, and was the single biggest obstacle to
+turning the engine on. The answer is not to weaken them — it is for each suite
+to **arrange** the state it is testing.
