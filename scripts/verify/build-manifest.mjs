@@ -63,6 +63,13 @@ const PHASES = ['01_tables', '02_views', '02_indexes', '03_seed', '04_procedures
   short rather than a pattern that might swallow the next forgotten file.
 */
 const EXCLUDED = new Map([
+  ['jp_mdm/03_seed/013_seed_school_plans.sql',
+    'SR-4: the school plan catalogue, built and proven but NOT activated. '
+    + 'Wiring it into run_all turns the entitlement engine on product-wide, which breaks every '
+    + 'suite that encodes 2.64 (the switched-off engine) as its premise — and the prices are '
+    + 'still unconfirmed (FIELD_MATRIX.md section E). SR_NOTES.md records the full list of what '
+    + 'must change and the one command that activates it.'],
+
   ['jp_app/03_seed/002_backfill_phase3c_owners.sql',
     'a one-time backfill, commented out in run_all with its own instructions — '
     + 'running it on a fresh database would be a no-op at best'],

@@ -618,3 +618,71 @@ October** — five days — so `run_all.sql` would have failed on the
 priced-public-plan guard, and the catalogue the product resolved against was
 the demo's. The teardown script is correct; the process around it is not. *A
 fixture that must be torn down by hand eventually is not.*
+
+---
+
+## Final verification — what passed, and the four that did not
+
+```
+node scripts/stop-all.mjs   -> every port free
+node scripts/start-all.mjs  -> all seven up (1s, 1s, 8s, 23s, then ~30-60s each)
+node scripts/verify/run.mjs -> 45/49 suites clean in 870s
+```
+
+### The four, and none of them is the SR work
+
+| Suite | Why |
+|---|---|
+| `build-manifest` 10/11 | **My own guard, working.** `013_seed_school_plans.sql` is on disk and deliberately not in `run_all`. Added to its EXCLUDED map **by name with the reason** — which is what that map exists for. Now **12/12**. |
+| `offers` 56/57 | A second-tenant fixture hits **G23**: `400 · Your account is linked to more than one school`. |
+| `team-contract` 47/50 | Same cause, three assertions, same message. |
+| `screens-3h` | `Rohit 100`, suite expects `90`. |
+
+### 🔴 Two of them are LEFTOVER DEMO-DAY STATE, and the timestamps prove it
+
+```
+t_app_schools      id 91  "Sunrise International Academy"  created 2026-10-20 14:50 UTC
+t_app_school_users id 251  same instant, owner head@stmarys.edu.in
+```
+
+**20:20 IST on 20 October** — a school registered live during the client demo,
+against an account that already owned St Mary's. That gives the St Mary's
+owner **two school memberships**, and G23's documented refusal fires: *"one
+user, one school — the API cannot say otherwise yet."* `offers` and
+`team-contract` both use that owner as their second tenant, so both now get a
+`400` where they assert a cross-tenant `404`.
+
+⚠️ **And it is why 8A was 48/48 while this run is not.** 8A's regression ran at
+~19:10 IST on 20 October — **an hour before** that registration. The failures
+are not a regression in anything; they are the demo changing the fixtures the
+suites are built on.
+
+🔴 **Not deleted.** That is the client demo's own data, and removing a school
+somebody registered in front of a client is their call, not mine. One line
+removes the membership if they want the fixtures back:
+
+```sql
+UPDATE jp_app.dbo.t_app_school_users SET Is_Deleted = 1 WHERE SchoolUserId = 251;
+```
+
+### `screens-3h` — fixture drift from a suite, not from the demo
+
+Rohit Kulkarni's profile completion is **100%**, and the suite asserts the
+seeded **90**. His row was modified `2026-10-25 03:03 UTC` — during this
+session, not on demo day — and he now carries
+`teacher-photos/2026/10/…`. A suite that uploads a teacher photo is not
+restoring it.
+
+🔴 **Also not fixed by hand.** Deleting a teacher's photo to make an assertion
+pass is faking the fixture; the suite that uploads it should restore it, and
+finding which one is a contained piece of work rather than a guess.
+
+### What this says about the suite ecosystem
+
+Three of the four failures are **fixture drift** — two from a live demo, one
+from a suite that does not clean up after itself. None is a defect in the
+product, and none would have been visible from reading code.
+
+⚠️ It is the same shape as the very first thing this run found: the demo plan
+fixture still live after five days. *State that must be restored by hand
+eventually is not.*
