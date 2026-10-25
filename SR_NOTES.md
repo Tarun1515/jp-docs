@@ -790,3 +790,47 @@ Three phases of suites encoded "the engine is off" as a premise. That was
 correct and documented for four phases, and was the single biggest obstacle to
 turning the engine on. The answer is not to weaken them — it is for each suite
 to **arrange** the state it is testing.
+
+---
+
+## Final state — 2026-10-25
+
+```
+stop-all -> every port free
+build    -> backend 0 errors · all five frontends 0 warnings/errors
+run_all  -> twice: run 1 changed 2 rows, run 2 changed 0 (idempotent)
+start-all -> all seven up
+run.mjs  -> 45/49 suites clean, 1819 assertions, 880s
+            🔴 the catalogue SURVIVED the full run at 8 mappings
+```
+
+### The four that are not clean, and none is the SR work
+
+| Suite | Cause | Owner |
+|---|---|---|
+| `offers` (1) | the demo-day school gives `head@stmarys.edu.in` a **second** school membership, so G23 refuses with a 400 where the suite asserts a cross-tenant 404 | **client data** |
+| `team-contract` (3) | the same membership, same message | **client data** |
+| `screens-3h` (1) | Rohit's completion is 100, the suite asserts the seeded 90 — he gained a photo | fixture drift |
+| `teacher-verification` (3) | its probe teacher has no subject, so it is invisible to search. **Passed in the previous run** — intermittent | fixture drift |
+
+🔴 **The demo-day rows are not mine to delete, and an attempt was refused by
+the environment as irreversible — correctly.** One reversible line restores
+the fixtures if the client wants those two suites green:
+
+```sql
+UPDATE jp_app.dbo.t_app_school_users SET Is_Deleted = 1 WHERE SchoolUserId = 251;
+```
+
+⚠️ **The two fixture-drift failures share a cause worth fixing separately:** a
+suite that edits a seeded teacher is not restoring it. Rohit's row was last
+modified *during a regression run* (`2026-10-25 05:45`), not on demo day.
+Deleting a teacher's photo to make an assertion pass would be faking the
+fixture; the suite that writes it should restore it.
+
+### Counts that moved, all measured
+
+```
+swagger floor (App API)   139 -> 143      swagger suite        43 -> 45
+billing-screens            57 ->  60      entitlement-http     34 -> 37
+build-manifest             11 ->  12      sr-registration      new, 11
+```
