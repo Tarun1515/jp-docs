@@ -30,12 +30,32 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { session as loginSession, token as loginToken } from './lib/login.mjs';
 import { secret } from './lib/accounts.mjs';
+import {
+  arrangeSecondTenant, dropSecondTenant, secondTenantRowsLeft,
+} from './lib/second-tenant.mjs';
 
 const SSO = 'http://localhost:5199/api';
 const APP = 'http://localhost:5299/api';
 
 const OWNER = { id: 'principal@greenwood.edu.in', pw: secret('principal@greenwood.edu.in') };
-const OTHER_SCHOOL = { id: 'head@stmarys.edu.in', pw: secret('head@stmarys.edu.in') };
+
+/*
+  🔴 THE STRANGER IN SECTION 5 IS THIS SUITE'S OWN, NOT A BORROWED ACCOUNT.
+
+  It used to be head@stmarys.edu.in — a seeded owner of another school, which
+  is exactly the right SHAPE of actor: it holds USER.MANAGE, so a refusal from
+  it can only be the scope. Then a school was registered against that same
+  account live during the 20 October client demo, giving it a SECOND school
+  membership, and G23 answers that with
+  `400 · Your account is linked to more than one school`. Three assertions here
+  assert 404. Nothing was wrong with the product; the suite was depending on
+  rows it did not create, and somebody's demo changed them.
+
+  ⚠️ So section 5 builds its own stranger and takes it away in a `finally`.
+  lib/second-tenant.mjs holds the how and the why; offers.mjs uses the same
+  helper for the same reason.
+*/
+const TENANT_TAG = 'team';
 
 const MAIL_DROP = 'D:/Projects/jp-backend/JP.App.Api/App_Data/mail-drop';
 
@@ -346,33 +366,69 @@ check('🔴 …and after all five, the owner row is untouched', ownerIntact === 
 // ---------------------------------------------------------------------------
 console.log('\n=== 5. 🔴 ANOTHER SCHOOL\'S TEAM IS NOT REACHABLE ===');
 
-const stranger = await login(OTHER_SCHOOL.id, OTHER_SCHOOL.pw);
+/*
+  ⚠️ A KILLED RUN'S STRANGER FIRST. The same belt-and-braces the annexe above
+  gets: this suite's own leftovers are removed on the way in, so a second
+  tenant from an interrupted run cannot be mistaken for this one's.
+*/
+dropSecondTenant(TENANT_TAG);
 
-const strangerRead = await j(`${APP}/school/team`, { headers: head(stranger) });
-const strangerSeesColleague = JSON.stringify(strangerRead.body?.data?.members ?? [])
-  .includes(colleagueUid);
-check('another school\'s team does not contain this colleague', !strangerSeesColleague,
-  `${strangerRead.body?.data?.members?.length} members, none of them ours`);
+/*
+  ⚠️ THE BUILD IS INSIDE THE TRY, NOT BEFORE IT. Making the stranger is four
+  statements across two databases, and a failure half way through leaves an
+  account with no school — which is the orphan state this project has a
+  reconciliation query for. Inside the try, the `finally` removes whatever got
+  as far as existing.
+*/
+try {
+  const otherSchool = arrangeSecondTenant(TENANT_TAG, OWNER.id);
 
-const strangerRole = await j(`${APP}/school/team/${colleagueUid}/role`, {
-  method: 'PUT', headers: auth(stranger), body: JSON.stringify({ roleInSchool: 4 }),
-});
-check('🔴 they cannot re-role somebody on our team — 404, not 403', strangerRole.http === 404,
-  `${strangerRole.http} · ${strangerRole.body?.message}`);
+  check('premise: this run built its own stranger — a SCHOOL_OWNER with ONE membership',
+    otherSchool.ok, otherSchool.detail);
 
-const strangerScope = await j(`${APP}/school/team/${colleagueUid}/branches`, {
-  method: 'PUT', headers: auth(stranger), body: JSON.stringify({ branchIds: [] }),
-});
-check('🔴 …nor change their campuses', strangerScope.http === 404, `${strangerScope.http}`);
+  const stranger = await login(otherSchool.id, otherSchool.pw);
 
-const strangerDelete = await j(`${APP}/school/team/${colleagueUid}`, {
-  method: 'DELETE', headers: head(stranger),
-});
-check('🔴 …nor remove them', strangerDelete.http === 404, `${strangerDelete.http}`);
+  const strangerRead = await j(`${APP}/school/team`, { headers: head(stranger) });
+  const strangerSeesColleague = JSON.stringify(strangerRead.body?.data?.members ?? [])
+    .includes(colleagueUid);
+  check('another school\'s team does not contain this colleague', !strangerSeesColleague,
+    `${strangerRead.body?.data?.members?.length} members, none of them ours`);
 
-const survived = sql(`SET NOCOUNT ON; SELECT CAST(RoleInSchool AS varchar(3)) + '|' + CAST(Is_Active AS varchar(3))
-  FROM jp_app.dbo.t_app_school_users WHERE UserUid = '${colleagueUid}' AND Is_Deleted = 0`);
-check('🔴 …and our colleague\'s row survived all three', survived === '3|1', `role|active = ${survived}`);
+  const strangerRole = await j(`${APP}/school/team/${colleagueUid}/role`, {
+    method: 'PUT', headers: auth(stranger), body: JSON.stringify({ roleInSchool: 4 }),
+  });
+  check('🔴 they cannot re-role somebody on our team — 404, not 403', strangerRole.http === 404,
+    `${strangerRole.http} · ${strangerRole.body?.message}`);
+
+  const strangerScope = await j(`${APP}/school/team/${colleagueUid}/branches`, {
+    method: 'PUT', headers: auth(stranger), body: JSON.stringify({ branchIds: [] }),
+  });
+  check('🔴 …nor change their campuses', strangerScope.http === 404, `${strangerScope.http}`);
+
+  const strangerDelete = await j(`${APP}/school/team/${colleagueUid}`, {
+    method: 'DELETE', headers: head(stranger),
+  });
+  check('🔴 …nor remove them', strangerDelete.http === 404, `${strangerDelete.http}`);
+
+  const survived = sql(`SET NOCOUNT ON; SELECT CAST(RoleInSchool AS varchar(3)) + '|' + CAST(Is_Active AS varchar(3))
+    FROM jp_app.dbo.t_app_school_users WHERE UserUid = '${colleagueUid}' AND Is_Deleted = 0`);
+  check('🔴 …and our colleague\'s row survived all three', survived === '3|1', `role|active = ${survived}`);
+} finally {
+  /*
+    🔴 IN A `finally`, AND THE REMOVAL BEFORE THE ASSERTION ABOUT IT.
+
+    Everything above can throw — a 429 that never clears, an API that is not
+    up — and the stranger is a whole school and a whole account. SR-4 found
+    three suites that had left shared state short because the restore sat in
+    the happy path after something that could return early.
+  */
+  dropSecondTenant(TENANT_TAG);
+
+  const strangerLeft = secondTenantRowsLeft(TENANT_TAG);
+
+  check('🔴 the stranger this run built is gone again, from jp_sso AND jp_app',
+    strangerLeft === '0', `${strangerLeft} row(s) left`);
+}
 
 // ---------------------------------------------------------------------------
 console.log('\n=== 6. CAMPUS SCOPE — FULL SET, AND A NO-OP THAT WRITES NOTHING ===');

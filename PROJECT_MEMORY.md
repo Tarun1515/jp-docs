@@ -1,7 +1,7 @@
 # TEACHER RECRUITMENT PORTAL — PROJECT MEMORY
 
 > **Ye file har kaam ke baad update hogi.** Har naye chat/session mein sabse pehle ye file padho.
-> Last updated: **2026-10-20** | Phase **3 COMPLETE** + **2.5 engine** + **4 jobs COMPLETE** + **2.67 swagger fix** + **PRE-5 (G26 band, 2.68/2.69)** + **PRE-5b (baseline green)** + **5A applications BACKEND (2.70, G28)** + **5B applications SCREENS COMPLETE — PHASE 5 POORA (2.71, G30)** + **6A-0 approval engine above level 1 (2.72, G14 BAND, G31)** + **6A Offer Lite BACKEND COMPLETE (2.73, G32)** + **6B TEACHER SEARCH + INVITES BACKEND COMPLETE — 🔒 CONSENT PATH 2 (2.74, G33, G34)** + **6C-0 verification ka bakaya: G33 aur G34 BAND (2.75, G35, G36)** + **6C-1 NOTIFICATIONS BACKEND + G27 BAND (2.76, G37)** + **6C-2-0 G37 BAND — badge asli hua, aur shared suite runner (2.77, G35 BAND)** + **6C-2 SCREENS COMPLETE — 🔒 consent path 2 screen se, devtools-forced negatives dono taraf (2.78)** + **6.5A BILLING BACKEND COMPLETE — manual first, seam service par, expiry derived (2.79, G38)** + **6.5B BILLING SCREENS COMPLETE — PHASE 6.5 POORA (2.80)** + **7A-0 PUBLIC SURFACE KE TEEN FAISLE, CODE SE PEHLE (2.81, G39, G40)** + **7A PUBLIC JOB PAGES + CONTACT FORM COMPLETE — 🔒 pehli ANONYMOUS surface, SSR JS band kar ke saabit (2.82, G41, G42)** + **7B-0 G41 BAND — public→teacher funnel, aur ek parameter jo do jagah likha jaata tha aur kahin padha nahi (2.83, G43)** + **7B ADMIN OPERATIONS DESK COMPLETE — paanch surface, chha screen, athaarah route, aur ek column jo hamesha zero rehta tha (2.84, G43 BAND, G44)** + **8-0 COMPLETE — saaton item: chhe gap band (G31, G36, G38, G42, G44 + sweep ke G3/G4), Accounts aur Analytics screens, aur §2A ka poora sweep (2.85, 2.86, 2.87); G38 "future risk" likha gaya tha par DO shipped procedure mein ZINDA tha, aur G45/G46 screen banate waqt mili** + **8A SECURITY PASS + E2E CONSOLIDATION COMPLETE — chha gap band (G8, G9, G10, G22, G45, G46), aur run_all mein GYARAH file missing thin: naye machine par public site, moderation desk aur analytics teeno fail hote, poori regression green rehte hue (2.88)** | Next: **8B** (deployment readiness + LAUNCH_CHECKLIST) — ⚠️ Point 7 (interview/offer scope) aur §4 Q4 (billing MVP ka likhit confirmation) dono ab bhi client ke paas hain
+> Last updated: **2026-11-11** | Phase **3 COMPLETE** + **2.5 engine** + **4 jobs COMPLETE** + **2.67 swagger fix** + **PRE-5 (G26 band, 2.68/2.69)** + **PRE-5b (baseline green)** + **5A applications BACKEND (2.70, G28)** + **5B applications SCREENS COMPLETE — PHASE 5 POORA (2.71, G30)** + **6A-0 approval engine above level 1 (2.72, G14 BAND, G31)** + **6A Offer Lite BACKEND COMPLETE (2.73, G32)** + **6B TEACHER SEARCH + INVITES BACKEND COMPLETE — 🔒 CONSENT PATH 2 (2.74, G33, G34)** + **6C-0 verification ka bakaya: G33 aur G34 BAND (2.75, G35, G36)** + **6C-1 NOTIFICATIONS BACKEND + G27 BAND (2.76, G37)** + **6C-2-0 G37 BAND — badge asli hua, aur shared suite runner (2.77, G35 BAND)** + **6C-2 SCREENS COMPLETE — 🔒 consent path 2 screen se, devtools-forced negatives dono taraf (2.78)** + **6.5A BILLING BACKEND COMPLETE — manual first, seam service par, expiry derived (2.79, G38)** + **6.5B BILLING SCREENS COMPLETE — PHASE 6.5 POORA (2.80)** + **7A-0 PUBLIC SURFACE KE TEEN FAISLE, CODE SE PEHLE (2.81, G39, G40)** + **7A PUBLIC JOB PAGES + CONTACT FORM COMPLETE — 🔒 pehli ANONYMOUS surface, SSR JS band kar ke saabit (2.82, G41, G42)** + **7B-0 G41 BAND — public→teacher funnel, aur ek parameter jo do jagah likha jaata tha aur kahin padha nahi (2.83, G43)** + **7B ADMIN OPERATIONS DESK COMPLETE — paanch surface, chha screen, athaarah route, aur ek column jo hamesha zero rehta tha (2.84, G43 BAND, G44)** + **8-0 COMPLETE — saaton item: chhe gap band (G31, G36, G38, G42, G44 + sweep ke G3/G4), Accounts aur Analytics screens, aur §2A ka poora sweep (2.85, 2.86, 2.87); G38 "future risk" likha gaya tha par DO shipped procedure mein ZINDA tha, aur G45/G46 screen banate waqt mili** + **8A SECURITY PASS + E2E CONSOLIDATION COMPLETE — chha gap band (G8, G9, G10, G22, G45, G46), aur run_all mein GYARAH file missing thin: naye machine par public site, moderation desk aur analytics teeno fail hote, poori regression green rehte hue (2.88)** + **SR SCHOOL REVAMP COMPLETE (SR-0…SR-5) — client ke demo feedback ka poora pass: FIELD_MATRIX, address model + tehsil master, poore Bharat ki geography (782 district, 902 town), ek searchable combobox 20 jagah (G27), logo step, principal fields profile par, plan catalogue chalu, registration par plan choice, aur teacher ko apni profile se matching jobs; TEEN cheezein green build ke peeche chupi thin — run_all ka order naye machine par toota, teacher-verification ka darj kaaran galat tha, aur do CATCH block asli failure chhupa rahe the; CHAAR aur sirf screenshot dekhne se mili, jinme ek form ka jhooth aur ek class jo kuch karti hi nahi thi (2.86)** | Next: **8B** (deployment readiness + LAUNCH_CHECKLIST) — ⚠️ Point 7 (interview/offer scope) aur §4 Q4 (billing MVP ka likhit confirmation) dono ab bhi client ke paas hain
 >
 > 🔴 **Ye do line har phase ke close-out mein update hongi.** File 3I tak
 > pahunch chuki thi aur ye header **Phase 0** par khada tha — saat phase purana,
@@ -10382,6 +10382,293 @@ aur homepage ka placeholder jhooth bol raha tha.
 
 ---
 
+### 2.86 SR — SCHOOL REVAMP (SR-0 … SR-5), AUR TEEN CHEEZEIN JO GREEN BUILD KE PEECHE CHUPI THIN
+
+Client ke demo feedback se nikla ek poora pass: registration ka har field
+dobara poocha gaya, address ka model badla, geography seed hui, ek searchable
+dropdown poore product mein laga, plan catalogue chalu hua, aur teacher ko apni
+profile se matching jobs milne lagin.
+
+⚠️ **Ye pehli baar hai jab SR series is file mein darj ho rahi hai.** SR-0 se
+SR-4 tak ka kaam `SR_NOTES.md` mein chal raha tha aur yahan ek bhi zikr nahi
+tha — jo theek wahi galti hai jiske liye header ke neeche wali do line likhi
+gayi thin.
+
+---
+
+#### 2.86.1 SR-0 — FIELD MATRIX, AUR EK NUMBER JO LIYA JAATA THA AUR PHEK DIYA JAATA THA
+
+`FIELD_MATRIX.md` banaya gaya — client ke liye, plain language mein, har field
+ka "kahan poocha jaata hai / compulsory hai ya nahi / kyun / aapka faisla".
+
+🔴 **Field-by-field chalne se ek bug mila jo har link ke test hone ke baad bhi
+zinda tha.** Principal ka mobile registration par liya jaata tha, registration
+ke saath store hota tha, aur approval par **gir jaata tha** —
+`USP_ProvisionSchoolFromApproval` mein uska parameter hi nahi tha. Number
+jp_mdm mein pada rehta tha jahan koi school-facing read dekhta hi nahi.
+
+⚠️ **Aur jisne ise invisible banaya wo ye tha ki `PrincipalName` paar chala
+jaata tha.** Profile par principal dikhta tha — bas usse phone nahi kar sakte
+the.
+
+Kisi suite ne nahi pakda kyunki koi suite **poori chain** nahi chalti thi:
+
+```
+form -> SaveDraft -> Submit -> registration_details
+                            -> ProvisionFromApproval -> t_app_schools
+```
+
+Har link test hota tha. Unke **beech ka jod** nahi. *Jo field do sahi procedure
+ke beech se gir jaaye, wo dono ke liye invisible hai.* `sr-registration.mjs`
+ab poora walk assert karti hai, step nahi.
+
+---
+
+#### 2.86.2 SR-1 — ADDRESS KA MODEL: TEHSIL MASTER, AUR GAON FREE TEXT
+
+`ADDRESS_DESIGN.md`. State → district → **tehsil (optional)** → town, aur uske
+baad **free text** area/village, plus coordinates aur GooglePlaceId.
+
+🔴 **Haryana ke ~6,800 gaon kabhi dropdown nahi banenge.** Isliye school naam
+**type** karta hai, aur wo ek *jagah* ki tarah store hota hai — address line
+mein thoosa nahi jaata. Gaon ka school ab poora address de sakta hai.
+
+⚠️ `TehsilId` **identity nahi hai**, wahi niyam jo `m_mdm_state`,
+`m_mdm_district` aur `m_mdm_city` follow karte hain: jp_app ye id **bina foreign
+key** ke store karta hai (2.2). Agar ye id generate hoti, to naya build alag
+number de sakta tha un numbers se jin par live jp_app point karta hai.
+
+⚠️ Migration section chhota raha kyunki `m_mdm_city` **hamesha khaali** thi — to
+koi row kisi city par point kar hi nahi sakti thi.
+
+---
+
+#### 2.86.3 SR-2 — GOOGLE PLACES, SEAM PAR, SHIPPED OFF
+
+`IAddressLookupService` + `DisabledAddressLookupService` (default) +
+`GooglePlacesAddressLookupService`. Key `GOOGLE_PLACES_API_KEY` se aati hai,
+Provider default `None`.
+
+⚠️ Google ka `REQUEST_DENIED` **HTTP 200 ke saath** aata hai, isliye body ka
+`status` padha jaata hai — HTTP code par bharosa nahi kiya gaya.
+
+⚠️ Matching narrowing hai (state → district → tehsil → city) aur **kabhi master
+row nahi banati**. Jo jagah list mein nahi hai wo free-text gaon box mein jaati
+hai, master mein nahi.
+
+🔴 **Key abhi tak nahi mili, isliye seam andhera hai aur product theek chalta
+hai** — `/api/address/availability` `{"available": false}` lautata hai, aur
+form dropdowns par gir jaata hai.
+
+---
+
+#### 2.86.4 SR-3 — EK SEARCHABLE DROPDOWN, POORE PRODUCT MEIN (G27)
+
+`<ui-combobox>` — ek component, har jagah jahan master list dropdown bharti hai.
+`<ui-select>` jaisa hi `UiSelectOption[]` leta hai, to swap ek **tag change** hai.
+
+```
+registration 4 · branches 3 · school-profile 3 · job-form 3
+teacher-profile 5 · job-browse 2          = 20 control
+```
+
+⚠️ **Chhoti list plain `<select>` hi rahi** — gender (3), language proficiency
+(4), board, school type, campus, employment type. Chaar option par search box
+un chaar options se **bura** control hai; yahi `searchFrom: 8` ka matlab hai.
+
+🔴 **`ariaLabel` isliye joda gaya ki component apna `controlId` khud banata
+hai.** Filter toolbar `<label class="visually-hidden">` se naam deta tha, jo
+plain `<select>` ko `for`/`id` se mil jaata tha. Combobox tak wo label pahunch
+hi nahi sakta — label hata kar kuch na dena matlab screen reader "combobox"
+bolta aur **bas**. Wo asli regression hai, cosmetic nahi.
+
+Baaki SR-3: logo/photo ka apna step (compulsory), principal + HR fields
+registration se **profile par** chale gaye (form lamba nahi hua), multi-campus
+org ke dashboard par "Add your next school", aur teacher browse ke defaults.
+
+---
+
+#### 2.86.5 SR-4 — PLAN CATALOGUE CHALU, AUR BLAST RADIUS JO KISI NE NAHI SOCHA THA
+
+Teen school plan seed hue (`SCHOOL_FREE`, `SCHOOL_STANDARD ₹1,499`,
+`SCHOOL_UNLIMITED ₹3,999`), `JOB_POST` METERED quota 1 free par, aur
+`SCHOOL_UNLIMITED` ke `JOB_POST` par **NULL** QuotaPerPeriod.
+
+⚠️ **Daam plan ke NAAM mein marked hain** — `(SAMPLE PRICING)` — aur 013 ka
+build guard fail ho jaata hai agar marker gayab ho jaaye jab tak daam
+placeholder hain. Screen par use "saaf" karna us guard ko bahar se haraana hota.
+
+🔴 **NULL quota sentinel nahi hai.** `036_entitlement_catalog.sql` 2.5 se keh
+raha hai ki NULL ka matlab unlimited hai; engine exactly wahi karta hai — NULL
+quota comparison skip kar deta hai.
+
+🔴 **ENGINE ON KARNE NE NAU SUITE TODI, AUR WAJAH EK VAAKYA THI.** 2.64 ke
+tahat engine OFF ship hua tha: har feature FREE, ek bhi plan-feature mapping
+nahi. To *"shipped state wapas lao"* aur *"sab delete kar do"* **ek hi baat**
+thi, aur nau suite ne use aise likha tha:
+
+```sql
+DELETE FROM m_mdm_plan_features;
+UPDATE m_mdm_features SET GatingModeId = 1 WHERE Is_Deleted = 0;
+```
+
+SR-4 ne asli catalogue seed kiya aur wo vaakya sach nahi raha. Naapa gaya: ek
+`jobs-consume.mjs` run catalogue ko **0 mappings** par chhod gaya. Nau suite
+entry **aur** exit par — ek regression mein product ki pricing **attharah baar**
+delete.
+
+⚠️ **Fix ek function hai, nau edit nahi** — `lib/catalogue.mjs`. Aur
+catalogue wahan **dobara type nahi hui**: `restoreCatalogue()` **seed file
+chalata hai**, jo uska maalik hai (2.47). Test helper ke andar aath mapping ki
+doosri copy do jagah update karne ki aur ek bhoolne ki guarantee hai.
+
+🔴 **Aur SR-4 ka sabak, jo teen baar aaya:** *jo test shipped DEFAULT par tika
+ho, wo default ke decision ban-te hi toot jata hai.* SR-4 se pehle ye suites
+ungated engine muft mein paati thin; ab maangti hain (`arrangeUngated()`).
+
+Plus: quota wall ka banner "aapki job draft mein mehfooz hai" se shuru hota
+hai; aur menu se pricing par jaane ke baad **wapas usi page par** aana
+(`UpgradeService` + `ReturnUrlService`, jo pehle se `safeInternalPath` chalata
+hai — doosra implementation open redirect ki doosri jagah hoti).
+
+---
+
+#### 2.86.6 SR-5 — POORA BHARAT, PROFILE-MATCHED BROWSE, AUR REGISTRATION PAR PLAN
+
+**Geography.** 35 aur state/UT — **759 district + 759 headquarter town**.
+Haryana ke 23 milaa kar **782 district, 902 town**. Idempotent (pass 2 wahi).
+
+⚠️ **Generator se, haath se nahi** (`jp-docs/scripts/gen-geography.mjs`).
+Haryana ke 23 aankh se check ho sakte the; 759 nahi — ek digit idhar-udhar
+matlab district doosre state ke number range mein, aur **kuch bhi red nahi**.
+
+⚠️ **Tehsil sirf Haryana ke.** Bharat mein ~6,000 hain, naam badalte rehte
+hain, aur aaj koi citable list poori aur current dono nahi. `hasTehsils()`
+pehle se control chhupa deta hai, to baaki state saaf degrade hote hain. Aadha
+yaad kiya hua naam master table ki authority pehan kar galat data dikhata.
+
+🔴 **Naam client ke hain (2.47).** MERGE mein `WHEN MATCHED THEN UPDATE` nahi —
+client ne naam theek kiya to re-run use chupchap wapas nahi palatega.
+
+**Profile-matched browse.** Client ne **unke subjects (plural), unke class
+levels, aur state** maanga tha. Jo bana tha wo *pehla* subject aur top state
+bharta tha — jo wahi baat nahi hai, aur ek subject random chun kar use "aapki
+profile" kehna na-bharne se bura hai.
+
+```
+<ui-multi-select> -> subjectIds[] repeated query string mein
+                  -> int[] bound [FromQuery]
+                  -> dbo.IntIdList table-valued parameter
+                  -> USP_BrowseJobs
+```
+
+🔴 **`int[]`, `IReadOnlyList<int>` nahi — aur ye style ki baat nahi hai.** In
+contracts ki baaki har list `IReadOnlyList<int>` hai, par wo **body** par
+rehti hain jahan JSON deserialiser list banata hai. Ye type `[FromQuery]` bind
+hoti hai, aur ASP.NET Core ka collection binder khud instance banata aur bharta
+hai — read-only interface ke liye wo kar hi nahi sakta. Values **chupchap
+khaali** aatin, aur khaali set ka matlab "filter mat karo" hai: screen saari
+jobs dikhati hue keh rahi hoti ki "aapki profile ki jobs hain". Kuch red nahi.
+Feature bas gayab.
+
+⚠️ **Class level plural, state nahi.** Subject aur class level teacher ke baare
+mein facts hain, sab liye jaate hain. State sirf **top preference** — teen
+state wali list "jobs near me" se *chaudi* hoti, sankri nahi.
+
+⚠️ **Banner hi use imaandaar banata hai.** Jo list teacher ne filter nahi ki,
+wo "mere liye kaam hi nahi hai" padhti hai. Isliye ek line + ek click wala
+*"Show all jobs"* — "clear filters" nahi, jo unse ummeed karta hai ki wo
+samjhein ki aise filter maujood hain jo unhone kabhi lagaye hi nahi.
+
+⚠️ **Zero result par ek baar widen, aur bol kar.** Profile ke filter se kuch
+match na ho to screen khaali nahi chhodta. Flag retry se **pehle** clear hota
+hai, to khaali database do state ko ek doosre ko hamesha bulane nahi deta.
+
+**Registration par plan.** "Register as Free" pre-selected; paid chunne par
+**pending plan-change request** banti hai aur account Free par shuru hota hai.
+
+⚠️ **Saatvaan step nahi** — plan `review` mein, Submit se theek pehle. Paanch
+collecting step wo daave ikattha karte hain jo school apne baare mein karta hai
+aur admin documents se milaata hai; **plan wo cheez nahi jise admin verify
+karta hai**. Priced cards ka apna step verification form ke andar **checkout**
+padhta hai.
+
+🔴 **`USP_ProvisionSchoolFromApproval` par naya parameter nahi daala gaya.** Wo
+procedure **jp_app** mein hai; plan-change request **jp_mdm** mein, aur jp_app
+wahan likh nahi sakta (2.2). Parameter ka matlab hota ek column jo jp_app store
+kare aur koi padhe nahi — **SR-0 ka ulta shape**. Cross-database step ka maalik
+pehle se `ApprovalOrchestrationService` hai.
+
+⚠️ **"First login" guidance first-login FLAG nahi hai.** Shart pending request
+khud hai. Flag ek baar chalta hai, aur bank transfer un das second mein nahi
+hota jo koi dashboard par bitaata hai. Aur request **khud saaf ho jaati hai**
+jab admin payment verify karta hai.
+
+---
+
+#### 2.86.7 🔴 TEEN CHEEZEIN JO GREEN BUILD KE PEECHE CHUPI THIN
+
+**1. `run_all.sql` naye machine par fail hota.** `011` ka guard kehta hai
+catalogue bilkul chaar plan ho — par un chaar mein se do banata `013` hai, jo
+baad mein chalta tha. Upar ka comment ulta likha tha. **Sirf us machine par
+fail hota jisne kabhi 013 nahi chalaya**, aur project ki har machine chala
+chuki thi — to sab jagah green, aur agle clone karne wale ke liye toota.
+
+Maan kar nahi chala — transaction mein do plan chhupa kar `011` ki apni query
+chalayi, phir rollback:
+
+```
+CONFIRMED — 011 would FAIL on a fresh build. Missing: SCHOOL_STANDARD, SCHOOL_UNLIMITED
+after rollback, live plans of the four: 4 (must be 4)
+```
+
+**2. `teacher-verification` ka darj kaaran galat tha.** Likha tha "probe teacher
+ke paas subject nahi, isliye search mein invisible". Asli baat: `TEACHER_SEARCH`
+**BOOLEAN-gated** hai aur `SCHOOL_FREE` mein `included = 0`, aur search karne
+wala school free plan par hai. **Kuch toota nahi tha** — engine theek chal raha
+tha aur suite refusal ko absence samajh rahi thi. (Aur suite ka apna failure
+message hi wo galat explanation ka source tha.)
+
+**3. Do CATCH block asli failure chhupa rahe the.** `010_billing.sql`
+`EXEC dbo.USP_LogError @ProcedureName = …, @UserId = …` bulata tha — jp_mdm ke
+`USP_LogError` mein **ye dono parameter hain hi nahi**. To un CATCH se guzarne
+wala har raasta *"@ProcedureName is not a parameter"* raise karta, aur neeche ka
+`THROW` kabhi chalta hi nahi. Kisi ne nahi dekha kyunki wahan tak kuch pahuncha
+hi nahi tha — SR-4 ne use matter karne laayak banaya. Dono jagah fix
+(`USP_RequestPlanChange` **aur** `USP_VerifyPayment`) — *ek theek karke doosra
+chhodna apne hi fix ke bagal mein ek jaal chhodna hai.*
+
+---
+
+#### 2.86.8 ⚠️ AUR JO SR NE KHUD TODA, VERIFICATION NE PAKDA
+
+`jobs-screens` crash ho gayi: `page.selectOption('#subjectId', …)`. Job form ka
+subject ab `<ui-combobox>` hai jo apna id khud banata hai, to `#subjectId`
+kisi se match nahi hua.
+
+🔴 **Suite ne koi assertion fail nahi ki — wo beech mein mar gayi.** Playwright
+poore 30 second baitha, TimeoutError, summary line chhapi hi nahi, runner ne
+`nosummary` bola. *Jo test mid-run marta hai wo red test se alag dikhta hai,
+aur usey padhna zyada mushkil hai.*
+
+Ab control apne **dikhne wale label** se dhoondha jaata hai — jo ek insaan
+padhta hai, aur jo agle re-implementation ke baad bhi bacha rahega.
+
+---
+
+#### 2.86.9 Jo SR mein khula raha, naam se
+
+| Item | Haalat |
+|---|---|
+| **Google Places key** | khula — client degi; seam shipped OFF aur product uske bina theek chalta hai |
+| **Tehsil, Haryana ke alawa** | khula, **jaan-boojh kar** — client bataye kaun se state pehle chahiye |
+| **`ui-multi-select` ka wahi overlay defect** | khula — kisi modal call site se reachable nahi, isliye chhoda |
+| **Admin screen par requested plan** | khula — data `SchoolRegistrationDetailDto` tak aata hai, jp-admin render nahi karta |
+| **Escape modal ke andar dropdown ke saath modal bhi band karta hai** | khula — `ui-modal` ka niyam hai, saaton modal ka Escape semantics badlega |
+| **`team-contract` mein hardcoded password literal** | khula — G36 ki hi class, suite khud banati-mitaati hai us account ko |
+
+---
+
 ## 3. SCOPE (Client spec ke against)
 
 ### IN SCOPE — MVP
@@ -10608,6 +10895,7 @@ naya Code, agla free Id, kuch renumber mat karo.
 | 2026-10-14 | 7B-0 | **G41 BAND — public se teacher tak ka poora raasta.** `funnel-e2e.mjs` **24/24 (nayi)** · `safe-path.mjs` **37/37 (nayi)**. 🔴 **Jo naapne par mila aur gap mein likha nahi tha:** `?returnUrl=` **authenticated side par bhi** ignore ho raha tha — `auth.guard.ts` aur `auth.interceptor.ts` dono use Phase 3 se **likhte** hain aur chaar repo mein ek bhi **reader** nahi tha, to guard ka comment *"returnUrl brings them back where they were headed"* **jhooth** tha; jis teacher ka session application ke beech khatam hota wo dashboard par chhoda jaata. ⚠️ **Naam `redirect` → `returnUrl`**: brief ne `redirect` kaha, par `returnUrl` ke **do live emitter** the aur `redirect` ke **zero** — jiske emitter the usko poora karna sasta tha aur usse doosra hole bhi band hua; do naam ek kaam ke liye dono se bura. ⚠️ **Brief ka ek premise galat tha:** "same validation reset-password gets" — **aisi validation thi hi nahi** (`token` path nahi hai, server use validate karta hai), to likhi gayi. 🔒 **`safeInternalPath` mein koi Angular import nahi**, jaan-boojh kar, taaki table-test ho sake — jis security check ka ek hi test end-to-end ho wo do yaad aaye case par test hota hai; **nau hostile value `startsWith('/')` paas karti hain aur refuse hoti hain** (protocol-relative, `/\`, NUL, CRLF, raw space), aur **validator tod kar dekha** — aath admit ho gaye, normalisation aur traversal clamp bhi gaye. ⚠️ **Route-table allowlist jaan-boojh kar nahi** — teen app ke route ke saath sync rakhna padta aur stale allowlist legitimate destination ko chupchaap dashboard bana deta; jo defend hoti hai wo **ORIGIN** hai. 🔴 **Destination store hoti hai, pass nahi ki jaati** — funnel ke teen hop hain aur har beech wale navigation ko yaad rakhna padta; darwaze par capture, aakhir mein consume. **sessionStorage** (token ke ulta): pending destination ek visit ki cheez hai. 🔒 **Nikalte waqt bhi validate** hoti hai — storage page ka koi script likh sakta hai. ⚠️ `scopedStorageKey` ab **export** hota hai (`TokenStorageService` ka private method tha) — teen-line key rule ki doosri copy hi wo tareeka hai jisse do store alag jagah dekhne lagte hain; output identical, warna har session sign out. 🔴 **Uid route naya darwaza NAHI:** `USP_GetJobForTeacher` ab `@JobId` **ya** `@JobUid` leta hai (**exactly one**, warna RAISERROR — dono dena "ye id ya ye uid" padhta hai aur jo jeete wo haadsa), uid **procedure ke andar** id banta hai aur **wahi WHERE clause** milta hai; chha case chal kar dekhe: id → job, uid → **wahi** job, **DRAFT ka uid → khaali**, na-maujood uid → khaali (error nahi), dono → RAISERROR, koi nahi → RAISERROR. ⚠️ **C# mein do NAMED method**, ek do-nullable-id wala nahi — `(long?, Guid?, Guid?)` do nullable Guid aas-paas rakhta hai aur palat dene wala call site **compile ho jaata** aur us job ko dhoondhta jiska uid caller ka user uid hai. 🔴 **Funnel ek browser session mein, signed out:** public job → Apply (href `?returnUrl=%2Fjobs%2F<uid>%2Fapply`) → signup screen **kehti hai** ki wapas us job par le jaayegi → landing **us job ko naam se** bulati hai, kehti hai **"nothing has been sent yet"**, apply control maujood hai (**funnel pahunchata hai, apply nahi karta** — 2.56), aur stored destination **consume** ho jaati hai. ⚠️ **Teen apni galtiyan, teeno suite ne pakdin:** (1) section 2 **chaar sign-in** kharch kar raha tha aur paanchwa per-IP window (5/60s) se bahar tha — failure ek **navigation timeout** thi jo *"app navigate nahi hua"* padhti hai jabki limiter ne refuse kiya tha; helper ab refusal **uske apne shabdon mein** likhta hai aur mechanism (ek bhi value store nahi hoti) **bina sign-in** check hota hai. (2) **seeded account ka hourly cap** (10/3600s) chauthe run par khatam — run ke andar nahi khulta, to suite ab **apne hi banaye account** se sign in karti hai. (3) **retry ne test ki cheez delete kar di** — `signOut` sessionStorage saaf karta hai, to retry chal gaya aur **/dashboard** par utra, aur suite ne likha ki guard ka returnUrl ignore hota hai; feature theek tha. ⚠️ Log line **do baar bekaar** thi (`heading: (no heading)`, phir `the page says: Staffroom`) — ab wahi line chhapti hai jo assertion match karti hai: `This posting has gone`. ⚠️ **G43 khula:** signup ka `name` **required** hai aur server tak pahunchta hi nahi, jabki `002_provisioning_accounts.sql` ke paas `@FullName` **pehle se** hai — wahi class jo contact form ka `role` tha, par yahan field **rakhni aur bhejni** chahiye. **35/35 suite clean, 1341 assertion, 592 s · backend 0/0 · paanchon frontend 0 warning** | ✅ Done |
 | 2026-10-14 | 7A | **Public job pages + contact form — pehli ANONYMOUS surface.** `public-contract.mjs` **50/50 (nayi)** · `public-screens.mjs` **41/41 (nayi)**. 🔴 **Chaar asli bug, teen suite ne pakde:** (1) **file sahi thi, database purana** — `/jobs/filters` `id:0 name:""` de raha tha jabki count sahi tha; `024` disk par `AS Id, AS Name` karti hai par **deployed proc** mein purana `AS SubjectName` khada tha, aur SQL-layer probe deployed version par chali thi to C# mapper loop mein hi nahi tha. **Dono raw-bytes sweep pass hue** — shape perfect, content khaali; *schema assertion data assertion nahi hai*. Naya content check joda aur **purana alias wapas daal kar fail karte dekha** (sirf `subjects` ka naam liya, `states` ka nahi). (2) **sirf ek anonymous write hai aur uspar validation hi nahi thi** — `{}` POST → 200 aur Name/Email/Subject/Message chaaron khaali ek row; DTO ke `= string.Empty` ki wajah se sab "valid" bind hua. JP.App.Api ke paas **ek bhi validator nahi tha** (zaroorat bhi nahi thi — ab tak sab token ke peeche tha aur har write apni proc mein check karti thi); `PublicValidators.cs` + `FluentValidationFilter` + `AddValidatorsFromAssembly` wire hue, har maximum **apne column ke barabar**, aur 🔒 **honeypot par koi rule nahi** (ek "Website must be empty" wahi jumla bot likhne wale ko wapas de deta). (3) **Apply CTA job saath le hi nahi ja sakti** — jp-teacher mein `?redirect=` **koi nahi** padhta (poore app mein sirf reset-password ek query param padhta hai), `jobs/:id/apply` route **nahi hai**, aur `jobs/:jobId` `Number()` karta hai jabki public surface jaan-boojh kar sirf uid deta hai (2.47) — parameter **hata diya, chhupaya nahi** (jo parameter koi padhta nahi, use bhejna na bhejne se bura hai), **G41**. (4) **title 66 akshar** — `site-audit` ne pehli hi asli job par pakda; `fitTitle()` teen seedhi utarti hai (at-school → school gira → ellipsis) aur **teeno chal kar dekhi gayi**, school ka naam **beech se kabhi nahi** katta. 🔴 **SSR JavaScript BAND kar ke saabit hua** — wahi ek test jo server render aur hydration mein farq karta hai; `**` catch-all `/jobs` ko chup-chaap build-time par khaali page bana deta (koi error, koi warning nahi), aur build ne confirm kiya: **6 static route prerender**, `/jobs` unme nahi (pehle 7 the — `/faq` ab Server). 🔒 **Anonymous hona wire par naapa** — 5 request, ek par bhi Authorization/cookie nahi, teeno storage khaali, aur **wahi request valid token ke saath byte-identical** (1117 === 1117). 🔒 **404 deewar us lamhe par chali jab IST aur UTC ki date ALAG thi** (IST 10-14 · UTC 10-13) — UTC comparison us waqt har job 5.5 ghante pehle expire kar deta; chaaron state 404 aur refusal **kaaran nahi batati**, aur wahi paanch id school ki apni list par maujood hain. ⚠️ **Do suite ek hi rate-limit budget maang rahi thin, aur ye poori regression par hi dikha** — `public-contract` ka limit test **read budget** khatam karta tha aur agli suite ka SSR 429 aata tha, jise suite ne *"listing is not server-rendered"* likha (jhooth, aur galat file par le jaata); ab EXIT mein budget **wapas** hota hai (poll). Contact ka 3/hour dono maang rahi thin → zimmedari baanti: contract suite **server ka contract** (asli row, honeypot, chautha refuse), screens suite **screen** (interception se exact payload), budget **zero**. ⚠️ **Naya case jo pehle nahi tha:** failed send — 500 par page kehta hai nahi gaya, **jo likha tha wo form mein rehta hai**, prefilled mailto: milta hai — yehi 2.44 ki badi fikr thi. ⚠️ **FAQ copy DB mein** (`003_seed_public_faqs`, insert-if-absent — admin ke edit overwrite nahi) **aur ek jawab jhoota ho gaya tha**: "Can I search for jobs without an account?" ka "Not yet" **usi commit mein** theek hua, seed mein guard, dono suite data se assert. ⚠️ `role` field **hata diya** (column nahi, brief ne maanga nahi; collect kar ke discard karna teen mein se saaf galat raasta). ⚠️ **Swagger floor 113 → 119 (naapa, calculate nahi)** aur anonymous surface par ek **CEILING** — *exactly six operations*, kyunki yahan khatra route **gayab** hone ka nahi, **aa jaane** ka hai. **33/33 suite clean, 1183 assertion, 577 s · backend 0/0 · paanchon frontend 0 warning · Lighthouse 9 page SEO 100/a11y 100 · site-audit NO PROBLEMS · SQL 189 file (3 nayi), 285 DB object** | ✅ Done |
 | 2026-10-11 | 6.5B | **Billing screens — 6.5 POORA.** `billing-screens.mjs` **60/60**. 🔴 **Ek component, dono portal** (`UiBillingPageComponent` `jp-shared` mein, school aur teacher dono usi par route karte hain — wahi shape jo `/notifications` ka tha, G27); **admin ka screen alag**, kyunki "mera plan" aur "sabke pending payment" do kaam hain. 🔴 **Ek asli hole band hua jo 6.5A se khula tha:** `plan-change` par koi permission check nahi tha, to school ka **koi bhi** member — including read-only `SCHOOL_VIEWER` — apne account ko payment ke liye commit kar sakta tha. **Poochh kar mila ki naya menu row kisko dikhta hai**, kisi test ke fail hone se nahi. `BILLING.MANAGE` (SCHOOL_OWNER + TEACHER; 007 ka guard **closed set** assert karta hai, SCHOOL_VIEWER ko grant karte hi build exit 1). Reuse pehle dhoonda — `PROFILE.EDIT`/`USER.MANAGE`/`BRANCH.MANAGE` teeno aaj theek chalte, par koi bhi "paise ka zimmedaar" ka matlab nahi rakhta. 🔒 **Panel dekhna gated NAHI** — HR ko allowance pata honi chahiye, warna wo limit ko refuse hone se jaanta hai; 007 ka doosra guard **ulti disha** se assert karta hai ki row par permission na lage. 🔴 **Control wajah ke saath GHAYAB hai, disabled nahi** (2.62) — disabled "abhi nahi" kehta jo jhooth hai. 🔴 **Koi pay-now button nahi**, aur suite uski ghairhaazri assert karti hai; mode list mein ONLINE nahi aur screen **kehti hai kyun**. 🔴 **Mismatch shabdon mein** — "₹100.00 short" / "₹100.00 overpaid", server ke `ShortBy` ki wahi direction; remark zaroori hote hi Confirm disabled, par **server bhi wahi rule enforce karta hai** — client pehle poochhta hai, jagah nahi leta. 🔒 **Lapsed plan screen par naam se aata hai:** "paid plan ended on …", free plan par chal raha hai, allowance `of 3` (paid `of 25` nahi), kuch delete nahi hua, aur DB row `status 1, isActive 1` — kuch sweep nahi hua. **Teen forced negative:** viewer `plan-change` → **403**, school apna hi `verify` → **403** (payment PENDING, koi receipt nahi), teacher school plan id → **404 aur 403 nahi** (2.6). ⚠️ **Do apni galtiyan:** owner ka button ghayab tha aur stale cheez sirf ek **cached JWT** thi (claims mein permission hoti hai; suite ab cached token shuru mein phenk deti hai) · admin ka **375 check khaali queue naap raha tha** — table hi nahi tha, aur table hi 375 par overflow karta hai; ab pehle row banti hai aur assertion node count par nahi, us cheez par hai jo overflow karti. ⚠️ **Count guard isi commit mein hile:** permissions 24 → 25, SUPER_ADMIN **24 of 25** (pehli permission jo uske paas nahi), teacher 2 → 3, menus 34 → **37**, swagger **113 hi** (ek bhi endpoint nahi jura). **31/31 suite clean, 1214 assertion · SQL 296 · backend 0/0 · paanchon frontend 0 warning · run_all ×2 content-identical · 34 RoutePath, 0 dangling** | ✅ Done |
+| 2026-11-11 | SR | **SCHOOL REVAMP (SR-0…SR-5) — client ke demo feedback ka poora pass.** Details **2.86**. **49/49 suite clean, 1987 assertion, 798 s** (pehle 45/49, 1819). 🔴 **SR-0 ne ek bug nikala jo har link ke test hone ke baad bhi zinda tha:** principal ka mobile registration par liya jaata tha aur approval par **gir jaata tha** — `USP_ProvisionSchoolFromApproval` mein parameter hi nahi tha; `PrincipalName` paar chala jaata tha, isliye profile par principal dikhta tha, bas usse phone nahi kar sakte the. Kisi suite ne nahi pakda kyunki koi suite **poori chain** nahi chalti thi — har link test hota tha, unke **beech ka jod** nahi. 🔴 **Geography: 782 district, 902 town, 36 state/UT**, generator se (`gen-geography.mjs`) kyunki 759 row haath se type karna matlab ek digit idhar-udhar aur district doosre state ke number range mein, **kuch bhi red nahi**. **Tehsil sirf Haryana ke, jaan-boojh kar** — ~6,000 hain aur koi citable list poori+current nahi; `hasTehsils()` pehle se control chhupa deta hai. ⚠️ **Teen bug seeding ne hi diye:** generator T-SQL ke liye escape nahi kar raha tha (`file's` ka apostrophe string tod kar baaki line ko code bana deta tha, aur file ke digits **label** ban jaate the) · city code mein underscore `part()` se strip ho kar naam **do baar** aa gaya (61 char) · `m_mdm_district.Code` abhi bhi varchar(30) tha — **truncation error acchi baat thi**, column ne row refuse ki chhoti karke store nahi ki, warna do district ek hi code par takra jaate aur kuch bhi red na hota. 🔴 **Item 1 full-stack:** `<ui-multi-select>` → repeated query keys → `int[] [FromQuery]` → `dbo.IntIdList` → `USP_BrowseJobs`. **`int[]`, `IReadOnlyList<int>` nahi** — baaki contracts body par bind hote hain jahan JSON deserialiser list banata hai; query binder read-only interface bhar hi nahi sakta, to values **chupchap khaali** aatin aur khaali set ka matlab "filter mat karo" hai: screen saari jobs dikhati hue kehti ki "aapki profile ki jobs hain". `browse-sets.mjs` **8/8**, HTTP ke through, kyunki direct EXEC wahi layer skip kar deta jo tootne wala tha. 🔴 **Registration par plan:** Free pre-selected, paid chunne par **pending request**, account Free par shuru. **Saatvaan step nahi** — plan wo cheez nahi jise admin verify karta hai, aur priced cards ka apna step verification form ke andar checkout padhta hai. **`USP_ProvisionSchoolFromApproval` par naya parameter nahi** — wo jp_app mein hai, request jp_mdm mein, aur parameter ka matlab hota ek column jo jp_app store kare aur koi padhe nahi: **SR-0 ka ulta shape**. ⚠️ **"First login" guidance FLAG nahi hai** — shart pending request khud hai, kyunki flag ek baar chalta hai aur bank transfer un das second mein nahi hota jo koi dashboard par bitaata hai. 🔴 **Teen cheezein green build ke peeche chupi thin:** `run_all` ka order (011 chaaron plan maangta hai par do banata 013 hai — **sirf naye machine par** fail hota, transaction mein naap kar saabit kiya) · `teacher-verification` ka darj kaaran galat tha (subject nahi, `TEACHER_SEARCH` ka BOOLEAN gate + `SCHOOL_FREE` mein included=0 — **kuch toota nahi tha**, suite refusal ko absence samajh rahi thi) · do CATCH block `USP_LogError` ko aise parameter de rahe the jo usme hain hi nahi, to asli failure kabhi `THROW` hota hi nahi. ⚠️ **Aur chaar sirf SCREENSHOT dekhne se mili, jinhe koi assertion nahi pakadti:** form kehta tha "we are still building the district and city lists" jabki usi screen par dono bhar rahe the · "Har" likhne par **Bihar** sabse upar (Bi-*har*, *Har*yana, J*har*khand, Ma*har*ashtra) aur pehla option hi dabaya jaata hai · `.form-check--block` ek class thi jo **kahin define hi nahi** thi, isliye plan ka naam aur allowances jud gaye the · `includesLine()` ke baad separator nahi tha. 🔴 **SR ne khud `jobs-screens` todi** — `#subjectId` ab exist nahi karta (combobox apna id banata hai); suite ne assertion fail nahi ki, wo **beech mein mari**: 30s timeout, summary line nahi, runner ne `nosummary` bola. **Walkthrough: 49 screen, kuch bhi missed nahi**, dono width. **backend 0/0 · paanchon frontend 0/0 · geography idempotent (pass 2 same) · catalogue poore run ke baad salamat (4 plan, 8 mapping)** | ✅ Done |
 
 ---
 
@@ -11648,6 +11936,90 @@ bheja jabki DTO `toStatusId` maangta hai — **har call 200 deta aur kuch
 badalta nahi**, aur us ek chup no-op ke neeche atharah assertion fail hui.
 
 ---
+
+## ✅ SR COMPLETE — 2026-11-11 (SCHOOL REVAMP: SR-0 … SR-5, CLIENT KE DEMO FEEDBACK KA POORA PASS)
+
+Details **2.86**. Client ke demo feedback ke dasho item, aur chaar cheezein jo
+unme thi hi nahi par verify karte waqt mil gayin.
+
+```
+49/49 suite clean, 1987 assertion, 798 s   (pehle 45/49, 1819)
+geography      782 district · 902 town · idempotent (pass 2 same)
+walkthrough    49 screen, kuch bhi missed nahi
+backend 0/0 · paanchon frontend 0/0
+catalogue poore run ke baad bhi salamat: 4 plan, 8 mapping, JOB_POST mode 3
+```
+
+### Item-wise
+
+| # | Item | Saboot |
+|---|---|---|
+| 1 | Teacher ko apni profile se matching jobs | `browse-sets.mjs` **8/8**, HTTP ke through |
+| 2 | Registration par plan, Free pre-selected | walkthrough screen 24-26; account Free par shuru |
+| 3 | Free = 1 job post; apna data kabhi paywalled nahi | `entitlement-http.mjs:166` |
+| 4 | Teen plan + NULL-quota unlimited | `013_seed_school_plans.sql` |
+| 5 | Geography | 782 district, 902 town, 36 state/UT |
+| 6 | School photo/logo compulsory | apna step; walkthrough screen 17-18 |
+| 7 | Principal fields profile par | screen par likha bhi hai: *"part of your profile, not your application"* |
+| 8 | FIELD_MATRIX sign-off ready | geography gap "fixed" update, + "Optional" labels ka decision box |
+| 9 | Google Places | **khula** — key client degi; seam shipped OFF |
+| 10 | Multi-school | GroupType form par, dashboard CTA, walkthrough screen 30 |
+| 11 | start-all / stop-all | cold se chalaya, saaton service up |
+
+### 🔴 Phase ki sabse badi baat: teen cheezein green build ke peeche chupi thin
+
+**`run_all.sql` naye machine par fail hota.** `011` ka guard chaaron plan maangta
+hai, par un mein se do banata `013` hai — jo baad mein chalta tha. Sirf us
+machine par fail hota jisne kabhi `013` nahi chalaya. Transaction mein do plan
+chhupa kar naapa gaya, phir rollback.
+
+**`teacher-verification` ka darj kaaran galat tha.** "Probe teacher ke paas
+subject nahi" likha tha; asli baat `TEACHER_SEARCH` ka BOOLEAN gate aur
+`SCHOOL_FREE` mein `included = 0`. Kuch toota nahi tha — suite refusal ko
+absence samajh rahi thi.
+
+**Do CATCH block asli failure chhupa rahe the.** `USP_LogError` ko aise do
+parameter diye ja rahe the jo usme hain hi nahi, to har CATCH parameter ke naam
+ki shikayat raise karta aur neeche ka `THROW` kabhi chalta hi nahi.
+
+### ⚠️ Aur chaar cheezein sirf SCREENSHOT dekhne se mili
+
+Suites green thin. Ye koi assertion nahi pakadti:
+
+1. **Form jhooth bol raha tha** — "We are still building the district and city
+   lists for India", jabki usi screen par District aur Town bhar rahe the. Note
+   `!hasDistricts()` par tha, jo state chunne se *pehle* bhi sach hai — do alag
+   haalat ek hi vaakya pehne hue.
+2. **"Har" likhne par Bihar sabse upar aata tha** (Bi-*har*, *Har*yana,
+   J*har*khand, Ma*har*ashtra). Pehla option hi dabaya jaata hai, to control
+   aadmi ko galat state par le jaa raha tha. Ab prefix-match pehle; filter
+   wahi, sirf kram badla.
+3. **`.form-check--block` ek aisi class thi jo kuch karti hi nahi** — kahin
+   define nahi, aur chaaron app mein koi aur use nahi karta. Isliye plan ka naam
+   aur uski allowances jud gaye the: *"Register as FreePost a job: 1"*.
+4. **`includesLine()` ke baad separator nahi tha** — *"Post a job: 1 No payment"*.
+
+🔴 **Aur SR ne khud ek suite todi:** `jobs-screens` ka
+`page.selectOption('#subjectId', …)` — job form ka subject ab `<ui-combobox>`
+hai jo apna id khud banata hai. Suite ne assertion fail nahi ki, wo **beech mein
+mar gayi**: tees second timeout, summary line hi nahi, runner ne `nosummary`
+bola. *Jo test mid-run marta hai wo red test se alag dikhta hai, aur usey padhna
+zyada mushkil hai.*
+
+### Counts jo badle, sab naape hue
+
+```
+offers                57 -> 59      team-contract      50 -> 52
+teacher-verification  33 -> 35      public-screens     45 -> 46
+browse-sets           nayi, 8       jobs-screens       56 (combobox ke liye fix)
+```
+
+### Jo khula hai, naam se
+
+Google Places key · Haryana ke alawa tehsil (jaan-boojh kar) ·
+`ui-multi-select` ka wahi overlay defect (kisi modal se reachable nahi) ·
+admin screen par requested plan · modal ke andar Escape ka vyavhaar ·
+`team-contract` ka hardcoded password literal.
 
 ## ✅ 8-0 COMPLETE — 2026-10-20 (SAATON ITEM, CHHE GAP BAND, TEEN NAYI MILI)
 

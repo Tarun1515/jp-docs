@@ -79,9 +79,29 @@ registration — you told us on the call that you do not use them to approve.
 > only say "Haryana". A teacher in Hisar cannot search for jobs in Hisar,
 > because nothing in the system knows Hisar exists.
 >
-> We are fixing this in this round, starting with **Haryana in full** — every
-> district, every tehsil, and the cities and villages under them. Other states
-> follow once you confirm Haryana looks right.
+> ✅ **This is now fixed, and the boxes are no longer hidden.** The system
+> currently knows **782 districts and 902 towns across all 36 states and union
+> territories**. A school anywhere in India can now give a real district and
+> town, and a teacher in Hisar can search for jobs in Hisar.
+>
+> Two things about that data you should know, because they affect what you see:
+>
+> - **Haryana is the most detailed.** It has the full chain — district →
+>   **tehsil** → town, 23 districts and 143 tehsils, taken from a named public
+>   source on a stated date. Every other state goes district → town, with each
+>   district's headquarters town listed. The tehsil box simply does not appear
+>   for a state that has none, so nothing looks broken or empty.
+> - **We did not guess at tehsils for the rest of India.** There are roughly
+>   six thousand of them, the lists change often, and we could not find one that
+>   is both complete and current. Putting half-remembered names into a dropdown
+>   would look authoritative and be wrong. Tell us which states matter most to
+>   your sales team and we will do those properly, the way Haryana was done.
+>
+> 🔴 **Any name we got wrong is a one-field edit on your side and it stays
+> fixed.** District and town names belong to you: once you correct one, our
+> updates will never overwrite it. Districts do get renamed and split — several
+> states reorganised theirs in the last two years — so please skim the list for
+> the states you actually recruit in.
 >
 > We are also adding **Google address search**: the school starts typing their
 > address and picks it from a list, exactly like ordering food online. The
@@ -229,6 +249,32 @@ until somebody goes field by field:
    a place to store it; the registration form has never asked. So every school
    page shows a blank where a logo should be. The compulsory logo you asked for
    fills a hole that was already there.
+
+---
+
+## G. Two teacher-profile labels now say "Optional" — your call
+
+These are on the **teacher's** profile, not the school's, so they sit outside
+the tables above. We are flagging them because they are a visible wording
+change and we would rather you chose than discovered.
+
+While making every long dropdown searchable, two fields started showing the
+word **Optional** beside their label:
+
+| Field | Says today | Is it actually optional? |
+|---|---|---|
+| Highest qualification | Optional | **Yes** — a teacher can save their profile without it, and nothing refuses them |
+| What you are hired as (designation) | Optional | **Yes** — same |
+
+The word is **accurate**: neither field is enforced anywhere, so marking them
+compulsory would be a promise the system does not keep. But you may want
+teachers to treat them as expected rather than skippable.
+
+> ☐ **Leave them optional** (what they truly are today)
+> ☐ Make them compulsory — a teacher cannot save their profile without both
+>
+> If you pick compulsory, say so and we will enforce it properly — in the form
+> *and* on the server, so it is true rather than just printed.
 
 ---
 

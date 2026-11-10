@@ -834,3 +834,491 @@ swagger floor (App API)   139 -> 143      swagger suite        43 -> 45
 billing-screens            57 ->  60      entitlement-http     34 -> 37
 build-manifest             11 ->  12      sr-registration      new, 11
 ```
+
+---
+
+## 2026-11-10 — the Visual Studio failure, and what it was not
+
+### 🔴 Six projects would not load, and the message named the wrong thing
+
+```
+JP.Core.csproj : error : The project file cannot be opened.
+  C:\Program Files\dotnet\sdk\8.0.425\Sdks\Microsoft.NET.Sdk\Sdk not found.
+  Check that a recent enough .NET SDK is installed and/or increase the
+  version specified in global.json.
+```
+
+The message points at a missing SDK folder and at `global.json`. **Both are a
+dead end, and following either would have wasted the evening.** What was
+measured instead:
+
+| measured | value |
+|---|---|
+| `global.json` anywhere (D:\, D:\Projects, user profile, C:\, dotnet dir) | **none** |
+| `MSBuildSDKsPath`, `DOTNET_ROOT`, any `DOTNET_*` (Process/User/Machine) | **none that matter** |
+| `C:\Program Files\dotnet\sdk\8.0.425` | exists, **1 child** (`Roslyn`), no `Sdks\` |
+| `C:\Program Files\dotnet\sdk\8.0.427` | **176 children**, `Sdks\` present |
+| `dotnet build JP.sln` | **0 warnings, 0 errors** |
+| VS 2022 Community | **17.1.6**, MSBuild **17.1.0.7609** |
+
+So the rehearsal left nothing behind, and the product was never broken.
+
+### ⚠️ THE EXPERIMENT THAT SETTLED IT — same file, two MSBuilds
+
+A bare `net8.0` csproj was written to a scratch folder, **outside every repo**,
+with no `global.json` and no `.vs` cache anywhere near it:
+
+```
+A) VS 17.1's MSBuild  -> "C:\...\sdk\8.0.425\Sdks\Microsoft.NET.Sdk\Sdk not found"
+B) dotnet's MSBuild   -> resolved 8.0.427, reached NETSDK1004 (needs restore)
+```
+
+🔴 **That one comparison eliminated the repo, the `.vs` cache and the
+rehearsal in a single step.** The failure follows VS's toolchain, not the
+project — which is a thing you can only learn by changing exactly one variable.
+
+Pinning the SDK then made MSBuild state the real cause in its own words:
+
+```
+Version 8.0.427 of the .NET SDK requires at least version 17.8.3 of MSBuild.
+The current available version of MSBuild is 17.1.0.7609.
+```
+
+### ⚠️ The empty `8.0.425` folder is a red herring, and that is worth recording
+
+A .NET patch update left a stub: the directory survives with only `Roslyn` in
+it. `dotnet --list-sdks` correctly does not list it. VS's old resolver lands on
+it anyway, so the error names a path instead of saying "I am too old". **A
+misleading error message is not evidence about its own cause** — the only
+reason the right answer was found is that nobody tried to make that path exist.
+
+### Resolution — a Visual Studio update, which is the client's click
+
+17.1.6 → **17.14.44** (MSBuild **17.14.60**). Afterwards:
+
+```
+VS's own MSBuild on JP.sln -> EXIT CODE 0, all six projects built
+```
+
+🔴 **One false alarm along the way, recorded because it cost a cycle.** A build
+run *during* the install failed with `Could not resolve SDK "Microsoft.NET.Sdk"`
+— the installer had deleted the .NET SDK resolver and not yet replaced it. The
+watcher was then rewritten to require THREE facts before declaring success:
+installer gone, MSBuild ≥ 17.8.3, **and the resolver DLL back on disk**.
+*A component that is mid-replacement fails in a way that looks like a
+configuration error.*
+
+⚠️ **And one of our own making:** the first post-update build failed with
+`MSB3021 ... locked by JP.App.Api (22364)` — the demo APIs started earlier to
+prove the product was healthy were holding their own output DLLs. Stopping
+them gave exit code 0. *The processes you start to prove something works are
+part of the environment you are measuring.*
+
+### What VS still showed afterwards, and why it was not a new fault
+
+Solution Explorer kept reporting `(0 of 6 projects)` unloaded. That state lives
+in `.vs\JP\v17\.suo`, written before the update — VS remembers an unloaded
+project across restarts. Closing the solution and reopening it (or deleting the
+`.suo`, which holds only per-user UI state) is the whole fix. **Nothing to do
+with the SDK.**
+
+---
+
+## 2026-11-10 — SR-3 finished
+
+| item | where |
+|---|---|
+| Registration's four geography dropdowns → `<ui-combobox>` | `registration.component.*` |
+| Dashboard "Add your next school" CTA | `dashboard.component.html` |
+| Teacher browse starts from the teacher's own profile | `job-browse.component.*` |
+| `ariaLabel` added to `ui-combobox` | `ui-combobox.component.*` |
+
+### 🔴 The dashboard CTA is guarded by the group type, not the campus count
+
+`groupType !== 1` means the organisation *told us at registration* it runs more
+than one school. A group with one campus and a standalone school have the
+**same `branchCount`** and must not get the same screen — one has unfinished
+setup, the other is complete. Guessing from the count would sell at every
+single school on the one screen whose job is to state what is true.
+
+### 🔴 Teacher browse pre-fills, and the banner is the part that makes it honest
+
+Subject and top preferred state come from the profile. **Employment type is
+deliberately NOT pre-filled** — full-time vs part-time is a trade-off most
+people make differently for the right job, and guessing it hides postings they
+would have taken.
+
+⚠️ **A silent pre-filter is worse than no filter.** A short list the teacher did
+not ask for reads as "there is barely any work for me", and nothing on screen
+contradicts it. Hence the line plus a one-click *Show all jobs* — named that,
+not "clear filters", which would ask them to understand that filters they never
+set exist.
+
+⚠️ **Zero results widen once, and say so.** If the profile's filters match
+nothing, the screen falls back to everything with *"Nothing open matches your
+profile just yet"*. The one-shot flag is cleared **before** the retry, so an
+empty database cannot make two states call each other forever.
+
+### ⚠️ `ariaLabel` exists because the combobox owns its own id
+
+Three filter toolbars name their controls with `<label class="visually-hidden">`,
+which a plain `<select>` could use through `for`/`id`. `ui-combobox` generates
+its own `controlId`, so an outside label cannot point at it — dropping the label
+and passing nothing leaves a screen reader announcing "combobox" and nothing
+else. A real regression, not a cosmetic one, so the toolbar case got a supported
+input rather than each caller inventing a workaround.
+
+### What is NOT converted, on purpose
+
+Employment type, language proficiency and status filters stay plain `<select>`.
+A search box over four options is a worse control than the four options — which
+is exactly what the component's `searchFrom` threshold of 8 encodes.
+
+---
+
+## 2026-11-10 (late) — all-India geography, and the browse that matches a profile
+
+### 🔴 The delegated geography seed produced nothing in two hours
+
+An agent was given the whole task — read 012, generate the rest of India,
+run it, verify. After two hours it had written **no file and inserted no row**;
+its last words were *"Now I'll write a generator so the ids and codes are
+computed rather than hand-typed. First the data."* It was stopped.
+
+⚠️ **The instinct it stated was right, and that is the lesson.** 759 districts
+cannot be typed and eye-checked the way Haryana's 23 could: one transposed
+digit is a district filed under another state, and nothing would be red. So the
+work was redone here the way the agent had been about to — as a generator,
+`jp-docs/scripts/gen-geography.mjs`, where the arithmetic appears once.
+
+### What was seeded
+
+```
+pass 1  districts=782  cities=902  tehsils=143
+pass 2  districts=782  cities=902           <- idempotent
+```
+
+782 = 759 generated + Haryana's 23. Every state covered exactly once, asserted
+by the generator itself before it writes.
+
+| per state | |
+|---|---|
+| Uttar Pradesh | 75 |
+| Madhya Pradesh | 55 |
+| Rajasthan | 41 |
+| Bihar, Tamil Nadu | 38 |
+| Chandigarh, Lakshadweep | 1 |
+
+### ⚠️ Tehsils are Haryana-only, and that is a decision
+
+India has roughly six thousand and no citable list is both complete and
+current. `hasTehsils()` already hides the control for a state with none, so the
+rest degrade to state → district → town with nothing empty on screen. Seeding
+half-remembered names would have put wrong data in front of the client wearing
+the authority of a master table.
+
+### 🔴 Three bugs the seeding found, each worth keeping
+
+**1. A generator must escape for the language it emits, not the one it is
+written in.** The RAISERROR text contained `this file's ids`, and the
+apostrophe closed the T-SQL string early. The remainder parsed as code, the
+file name's leading digits read as a label, and the batch died with
+`The label '_seed_geography_north' has already been declared` — an error that
+says nothing about apostrophes.
+
+**2. The separator was being stripped by the very function meant to clean the
+name.** Town codes were built as `codeOf(state, \`${district}_${town}\`)`, and
+`part()` removes every non-alphanumeric — including that underscore. Where a
+district's headquarters shares its name, which is most of them, the result was
+the name written twice:
+`CG_MANENDRAGARHCHIRMIRIBHARATPURMANENDRAGARHCHIRMIRIBHARATPUR`, 61 characters.
+
+**3. `m_mdm_district.Code` was still varchar(30).** SR-1 widened the city's to
+60 and left the district's, because Haryana's longest is `HR_MAHENDRAGARH`.
+Chhattisgarh's 2022 districts reach 32.
+
+⚠️ **The truncation error is the good outcome, and it is worth saying why.**
+The column refused the row rather than storing a shortened code. Codes are the
+contract (2.47) — two districts truncated to the same thirty characters would
+collide on the unique index that exists to keep them apart, and nothing would
+have been red. `040_alter_m_mdm_district_code_width.sql` widens it to 60.
+
+### ⚠️ And one clean-up that was only safe because it was checked first
+
+573 districts and 573 towns from the failed first attempt had to go before the
+corrected codes could be inserted — the ids are explicit, so the second run
+would have hit a primary-key collision. Before deleting, `jp_app` was measured:
+**0 schools and 0 branches referenced any city**. Nothing pointed at the rows,
+so removing them was safe. *The database is not the build script, and a delete
+is not safe because the data looks new.*
+
+---
+
+## Item 1 — the browse that matches a teacher's profile, end to end
+
+The client's ask was **their subjects (plural), their class levels, and their
+state**. What existed pre-filled the FIRST subject and the top state — which is
+not the same thing, and picking one subject at random to call "your profile" is
+worse than not pre-filling at all.
+
+### The chain that had to change
+
+```
+<ui-multi-select>  ->  subjectIds[] repeated in the query string
+                   ->  int[] bound [FromQuery]
+                   ->  dbo.IntIdList table-valued parameter
+                   ->  USP_BrowseJobs
+```
+
+| layer | change |
+|---|---|
+| `USP_BrowseJobs` | `@SubjectIds` and `@ClassLevelIds` as `dbo.IntIdList READONLY` — **added beside** `@SubjectId`, not replacing it |
+| `JobBrowseFilter` | `int[]?` for both |
+| `ApplicationRepository` | both as table-valued parameters, `Distinct()` because the type has a PK |
+| `job-search.service.ts` | `append`, not `set` — repeated keys |
+| `job-browse.component` | sets, not single values; subject became a multi-select |
+
+### 🔴 `int[]`, not `IReadOnlyList<int>`, and the reason is not style
+
+Every other list in these contracts is `IReadOnlyList<int>` — but those live on
+request **bodies**, where the JSON deserialiser constructs the list. This type
+is bound `[FromQuery]`, and ASP.NET Core's collection binder must create and
+fill the instance itself. It cannot do that for a read-only interface, so the
+values would have arrived **silently empty** — and an empty set means "do not
+filter", so the screen would have shown every job while claiming to show the
+teacher's own. Nothing red. The feature simply absent.
+
+### ⚠️ A READONLY table parameter may be omitted, and that is what keeps callers safe
+
+SQL Server hands the procedure an empty table when a caller passes nothing, and
+the filter reads empty as "not filtering". So every existing caller of
+`USP_BrowseJobs` is untouched, and there is one code path rather than two.
+
+### ⚠️ Class levels are plural; the state is not
+
+Subjects and class levels are facts about the teacher and they take all of
+them. The state takes only the **top preference**: a teacher listing three
+states would otherwise open a list spanning all three, which is *wider* than
+"jobs near me" rather than narrower, and the state filter is the one people
+most expect to mean one place.
+
+### The control changed with the data
+
+Subject moved from a single dropdown to `<ui-multi-select>`. A toolbar showing
+one subject while the list is filtered by three is lying about what the user is
+looking at. `ariaLabel` was added to `ui-multi-select` for the same reason it
+was added to `ui-combobox`: the component owns its own `controlId`, so a
+toolbar's `visually-hidden` label cannot reach it.
+
+### 🔴 Verified by a suite that exists because compiling proves nothing here
+
+`scripts/verify/browse-sets.mjs`. It runs over **HTTP**, not against the
+procedure, because the query-string binding is the part most likely to break
+and a direct `EXEC` would skip it. Its central assertion is that
+`?subjectIds=1&subjectIds=2` returns **both** jobs — if the binder keeps only
+the last value, the most likely failure, a teacher would silently see only
+their last subject.
+
+It owns its fixtures: two published jobs differing in **both** dimensions, so a
+filter reading only one of them cannot pass, and a cross-filter
+(`maths` + `middle`) that must match **neither** — because an OR between the
+two sets would return both and look like success.
+
+⚠️ It writes its two jobs directly rather than through `USP_SaveJob`, which
+consumes a JOB_POST entitlement: SR-4 made the free plan's quota 1, so the
+second job would be refused and the suite would fail for a reason unrelated to
+filtering.
+
+---
+
+## 2026-11-10 (night) — four parallel agents, and what verifying them found
+
+Every agent's work was re-run first-hand. Three of the findings below came out
+of that verification, not out of the reports.
+
+### 🔴 `run_all.sql` would have failed a from-scratch build, and nobody could have seen it
+
+`011_seed_plan_change_request.sql` ran at line 297 and `013_seed_school_plans.sql`
+at line 302. But 011's guard asserts the catalogue is **exactly** four plans —
+and two of those four are the ones 013 creates. The comment above it read:
+
+> 🔴 AFTER 011, because 011 asserts the catalogue is exactly this set — it has
+> to run against a catalogue that already exists.
+
+The second clause is correct, and is precisely why the order was wrong.
+
+⚠️ **It could only ever fail on a machine that had never run 013**, and every
+machine in the project already had. So the build was green everywhere and
+broken for the next person to clone it.
+
+Measured rather than argued — the two plans hidden inside a transaction, 011's
+own `@missing` query run against that state, then rolled back:
+
+```
+CONFIRMED — 011 would FAIL on a fresh build. Missing: SCHOOL_STANDARD, SCHOOL_UNLIMITED
+after rollback, live plans of the four: 4 (must be 4)
+```
+
+013 was checked for any reference to the PLAN_CHANGE type before moving it —
+there is none, so nothing is owed in the other direction.
+
+### 🔴 `teacher-verification` was not about subjects at all
+
+Three assertions failed:
+
+```
+premise: the teacher is findable at all (MISSING from a search filtered to subject 42)
+the badge appears in a REAL search result (isVerified undefined)
+...and they now pass the verifiedOnly filter (0 verified teacher(s), ours included)
+```
+
+The recorded explanation — "its probe teacher has no subject, so it is
+invisible to search" — was wrong, and the suite's own failure message is where
+that explanation came from. Measured:
+
+```
+feature TEACHER_SEARCH gatingMode=2 (BOOLEAN)
+plan SCHOOL_FREE      -> TEACHER_SEARCH included=0
+plan SCHOOL_STANDARD  -> included=1
+school 2 Greenwood ... planId=1       <- SCHOOL_FREE
+```
+
+**Nothing was broken.** SR-4 made TEACHER_SEARCH a boolean feature the free
+plan does not include, Greenwood is on the free plan, and the suite was reading
+a refusal as an absence.
+
+⚠️ This is the SR-4 lesson for the third time: *a test that depends on a
+shipped default breaks when the default becomes a decision.* The fix is the one
+nine other suites already use — `arrangeUngated()` on entry,
+`restoreCatalogue()` **last** in the `finally`, outside the restore try/catch so
+a failed badge restore cannot take the product's pricing down with it.
+
+```
+teacher-verification  35/35
+catalogue after       4 plans, 8 mappings, JOB_POST mode 3
+```
+
+### The two suites that depended on rows they did not create
+
+`offers` and `team-contract` were borrowing `head@stmarys.edu.in`, which the
+demo-day registration had given a second school membership — so G23 answered
+400 where both asserted a cross-tenant 404. Both now build their own second
+tenant (`lib/second-tenant.mjs`) and tear it down.
+
+⚠️ **The fixture is unique per run on purpose.** A stable address could draw a
+cached token from `lib/login.mjs` minted for a since-deleted user: that
+authenticates, resolves to no membership, and turns the 404 into a 403 — a
+green-looking suite failing for a third reason.
+
+```
+team-contract  52/52     offers  59/59
+```
+
+### ⚠️ `screens-3h` computes instead of asserting literals, and that is weaker in one direction
+
+Its claim is "nothing was saved" — a before/after question — so it reads the
+three seeded teachers on entry and again at the end and requires them equal.
+That catches any change in either direction, including the next photo. It no
+longer asserts that Rohit is 90: a database where he is 100 passes, and so
+would one where all three are 0. Whether his number is *correct* is
+`002_test_teacher.sql`'s question, which checks the recalculation against its
+components.
+
+### The combobox-in-a-modal fix went into the combobox, not the modal
+
+The open list extended `ui-modal`'s scroll area instead of overlaying it. The
+obvious fix — `overflow: visible` on the modal body — **does not work**:
+`.modal-backdrop` is *also* `overflow-y: auto`, so the list would extend the
+backdrop's scroll area instead. Same symptom, different scrollbar. And it would
+have cost the branches modal its scrollbar: 976px of content in an 822px box,
+with Save below the fold.
+
+So the list is pinned to the viewport with `position: fixed`, measured from the
+input's own rect. **The `<ul>` did not move in the DOM** — only where the
+browser paints it — which is what keeps blur, outside-click, Escape, the arrow
+keys, `aria-activedescendant` and the clear button's mousedown-before-blur
+trick working unchanged.
+
+```
+42/42 browser assertions · 7 screenshots · modal scrollHeight 976 -> 976 on open
+all four apps build 0/0
+```
+
+⚠️ **`ui-multi-select` has the identical latent defect** and was deliberately
+left alone — no multi-select appears inside any of the seven modal call sites,
+and doubling the surface under test to fix something unreachable is a bad
+trade. Written down here so it is not a surprise later.
+
+### 🔴 Two CATCH blocks that reported the wrong failure
+
+`010_billing.sql` called `EXEC dbo.USP_LogError @ProcedureName = ..., @UserId = ...`.
+jp_mdm's `USP_LogError` has **neither parameter**. So every path through those
+CATCHes raised "@ProcedureName is not a parameter for procedure USP_LogError"
+instead of the real failure, and the `THROW` below never ran.
+
+Nothing had noticed because nothing had reached them — the happy path and both
+refusals return earlier. SR-4 is what made it matter: provisioning now calls
+`USP_RequestPlanChange` from an orchestration where a failure is caught, logged
+and deliberately non-fatal, so the log row and the exception message are the
+only things an operator would have, and both were about a parameter name.
+
+Fixed in both `USP_RequestPlanChange` and `USP_VerifyPayment` — *fixing one and
+leaving the other would have left a trap beside its own fix.*
+
+---
+
+## Plan choice at registration
+
+### ⚠️ No seventh step — the plan sits in `review`, last block before Submit
+
+The five collecting steps gather claims the school makes about itself, which a
+human checks against documents. **The plan is not a fact the admin verifies.**
+A peer step implies it is part of the application being reviewed, and the first
+consequence is an admin wondering whether they are meant to approve it.
+
+A step of priced cards inside a verification form also reads as a checkout —
+the exact failure this had to avoid. And beside the Submit button is where the
+caveat does its work: "you will start on the free plan until we confirm your
+payment" has to be read, and three screens earlier it is a sentence they
+scrolled past.
+
+### 🔴 No new parameter on `USP_ProvisionSchoolFromApproval`
+
+The tempting move was to carry `@RequestedPlanCode` into provisioning. That
+procedure lives in **jp_app**; the plan-change request lives in **jp_mdm**, and
+jp_app cannot write there (2.2). A parameter would have created a column jp_app
+stores and nothing reads — **the SR-0 shape in reverse**. The cross-database
+step already has an owner, `ApprovalOrchestrationService`, so that is where it
+happens, after provisioning, never fatal.
+
+Registration records a *preference* on the draft; approval calls the existing
+`USP_RequestPlanChange`. `ALREADY_REQUESTED` is treated as success, so a
+retried orchestration converges rather than stacking requests.
+
+### ⚠️ The "first login" guidance is NOT a first-login flag
+
+The condition is the pending request itself. A flag fires once, and a bank
+transfer does not happen in the ten seconds somebody spends on a dashboard —
+the guidance has to still be there tomorrow when they are at their banking
+screen. More importantly the request **clears itself** when an admin verifies
+the payment. A seen-it flag would either keep nagging a school that had paid or
+stop telling one that had not, and only one of those is survivable.
+
+### The hedge is the FAQ's sentence, word for word
+
+Pricing is not finalised; the public FAQ and the Terms both say so. Registration
+and the billing page now use **the FAQ's wording verbatim** rather than a second
+caveat written in code — *the one that goes stale is always the one in code*.
+It is gated on a `pricesArePlaceholders()` computed from the catalogue, so it
+disappears by itself the day 013 drops the `(SAMPLE PRICING)` marker with real
+prices in the same commit.
+
+### Still open on this piece
+
+- **No admin screen shows the requested plan.** `requestedPlanCode` reaches
+  `SchoolRegistrationDetailDto`, but nothing in jp-admin renders it on the
+  verification queue or detail — so an admin reviewing a registration cannot
+  see that this school asked for Standard. They do see the plan-change request
+  in the payments queue *after* approval.
+- **The `school-approved` email does not mention the plan.** Left alone rather
+  than adding a token nothing renders.

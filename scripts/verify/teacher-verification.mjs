@@ -45,11 +45,21 @@
   approval requests it creates are removed too — the one-pending-per-entity
   index would block the next run otherwise.
 
+  ⚠️ AND IT ARRANGES THE ONE THING IT USED TO INHERIT. Section 3 asked for page
+  one of a search ordered by profile completion, so whether the probe teacher
+  was on that page depended on every other teacher's percentage — which made
+  this suite intermittently red for reasons that had nothing to do with
+  verification. It now gives the probe a subject (if they have none) and
+  filters the search to it, then takes the subject away again. See
+  arrangeProbeSubject, which also records why the old failure message blamed
+  the wrong thing.
+
   Run (both APIs up): node scripts/verify/teacher-verification.mjs
 */
 import { execFileSync } from 'node:child_process';
 import { token as loginToken } from './lib/login.mjs';
 import { secret } from './lib/accounts.mjs';
+import { arrangeUngated, restoreCatalogue } from './lib/catalogue.mjs';
 
 const APP = 'http://localhost:5299/api';
 
@@ -58,11 +68,51 @@ const ARGS = ['-S', 'localhost\\TARUN', '-E', '-I', '-b', '-f', '65001', '-h', '
 const ADMIN = { id: 'superadmin@teacherportal.local', pw: secret('superadmin@teacherportal.local') };
 const OWNER = { id: 'principal@greenwood.edu.in', pw: secret('principal@greenwood.edu.in') };
 
-/** 90% profile with a subject, so a search can actually find them. */
+/*
+  The probe. A mostly-complete seeded profile, which is why it is the one that
+  gets verified here.
+
+  ⚠️ THIS COMMENT USED TO READ '90% profile with a subject, so a search can
+  actually find them' — an assumption about seed data, stated as a fact, in the
+  place somebody would look first. The suite no longer assumes it either way:
+  arrangeProbeSubject gives the teacher a subject if they have none and says in
+  its own output which of the two it found.
+*/
 const TEACHER = { id: 'rohit.kulkarni.86002@yopmail.com', pw: secret('rohit.kulkarni.86002@yopmail.com') };
 
 /** The decline path, on somebody else, so the two outcomes cannot interfere. */
 const TEACHER_2 = { id: 'imran.qureshi.86007@yopmail.com', pw: secret('imran.qureshi.86007@yopmail.com') };
+
+/*
+  🔴 THE ENGINE IS UNGATED FOR THIS SUITE, AND THIS IS NOT A CHEAT.
+
+  This suite proves a verified teacher carries a badge INTO A REAL SEARCH
+  RESULT — which means it has to run a teacher search. SR-4 made
+  TEACHER_SEARCH a BOOLEAN feature that SCHOOL_FREE does not include, and
+  Greenwood, the school doing the searching here, is on SCHOOL_FREE.
+
+  So the search returned nothing and three assertions failed:
+
+      premise: the teacher is findable at all (MISSING from a search …)
+      the badge appears in a REAL search result (isVerified undefined)
+      …and they now pass the verifiedOnly filter (0 verified teacher(s))
+
+  ⚠️ NOTHING WAS BROKEN — the entitlement engine was working exactly as
+  designed, and the suite was reading a refusal as an absence. This is the
+  lesson SR-4 produced twice over, written down in lib/catalogue.mjs:
+  *a test that depends on a shipped DEFAULT breaks when the default becomes a
+  decision.* Before SR-4 every feature was FREE and this suite got its search
+  for nothing; now it asks.
+
+  ⚠️ IT IS NOT "TURN OFF THE FEATURE WE BUILT". Gating is covered by the
+  suites whose subject it is — billing, billing-screens, entitlement-http,
+  entitlement-engine, jobs-consume, screens-25 — which arrange metered state
+  themselves and assert it. This suite is about verification badges.
+
+  Paired with restoreCatalogue() in the finally, which every suite doing this
+  already calls.
+*/
+arrangeUngated();
 
 const ACTION_APPROVE = 1;
 const ACTION_REJECT = 2;
@@ -176,12 +226,92 @@ const restoreBadge = (teacherId, found) => sql(`SET NOCOUNT ON; USE jp_app;
          VerifiedByUserId = ${found.verifiedBy === '-' ? 'NULL' : found.verifiedBy}
    WHERE TeacherId = ${teacherId};`);
 
+const subjectCount = (teacherId) => scalar(`SET NOCOUNT ON; USE jp_app;
+  SELECT CAST(COUNT(*) AS varchar(6)) FROM t_app_teacher_subjects
+   WHERE TeacherId = ${teacherId} AND Is_Deleted = 0;`);
+
+/**
+ * Give the probe teacher one subject to be found by, if they have none.
+ *
+ * ----------------------------------------------------------------------------
+ * 🔴 WHAT WAS ACTUALLY WRONG, BECAUSE THE OLD MESSAGE SAID OTHERWISE
+ * ----------------------------------------------------------------------------
+ * Section 3's premise — 'the teacher is findable at all' — was intermittent:
+ * green in one regression, red in the next, with nothing about verification
+ * having changed. Its own failure text blamed a teacher with no subject being
+ * invisible to search.
+ *
+ * ⚠️ THAT EXPLANATION IS WRONG ABOUT THE PROCEDURE, and it is written down
+ * here because it would send the next reader to the wrong file.
+ * USP_SearchTeachers touches t_app_teacher_subjects ONLY inside
+ * `@SubjectId IS NULL OR EXISTS (…)` — with no subject filter, a teacher with
+ * no subjects is in the results like anybody else.
+ *
+ * 🔴 THE REAL CAUSE IS PAGING. The call asked for page one with pageSize=100,
+ * and the procedure orders by `ProfileCompletionPercent DESC, TeacherId`. So
+ * which teachers are on page one depends on EVERY OTHER TEACHER's completion
+ * percentage — and the suites that move those decide whether this assertion
+ * passes. One of them gave this very teacher a photo and ten more points.
+ *
+ * ⚠️ SO THE SUITE ARRANGES WHAT IT NEEDS instead of hoping for a seeded
+ * default: the teacher gets a subject, and section 3 filters the search to it.
+ * The result set becomes the teachers who teach that one subject, the probe is
+ * on page one whatever the rest of the platform looks like, and the assertion
+ * is about the badge again.
+ *
+ * ⚠️ A DIRECT INSERT, NOT USP_SaveTeacherSubjects — deliberately. The save
+ * procedure RECALCULATES ProfileCompletionPercent, which is shared state
+ * screens-3h reads, and a fixture is not a reason to move a seeded teacher's
+ * completion. The row is removed again in the `finally`.
+ *
+ * @returns {{subjectId:string, added:boolean, countBefore:string}}
+ */
+const arrangeProbeSubject = (teacherId) => {
+  const row = scalar(`SET NOCOUNT ON; USE jp_app;
+    DECLARE @tid bigint = ${teacherId};
+    DECLARE @before int = (SELECT COUNT(*) FROM t_app_teacher_subjects
+                            WHERE TeacherId = @tid AND Is_Deleted = 0);
+    DECLARE @sid int = (SELECT TOP (1) SubjectId FROM t_app_teacher_subjects
+                         WHERE TeacherId = @tid AND Is_Deleted = 0 ORDER BY SubjectId);
+    DECLARE @added bit = 0;
+
+    IF @sid IS NULL
+    BEGIN
+        SET @sid = (SELECT TOP (1) SubjectId FROM jp_mdm.dbo.m_mdm_subject
+                     WHERE Is_Active = 1 AND Is_Deleted = 0
+                     ORDER BY DisplayOrder, SubjectId);
+
+        /*
+          ⚠️ GUARDED. With no subject master seeded at all, an unguarded INSERT
+          would die on a NOT NULL column and take the whole suite down with a
+          Msg 515 — when the honest answer is the premise assertion below
+          failing with 'subject 0' and naming the missing seed.
+        */
+        IF @sid IS NOT NULL
+        BEGIN
+            INSERT INTO t_app_teacher_subjects (TeacherId, SubjectId) VALUES (@tid, @sid);
+
+            SET @added = 1;
+        END
+    END
+
+    SELECT CAST(ISNULL(@sid, 0) AS varchar(10)) + '|' + CAST(@added AS varchar(2))
+         + '|' + CAST(@before AS varchar(6));`);
+
+  const [subjectId, added, countBefore] = row.split('|');
+
+  return { subjectId, added: added === '1', countBefore };
+};
+
 let found1 = null;
 let found2 = null;
 let teacher1Id = null;
 let teacher2Id = null;
 let uid1 = null;
 let uid2 = null;
+
+/** What arrangeProbeSubject did, so the `finally` can undo exactly that. */
+let probeSubject = null;
 
 try {
   // =========================================================================
@@ -237,6 +367,19 @@ try {
        WHERE RequestTypeId = ${REQUEST_TYPE_TEACHER_VERIFICATION}
          AND LOWER(CAST(EntityUid AS varchar(40))) IN ('${uid1}', '${uid2}');`) === '0',
     'clean');
+
+  /*
+    🔴 THE ONE THING SECTION 3 USED TO INHERIT INSTEAD OF ARRANGING. See
+    arrangeProbeSubject's header: the search is filtered to this subject, which
+    is what makes 'the teacher is findable' a fact about the badge rather than
+    about everybody else's profile completion.
+  */
+  probeSubject = arrangeProbeSubject(teacher1Id);
+
+  check('premise: the probe teacher has a subject for section 3 to search on',
+    Number(probeSubject.subjectId) > 0,
+    `subject ${probeSubject.subjectId}, ${probeSubject.added ? 'ADDED by this run' : 'already theirs'}`
+    + ` (had ${probeSubject.countBefore})`);
 
   // =========================================================================
   section('1. 🔴 THE REAL QUEUE — submitted by the teacher, approved by the admin');
@@ -327,14 +470,30 @@ try {
   section('3. 🔴 THE SEARCH RESULT — the badge where the screens read it');
   // =========================================================================
 
-  const search = await j(`${APP}/teacher-search?pageSize=100`, { headers: H(ownerToken) });
+  /*
+    🔴 FILTERED TO THE SUBJECT THIS RUN ARRANGED, AND THAT IS THE FIX FOR AN
+    INTERMITTENT FAILURE — see arrangeProbeSubject's header.
+
+    The unfiltered call asked for page one of a list ordered by
+    ProfileCompletionPercent DESC: whether the probe was on it depended on every
+    other teacher's completion, so this assertion passed or failed according to
+    what some other suite had done to somebody else's profile. With the filter
+    the result set is the teachers who teach this one subject, and the probe is
+    on the page whatever the rest of the platform looks like.
+
+    ⚠️ IT IS A NARROWER QUERY, NOT A WEAKER ASSERTION. The row must still be
+    present AND carry the badge, which is the only thing this section claims.
+  */
+  const searchQuery = `subjectId=${probeSubject.subjectId}&pageSize=100`;
+
+  const search = await j(`${APP}/teacher-search?${searchQuery}`, { headers: H(ownerToken) });
   const row = (search.body?.data ?? []).find((r) => (r.teacherUid ?? '').toLowerCase() === uid1);
 
-  console.log(`\n    /teacher-search returned ${(search.body?.data ?? []).length} teacher(s); `
+  console.log(`\n    /teacher-search?${searchQuery} returned ${(search.body?.data ?? []).length} teacher(s); `
     + `ours ${row ? `isVerified=${row.isVerified}` : 'NOT IN THE RESULTS'}\n`);
 
   check('premise: the teacher is findable at all', search.http === 200 && !!row,
-    row ? 'present in the results' : 'MISSING — a teacher with no subject is invisible to search');
+    row ? 'present in the results' : `MISSING from a search filtered to subject ${probeSubject.subjectId}`);
 
   /*
     🔴 THE REASON 6C-2 COULD NOT START WITHOUT THIS.
@@ -346,7 +505,9 @@ try {
   check('🔴 the badge appears in a REAL search result, which is where the screens read it',
     row?.isVerified === true, `isVerified ${row?.isVerified}`);
 
-  const verifiedOnly = await j(`${APP}/teacher-search?verifiedOnly=true&pageSize=100`, { headers: H(ownerToken) });
+  /* Same narrowing, same reason: page one of the verified list is not ours to assume either. */
+  const verifiedOnly = await j(`${APP}/teacher-search?verifiedOnly=true&${searchQuery}`,
+    { headers: H(ownerToken) });
   const inFiltered = (verifiedOnly.body?.data ?? []).some((r) => (r.teacherUid ?? '').toLowerCase() === uid1);
 
   check('🔴 …and they now pass the verifiedOnly filter they used to fail',
@@ -534,6 +695,29 @@ try {
   section('8. EXIT — the badge put back, the requests removed');
   // =========================================================================
 
+  /*
+    🔴 THE ARRANGED SUBJECT GOES BACK FIRST, AND IN ITS OWN TRY.
+
+    Two restores that share one try/catch are one restore: whichever throws
+    takes the other with it. This one is independent of the badge restore
+    below, and it only removes the row THIS run inserted — a subject the
+    teacher already had is left exactly where it was.
+  */
+  let subjectRestore = 'nothing to undo — the teacher already had a subject';
+
+  try {
+    if (teacher1Id && probeSubject?.added) {
+      sql(`SET NOCOUNT ON; USE jp_app;
+        DELETE FROM t_app_teacher_subjects
+         WHERE TeacherId = ${teacher1Id} AND SubjectId = ${probeSubject.subjectId};`);
+
+      subjectRestore = `subject ${probeSubject.subjectId} removed`;
+    }
+  } catch (error) {
+    subjectRestore = `COULD NOT REMOVE subject ${probeSubject?.subjectId}: ${error.message}`;
+    console.error(`  ⚠️ ${subjectRestore}`);
+  }
+
   try {
     /*
       ⚠️ RESTORED, because teacher-search.mjs counts verified teachers and
@@ -567,9 +751,31 @@ try {
       scalar(`SET NOCOUNT ON; USE jp_app;
         SELECT CAST(COUNT(*) AS varchar(6)) FROM t_app_teachers WHERE IsVerified = 1 AND Is_Deleted = 0;`) === '4',
       '4 seeded verified teachers, as found');
+
+    /*
+      ⚠️ AND THE PROBE'S SUBJECTS ARE BACK TO THE NUMBER THIS RUN FOUND. The
+      count, not the fact of a delete: teacher-search.mjs filters on subjects,
+      and a fixture row left behind would quietly change what it finds.
+    */
+    check('🔴 exit: the probe teacher has exactly the subjects this run found them with',
+      subjectCount(teacher1Id) === probeSubject?.countBefore,
+      `${subjectCount(teacher1Id)} now, ${probeSubject?.countBefore} on entry — ${subjectRestore}`);
   } catch (error) {
     console.error('  ⚠️ COULD NOT RESTORE:', error.message);
   }
+
+  /*
+    🔴 THE CATALOGUE GOES BACK LAST, AND "LAST" IS THE WHOLE POINT.
+
+    SR-4 shipped three suites that restored the catalogue from somewhere in
+    the middle of their finally; an earlier restore threw, and the catalogue
+    was left short — 6 mappings, then 5, then 0 — and the next suite in the
+    run failed for a reason that had nothing to do with it.
+
+    ⚠️ IT IS ALSO OUTSIDE THE try/catch ABOVE, so a failed badge or subject
+    restore cannot take the product's pricing down with it.
+  */
+  restoreCatalogue();
 }
 
 const failed = results.filter((r) => !r.pass);

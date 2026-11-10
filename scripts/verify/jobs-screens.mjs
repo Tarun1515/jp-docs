@@ -361,6 +361,46 @@ const shot = async (page, name) => {
   await page.screenshot({ path: path.join(OUT, `${name}.png`), fullPage: true });
 };
 
+/*
+  ----------------------------------------------------------------------------
+  🔴 THE JOB FORM'S MASTER DROPDOWNS ARE NO LONGER <select> ELEMENTS
+  ----------------------------------------------------------------------------
+  SR-5 swapped subject, designation and qualification to <ui-combobox> (G27),
+  because the subject list is long enough that a native select is only usable
+  if you already know where the name falls alphabetically.
+
+  ⚠️ `page.selectOption('#subjectId', …)` STOPPED WORKING, and the way it
+  stopped is worth recording: the combobox generates its OWN control id, so
+  `#subjectId` matched nothing at all and Playwright sat on it for the full
+  thirty seconds before throwing. The suite did not fail an assertion — it died
+  mid-run with a TimeoutError and printed no summary line, which is why the
+  runner reported `nosummary` rather than a count.
+
+  ⚠️ IT FINDS THE CONTROL BY ITS VISIBLE LABEL, which is what a person reads
+  and the one handle that survives the next re-implementation. The label is
+  matched loosely because it carries "(locked)" on a published job.
+*/
+const pickCombobox = async (page, label, index = 0) => {
+  const field = page.getByLabel(label).first();
+
+  await field.click();
+  await page.waitForTimeout(250);
+
+  /*
+    ⚠️ INDEX 0 IS THE FIRST REAL OPTION, where the old `{ index: 1 }` skipped a
+    placeholder <option>. The combobox has no placeholder row — its empty state
+    is placeholder TEXT on the input — so the offset is gone, not forgotten.
+  */
+  await page.locator('[role="option"]').nth(index).click();
+  await page.waitForTimeout(200);
+};
+
+/** Subject + designation, the two every job needs. */
+const fillJobMasters = async (page) => {
+  await pickCombobox(page, /Primary subject/);
+  await pickCombobox(page, /Designation/);
+};
+
 try {
   // =========================================================================
   console.log('\n=== 1. THE LIFECYCLE, THROUGH THE UI ===');
@@ -472,8 +512,7 @@ try {
     !!partTime, partTime ? `id ${partTime.id} · ${partTime.name}` : 'ABSENT');
 
   await page.fill('#jobTitle', 'PGT Physics — Senior School');
-  await page.selectOption('#subjectId', { index: 1 });
-  await page.selectOption('#designationId', { index: 1 });
+  await fillJobMasters(page);
   await page.selectOption('#employmentTypeId', String(partTime.id));
   await page.fill('#noOfVacancies', '2');
   await page.fill('#salaryMin', '40000');
@@ -558,7 +597,12 @@ try {
     with it, in the same commit, with the reason (5B's rule).
   */
   const lockedBanner = await page.locator('.banner--warning').count();
-  const subjectDisabled = await page.locator('#subjectId').isDisabled();
+  /*
+    ⚠️ THE COMBOBOX'S OWN INPUT, found by the label it carries when locked.
+    `[disabled]` is bound on that input, so the question is the same one the
+    old `#subjectId` asked — it is only the handle that changed.
+  */
+  const subjectDisabled = await page.getByLabel(/Primary subject/).first().isDisabled();
   const titleDisabled = await page.locator('#jobTitle').isDisabled();
 
   check('🔴 a published job shows the locked banner with the reason',
@@ -617,8 +661,7 @@ try {
   await page.waitForTimeout(1200);
 
   await page.fill('#jobTitle', 'Salary the wrong way round');
-  await page.selectOption('#subjectId', { index: 1 });
-  await page.selectOption('#designationId', { index: 1 });
+  await fillJobMasters(page);
   await page.fill('#salaryMin', '90000');
   await page.fill('#salaryMax', '10000');
   await page.locator('button[type="submit"]').click();
@@ -684,8 +727,7 @@ try {
     await page.goto(`${SCHOOL_APP}/jobs/new`, { waitUntil: 'networkidle' });
     await page.waitForTimeout(1100);
     await page.fill('#jobTitle', title);
-    await page.selectOption('#subjectId', { index: 1 });
-    await page.selectOption('#designationId', { index: 1 });
+    await fillJobMasters(page);
     await page.fill('#lastDateToApply', '2026-12-31');
     await page.locator('button[type="submit"]').click();
     await page.waitForTimeout(1600);

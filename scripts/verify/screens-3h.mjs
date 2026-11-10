@@ -171,6 +171,46 @@ const setKnownPassword = async (email) => {
   return reset.http === 200;
 };
 
+/**
+ * The three profiles as the database holds them: name, completion, subjects.
+ *
+ * ----------------------------------------------------------------------------
+ * 🔴 WHY THIS IS A FUNCTION CALLED TWICE INSTEAD OF THREE PINNED NUMBERS
+ * ----------------------------------------------------------------------------
+ * Section 6 used to assert the literals `Anita 37, Imran 0, Rohit 90` under the
+ * heading NOTHING WAS SAVED. On 25 October it went red: Rohit reads 100, not
+ * 90, because he gained a profile photo — `teacher-photos/2026/10/…`, written
+ * DURING a regression run (his row's ModifiedOn moved at 05:45, not on demo
+ * day). Some suite uploads a photo for him and does not put it back.
+ *
+ * ⚠️ THE ASSERTION WAS RIGHT TO FIRE AND WRONG ABOUT WHY. Its subject is
+ * whether THIS run saved anything — the multi-select is opened and filled with
+ * twenty subjects on purpose, and Save is deliberately never pressed. The
+ * seeded percentages were never the claim; they were a proxy for it that
+ * happened to be stable for two months.
+ *
+ * So the claim is now measured instead of remembered: read the three rows
+ * BEFORE the browser opens, read them again at the end, and require them to be
+ * identical. That is strictly stronger — it catches a change to any of the
+ * three, in either direction, including the next photo — and it cannot be made
+ * false by somebody else's fixture drift.
+ *
+ * ⚠️ WHAT IT NO LONGER ASSERTS, SAID OUT LOUD: the seeded VALUES. A database
+ * where Rohit is 100 and Anita 37 passes, and so would one where all three are
+ * 0 — the sentence is "this run changed nothing", not "the seed is intact".
+ * The entry baseline is printed below so the log still records what the three
+ * profiles were on the day, which is what a reader of a screenshot run wants.
+ * Whether 100 is CORRECT for Rohit's data is 002_test_teacher.sql's question
+ * (it asserts the recalculation against the components) and not a screen's.
+ */
+const profileRows = () => sql(`SET NOCOUNT ON;
+  SELECT t.FullName + '|' + CAST(t.ProfileCompletionPercent AS varchar(4)) + '|'
+       + CAST((SELECT COUNT(*) FROM jp_app.dbo.t_app_teacher_subjects s
+               WHERE s.TeacherId = t.TeacherId AND s.Is_Deleted = 0) AS varchar(4))
+  FROM jp_app.dbo.t_app_teachers t
+  WHERE t.FullName IN (N'Rohit Kulkarni', N'Anita Deshmukh', N'Imran Qureshi') AND t.Is_Deleted = 0
+  ORDER BY t.FullName`);
+
 // ---------------------------------------------------------------------------
 console.log('\n=== 0. THE THREE ACCOUNTS ===');
 
@@ -182,6 +222,12 @@ for (const person of PEOPLE) {
   const ok = await setKnownPassword(person.email);
   check(`${person.name} can be signed in as (${person.why})`, ok, person.email);
 }
+
+/* The baseline section 6 compares against. Printed, so the log says what it was. */
+const before = profileRows();
+
+console.log('\n    name|completion|subjects, as found:');
+console.log(before.split('\n').map((l) => `      ${l.trim()}`).join('\n'));
 
 const browser = await chromium.launch();
 
@@ -412,13 +458,7 @@ await browser.close();
 // ---------------------------------------------------------------------------
 console.log('\n=== 6. NOTHING WAS SAVED ===');
 
-const after = sql(`SET NOCOUNT ON;
-  SELECT t.FullName + '|' + CAST(t.ProfileCompletionPercent AS varchar(4)) + '|'
-       + CAST((SELECT COUNT(*) FROM jp_app.dbo.t_app_teacher_subjects s
-               WHERE s.TeacherId = t.TeacherId AND s.Is_Deleted = 0) AS varchar(4))
-  FROM jp_app.dbo.t_app_teachers t
-  WHERE t.FullName IN (N'Rohit Kulkarni', N'Anita Deshmukh', N'Imran Qureshi') AND t.Is_Deleted = 0
-  ORDER BY t.FullName`);
+const after = profileRows();
 
 console.log(after.split('\n').map((l) => `      ${l.trim()}`).join('\n'));
 
@@ -428,11 +468,18 @@ check('🔴 Anita still has ZERO subjects — the twenty ticked were never saved
   rows.some((r) => r[0] === 'Anita Deshmukh' && r[2] === '0'),
   'the seeded profiles are untouched');
 
-check('…and the three percentages are as they were',
-  rows.some((r) => r[0] === 'Anita Deshmukh' && r[1] === '37') &&
-  rows.some((r) => r[0] === 'Imran Qureshi' && r[1] === '0') &&
-  rows.some((r) => r[0] === 'Rohit Kulkarni' && r[1] === '90'),
-  'Anita 37, Imran 0, Rohit 90');
+/*
+  🔴 COMPARED WITH WHAT THIS RUN FOUND, NOT WITH A REMEMBERED NUMBER.
+
+  See profileRows()'s header: the literals `Anita 37, Imran 0, Rohit 90` went
+  red when Rohit gained a photo and his completion recalculated to 100. The
+  claim here is NOTHING WAS SAVED, and that is a before-and-after question.
+*/
+check('…and all three rows are byte-for-byte what they were before the browser opened',
+  after === before,
+  after === before
+    ? `unchanged — ${rows.map((r) => `${r[0].split(' ')[0]} ${r[1]}%/${r[2]} subj`).join(', ')}`
+    : `BEFORE ${before.replace(/\s*\r?\n\s*/g, ' · ')}  AFTER ${after.replace(/\s*\r?\n\s*/g, ' · ')}`);
 
 // ---------------------------------------------------------------------------
 const failed = results.filter((r) => !r.pass);

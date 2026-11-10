@@ -308,8 +308,47 @@ try {
   check('premise: the subject filter offers Mathematics, with a count',
     !!mathsOption, `value ${mathsOption}`);
 
-  await page.selectOption('#filter-subject', mathsOption ?? '');
-  await page.waitForURL(/subjectId=/, { timeout: 10_000 });
+  /*
+    🔴 SELECT, THEN CHECK THE SELECTION SURVIVED, THEN SELECT AGAIN IF IT DID NOT.
+
+    The race documented at the top of this section is real and it came back:
+    under the full runner this line selected an option, the /jobs/filters
+    response landed a moment later, Angular re-rendered the <option> list on
+    the signal update, and the selection went with it. No change event, so no
+    navigation, so `waitForURL` sat for ten seconds and the suite died —
+    45/45 standalone, dead under load. Identical code, different timing.
+
+    ⚠️ THE EARLIER GUARD WAS NOT ENOUGH. It waits for the options to arrive,
+    which closes the window where the list is still empty — but not the one
+    where a SECOND render replaces a list that was already populated.
+
+    ⚠️ RE-SELECTING IS NOT WEAKENING THE ASSERTION. What is being tested is
+    "choosing Mathematics filters the list", and that claim is unchanged; the
+    retry only removes a lost click that no user would ever experience, because
+    a person does not select an option in the same millisecond a response
+    lands. The URL assertion below is untouched and still has to pass.
+  */
+  const selectMaths = async () => {
+    await page.selectOption('#filter-subject', mathsOption ?? '');
+
+    return page.evaluate(
+      (want) => document.querySelector('#filter-subject')?.value === want,
+      mathsOption ?? '',
+    );
+  };
+
+  let stuck = await selectMaths();
+
+  if (!stuck) {
+    console.log('    ⚠️ the option list re-rendered and dropped the selection — selecting again');
+    await page.waitForTimeout(400);
+    stuck = await selectMaths();
+  }
+
+  check('premise: the subject selection stuck on the control',
+    stuck, stuck ? 'selected' : 'the control dropped it twice');
+
+  await page.waitForURL(/subjectId=/, { timeout: 15_000 });
   await settled(page);
 
   const filteredTitles = await page.locator('.job-card__title').allInnerTexts();

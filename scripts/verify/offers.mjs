@@ -38,6 +38,12 @@
   fixture has outlived the assertion it was made for; the rule that came out of
   it is applied here from the first line.
 
+  ⚠️ AND SINCE THE 20 OCTOBER DEMO, THE SECOND TENANT IS ONE OF THEM. Section 6
+  used to borrow a seeded owner from another school; a school registered against
+  that account during the demo gave it two memberships and G23 answered 400
+  where this suite asserts 404. It builds its own now — lib/second-tenant.mjs —
+  and `cleanup()` removes it on entry and in the finally like everything else.
+
   Run (both APIs up for section 6; sections 1-5 need only the database):
       node scripts/verify/offers.mjs
 */
@@ -45,6 +51,9 @@ import { execFile, execFileSync } from 'node:child_process';
 import { promisify } from 'node:util';
 import { token as loginToken } from './lib/login.mjs';
 import { secret } from './lib/accounts.mjs';
+import {
+  arrangeSecondTenant, dropSecondTenant, secondTenantRowsLeft,
+} from './lib/second-tenant.mjs';
 
 const execFileAsync = promisify(execFile);
 
@@ -56,21 +65,31 @@ const APP = 'http://localhost:5299/api';
 
 const OWNER = { id: 'principal@greenwood.edu.in', pw: secret('principal@greenwood.edu.in') };
 const VIEWER = { id: 'viewer@greenwood.edu.in', pw: secret('viewer@greenwood.edu.in') };
-/*
-  🔴 A DIFFERENT SCHOOL'S OWNER, NOT THE HR LEAD.
+const TEACHER = { id: 'rohit.kulkarni.86002@yopmail.com', pw: secret('rohit.kulkarni.86002@yopmail.com') };
 
-  The first version used hr.lead@greenwood — and got 403 rather than the 404 it
+/*
+  🔴 THE SECOND TENANT IS THIS SUITE'S OWN, AND THAT TOOK TWO LESSONS.
+
+  FIRST: a scope negative needs an actor who would otherwise be ALLOWED. The
+  original version used hr.lead@greenwood and got 403 rather than the 404 it
   asserted, because HR holds NEITHER offer permission. The refusal was correct
   and it was about the PERMISSION, so the scope was never reached and the
   assertion proved nothing about it.
 
-  A scope negative needs an actor who would otherwise be allowed. head@stmarys
-  is a SCHOOL_OWNER — it holds OFFER.CREATE and OFFER.APPROVE — so a 404 from
-  it can only be the scope. The permission half is proved separately, by the
-  Viewer, who is in the SAME school and holds neither.
+  SECOND, and this is the one that cost a red: the fix was to borrow
+  head@stmarys.edu.in, a seeded SCHOOL_OWNER in another school. Then a school
+  was registered against that account live during the 20 October client demo,
+  giving it a SECOND membership — and G23 refuses that with
+  `400 · Your account is linked to more than one school`, where this suite
+  asserts 404. The suite was depending on a row it did not create, and somebody
+  else's ordinary working day changed it.
+
+  ⚠️ SO IT CREATES ITS OWN, and removes it again: see lib/second-tenant.mjs,
+  which is also where team-contract gets its stranger. The permission half of
+  the split is still proved separately by the Viewer, who is in the SAME school
+  and holds neither offer permission.
 */
-const OTHER_SCHOOL = { id: 'head@stmarys.edu.in', pw: secret('head@stmarys.edu.in') };
-const TEACHER = { id: 'rohit.kulkarni.86002@yopmail.com', pw: secret('rohit.kulkarni.86002@yopmail.com') };
+const TENANT_TAG = 'offers';
 
 const TEMP_INDEX = 'UQ_TEMP_6A_OneOfferPerTeacher';
 
@@ -120,7 +139,22 @@ const H = (t) => ({ authorization: `Bearer ${t}`, 'content-type': 'application/j
 // ---------------------------------------------------------------------------
 // Fixtures. Entry and exit run the same statements.
 // ---------------------------------------------------------------------------
-const cleanup = () => sql(`SET NOCOUNT ON; USE jp_app;
+const cleanup = () => {
+  dropOwnFixtures();
+
+  /*
+    🔴 AND THE SECOND TENANT, LAST AND UNCONDITIONALLY.
+
+    Last because the statements above are this suite's own subject matter and
+    must run even if the helper throws; unconditional because "was it me who
+    made it?" needs state a killed run does not have, and removing a tenant
+    that is not there costs one no-op DELETE. SR-4 lost shared state three
+    times to a restore that sat behind a condition.
+  */
+  dropSecondTenant(TENANT_TAG);
+};
+
+const dropOwnFixtures = () => sql(`SET NOCOUNT ON; USE jp_app;
   IF EXISTS (SELECT 1 FROM sys.indexes WHERE name = '${TEMP_INDEX}'
              AND object_id = OBJECT_ID('dbo.t_app_offers'))
       DROP INDEX ${TEMP_INDEX} ON dbo.t_app_offers;
@@ -708,7 +742,22 @@ try {
 
   const ownerToken = await login(OWNER);
   const viewerToken = await login(VIEWER);
-  const otherSchoolToken = await login(OTHER_SCHOOL);
+
+  /*
+    🔴 THE SECOND TENANT, MADE HERE RATHER THAN BORROWED. See the header note
+    beside TENANT_TAG for the demo-day incident this replaces.
+
+    ⚠️ The premise is ASSERTED, not assumed. A half-built tenant would earn a
+    403 (no membership) or a 400 (two memberships) and the 404 assertion below
+    would fail with the wrong explanation attached to it — which is exactly the
+    morning that produced this change.
+  */
+  const otherSchool = arrangeSecondTenant(TENANT_TAG, OWNER.id);
+
+  check('premise: this run built its own second tenant — a SCHOOL_OWNER with ONE membership',
+    otherSchool.ok, otherSchool.detail);
+
+  const otherSchoolToken = await login({ id: otherSchool.id, pw: otherSchool.pw });
 
   const viewerSend = await j(`${APP}/applicants/${httpApp.applicationId}/offers`, {
     method: 'POST', headers: H(viewerToken),
@@ -820,6 +869,16 @@ try {
       SELECT CAST((SELECT COUNT(*) FROM dbo.t_app_jobs WHERE JobTitle LIKE '6A %')
                 + (SELECT COUNT(*) FROM dbo.t_app_offers) AS varchar(10));`) === '0',
     'no jobs, no offers');
+
+  /*
+    🔴 INCLUDING THE SECOND TENANT, in both databases. A school and an account
+    left behind would be the next suite's mystery, and this one has just spent
+    a phase learning what a borrowed tenant costs.
+  */
+  const tenantLeft = secondTenantRowsLeft(TENANT_TAG);
+
+  check('exit: the second tenant this run created is gone from jp_sso AND jp_app',
+    tenantLeft === '0', `${tenantLeft} row(s) left`);
 
   check('exit: the temporary index is gone and the index count is back to what it was',
     indexCount() === entryIndexes, `${entryIndexes} before, ${indexCount()} after`);
