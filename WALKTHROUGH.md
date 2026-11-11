@@ -300,3 +300,52 @@ Applicants on a phone.
 Plans on a phone.
 
 ![49-phone-billing-375.png](design-screens/walkthrough/49-phone-billing-375.png)
+
+---
+
+## PART 4 — the public site's filters (P3b)
+
+These seven are not captured by `walkthrough-school.mjs`; they are the public
+job search, which is the one surface a visitor sees before any account exists.
+The point of the pair below is that it is the SAME page twice: the server sends
+a working native `<select>`, and the browser upgrades it.
+
+### public jobs — JavaScript OFF
+
+The server sends real `<select>`s with their options, and the form is a plain
+GET, so searching works with no JavaScript at all.
+
+![50-public-jobs-nojs-1440.png](design-screens/walkthrough/50-public-jobs-nojs-1440.png)
+
+### public jobs — upgraded
+
+The same page with JavaScript on: each filter has become a type-ahead, in
+place, keeping its id and its label.
+
+![51-public-jobs-upgraded-1440.png](design-screens/walkthrough/51-public-jobs-upgraded-1440.png)
+
+### subject filter, open
+
+![52-public-filter-subject-open-1440.png](design-screens/walkthrough/52-public-filter-subject-open-1440.png)
+
+### state filter — typing "Har"
+
+Haryana leads. Bihar, Jharkhand and Maharashtra all contain "har" and stay in
+the list, below it — the filter is CONTAINS, and only the ORDER changed.
+
+![53-public-filter-state-har-1440.png](design-screens/walkthrough/53-public-filter-state-har-1440.png)
+
+### town filter, open
+
+The control the client asked for. ⚠️ It is a FACET: it offers the towns that
+have live jobs, with a count beside each — not the whole 902-town master.
+
+![54-public-filter-city-open-1440.png](design-screens/walkthrough/54-public-filter-city-open-1440.png)
+
+### town filter — typing narrows it
+
+![55-public-filter-city-search-1440.png](design-screens/walkthrough/55-public-filter-city-search-1440.png)
+
+### the public job search on a phone
+
+![56-public-jobs-375-1440.png](design-screens/walkthrough/56-public-jobs-375-1440.png)
