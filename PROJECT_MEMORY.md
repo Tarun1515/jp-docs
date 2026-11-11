@@ -1,7 +1,7 @@
 # TEACHER RECRUITMENT PORTAL — PROJECT MEMORY
 
 > **Ye file har kaam ke baad update hogi.** Har naye chat/session mein sabse pehle ye file padho.
-> Last updated: **2026-11-11** | Phase **3 COMPLETE** + **2.5 engine** + **4 jobs COMPLETE** + **2.67 swagger fix** + **PRE-5 (G26 band, 2.68/2.69)** + **PRE-5b (baseline green)** + **5A applications BACKEND (2.70, G28)** + **5B applications SCREENS COMPLETE — PHASE 5 POORA (2.71, G30)** + **6A-0 approval engine above level 1 (2.72, G14 BAND, G31)** + **6A Offer Lite BACKEND COMPLETE (2.73, G32)** + **6B TEACHER SEARCH + INVITES BACKEND COMPLETE — 🔒 CONSENT PATH 2 (2.74, G33, G34)** + **6C-0 verification ka bakaya: G33 aur G34 BAND (2.75, G35, G36)** + **6C-1 NOTIFICATIONS BACKEND + G27 BAND (2.76, G37)** + **6C-2-0 G37 BAND — badge asli hua, aur shared suite runner (2.77, G35 BAND)** + **6C-2 SCREENS COMPLETE — 🔒 consent path 2 screen se, devtools-forced negatives dono taraf (2.78)** + **6.5A BILLING BACKEND COMPLETE — manual first, seam service par, expiry derived (2.79, G38)** + **6.5B BILLING SCREENS COMPLETE — PHASE 6.5 POORA (2.80)** + **7A-0 PUBLIC SURFACE KE TEEN FAISLE, CODE SE PEHLE (2.81, G39, G40)** + **7A PUBLIC JOB PAGES + CONTACT FORM COMPLETE — 🔒 pehli ANONYMOUS surface, SSR JS band kar ke saabit (2.82, G41, G42)** + **7B-0 G41 BAND — public→teacher funnel, aur ek parameter jo do jagah likha jaata tha aur kahin padha nahi (2.83, G43)** + **7B ADMIN OPERATIONS DESK COMPLETE — paanch surface, chha screen, athaarah route, aur ek column jo hamesha zero rehta tha (2.84, G43 BAND, G44)** + **8-0 COMPLETE — saaton item: chhe gap band (G31, G36, G38, G42, G44 + sweep ke G3/G4), Accounts aur Analytics screens, aur §2A ka poora sweep (2.85, 2.86, 2.87); G38 "future risk" likha gaya tha par DO shipped procedure mein ZINDA tha, aur G45/G46 screen banate waqt mili** + **8A SECURITY PASS + E2E CONSOLIDATION COMPLETE — chha gap band (G8, G9, G10, G22, G45, G46), aur run_all mein GYARAH file missing thin: naye machine par public site, moderation desk aur analytics teeno fail hote, poori regression green rehte hue (2.88)** + **SR SCHOOL REVAMP COMPLETE (SR-0…SR-5) — client ke demo feedback ka poora pass: FIELD_MATRIX, address model + tehsil master, poore Bharat ki geography (782 district, 902 town), ek searchable combobox 20 jagah (G27), logo step, principal fields profile par, plan catalogue chalu, registration par plan choice, aur teacher ko apni profile se matching jobs; TEEN cheezein green build ke peeche chupi thin — run_all ka order naye machine par toota, teacher-verification ka darj kaaran galat tha, aur do CATCH block asli failure chhupa rahe the; CHAAR aur sirf screenshot dekhne se mili, jinme ek form ka jhooth aur ek class jo kuch karti hi nahi thi (2.86)** + **POLISH PASS P1–P5 COMPLETE — address cascade ulta (district→city→tehsil, naam-milaan ke bajaye `m_mdm_city.TehsilId`), Find-teachers apne ilaake par khulta hai, combobox sweep poori (par jp-public tak pahunch hi nahi sakti — wo jaan-boojh kar unfederated hai), browse ka qualification default, aur teacher browse ke TEEN SERVER-SIDE TAB with apply on the card; 52/52 suite, 2020 assertion. 🔴 EK SUITE REGRESSION MEIN KABHI CHALI HI NAHI THI (`browse-sets` manifest mein nahi thi aur uski summary line bhi unparseable thi — pichhle pass ke saboot mein ginwayi gayi thi), aur pin karte hi usne ek ZINDA BUG pakda: unmoded browse ke set filters WHERE se classification mein chale gaye the, to `?subjectIds=999999` saari jobs laata tha; aur EK ASSERTION GALAT WAJAH SE PAAS HO RAHI THI — `screens-3f` ne "id nahi mili" ko "control nahi hai" padh liya; phir **P3b** ne jp-public ko uska APNA combobox diya (SSR native select + hydration type-ahead) ek SHARED VECTOR FILE ke saath jise dono suites chalati hain, aur screenshots lete waqt DO AUR BUG mile jo kisi test ne nahi pakde: `animation-fill-mode: both` identity matrix chhod jaata tha jisse `.page.enter` har `position: fixed` dropdown ka containing block ban gaya tha (list viewport se 1983px bahar), aur naya tehsil-by-city endpoint `parentId` nahi padhta tha — HTTP 200, khaali list, control chhupa, kahin koi error nahi. **53/53 suite, 2055 assertion** (2.89)** | Next: **8B** (deployment readiness + LAUNCH_CHECKLIST) — ⚠️ Point 7 (interview/offer scope) aur §4 Q4 (billing MVP ka likhit confirmation) dono ab bhi client ke paas hain
+> Last updated: **2026-11-11** | Phase **3 COMPLETE** + **2.5 engine** + **4 jobs COMPLETE** + **2.67 swagger fix** + **PRE-5 (G26 band, 2.68/2.69)** + **PRE-5b (baseline green)** + **5A applications BACKEND (2.70, G28)** + **5B applications SCREENS COMPLETE — PHASE 5 POORA (2.71, G30)** + **6A-0 approval engine above level 1 (2.72, G14 BAND, G31)** + **6A Offer Lite BACKEND COMPLETE (2.73, G32)** + **6B TEACHER SEARCH + INVITES BACKEND COMPLETE — 🔒 CONSENT PATH 2 (2.74, G33, G34)** + **6C-0 verification ka bakaya: G33 aur G34 BAND (2.75, G35, G36)** + **6C-1 NOTIFICATIONS BACKEND + G27 BAND (2.76, G37)** + **6C-2-0 G37 BAND — badge asli hua, aur shared suite runner (2.77, G35 BAND)** + **6C-2 SCREENS COMPLETE — 🔒 consent path 2 screen se, devtools-forced negatives dono taraf (2.78)** + **6.5A BILLING BACKEND COMPLETE — manual first, seam service par, expiry derived (2.79, G38)** + **6.5B BILLING SCREENS COMPLETE — PHASE 6.5 POORA (2.80)** + **7A-0 PUBLIC SURFACE KE TEEN FAISLE, CODE SE PEHLE (2.81, G39, G40)** + **7A PUBLIC JOB PAGES + CONTACT FORM COMPLETE — 🔒 pehli ANONYMOUS surface, SSR JS band kar ke saabit (2.82, G41, G42)** + **7B-0 G41 BAND — public→teacher funnel, aur ek parameter jo do jagah likha jaata tha aur kahin padha nahi (2.83, G43)** + **7B ADMIN OPERATIONS DESK COMPLETE — paanch surface, chha screen, athaarah route, aur ek column jo hamesha zero rehta tha (2.84, G43 BAND, G44)** + **8-0 COMPLETE — saaton item: chhe gap band (G31, G36, G38, G42, G44 + sweep ke G3/G4), Accounts aur Analytics screens, aur §2A ka poora sweep (2.85, 2.86, 2.87); G38 "future risk" likha gaya tha par DO shipped procedure mein ZINDA tha, aur G45/G46 screen banate waqt mili** + **8A SECURITY PASS + E2E CONSOLIDATION COMPLETE — chha gap band (G8, G9, G10, G22, G45, G46), aur run_all mein GYARAH file missing thin: naye machine par public site, moderation desk aur analytics teeno fail hote, poori regression green rehte hue (2.88)** + **SR SCHOOL REVAMP COMPLETE (SR-0…SR-5) — client ke demo feedback ka poora pass: FIELD_MATRIX, address model + tehsil master, poore Bharat ki geography (782 district, 902 town), ek searchable combobox 20 jagah (G27), logo step, principal fields profile par, plan catalogue chalu, registration par plan choice, aur teacher ko apni profile se matching jobs; TEEN cheezein green build ke peeche chupi thin — run_all ka order naye machine par toota, teacher-verification ka darj kaaran galat tha, aur do CATCH block asli failure chhupa rahe the; CHAAR aur sirf screenshot dekhne se mili, jinme ek form ka jhooth aur ek class jo kuch karti hi nahi thi (2.86)** + **POLISH PASS P1–P5 COMPLETE — address cascade ulta (district→city→tehsil, naam-milaan ke bajaye `m_mdm_city.TehsilId`), Find-teachers apne ilaake par khulta hai, combobox sweep poori (par jp-public tak pahunch hi nahi sakti — wo jaan-boojh kar unfederated hai), browse ka qualification default, aur teacher browse ke TEEN SERVER-SIDE TAB with apply on the card; 52/52 suite, 2020 assertion. 🔴 EK SUITE REGRESSION MEIN KABHI CHALI HI NAHI THI (`browse-sets` manifest mein nahi thi aur uski summary line bhi unparseable thi — pichhle pass ke saboot mein ginwayi gayi thi), aur pin karte hi usne ek ZINDA BUG pakda: unmoded browse ke set filters WHERE se classification mein chale gaye the, to `?subjectIds=999999` saari jobs laata tha; aur EK ASSERTION GALAT WAJAH SE PAAS HO RAHI THI — `screens-3f` ne "id nahi mili" ko "control nahi hai" padh liya; phir **P3b** ne jp-public ko uska APNA combobox diya (SSR native select + hydration type-ahead) ek SHARED VECTOR FILE ke saath jise dono suites chalati hain, aur screenshots lete waqt DO AUR BUG mile jo kisi test ne nahi pakde: `animation-fill-mode: both` identity matrix chhod jaata tha jisse `.page.enter` har `position: fixed` dropdown ka containing block ban gaya tha (list viewport se 1983px bahar), aur naya tehsil-by-city endpoint `parentId` nahi padhta tha — HTTP 200, khaali list, control chhupa, kahin koi error nahi. **53/53 suite, 2055 assertion** (2.89)** + **PLACES ON — client ki key live, SIRF server par (2.90): seam SIRF BACKEND tak bana tha, kisi frontend ne use chhua hi nahi tha; Google ne TEEN baar mana kiya (legacy API, phir referrer restriction, phir service enabled nahi) aur teenon baar seam theek gira — log mein Google ka apna vaakya, khaali list, chalta manual cascade; key user env var mein, saaton working tree + har git-tracked file + paanch app ki 661 built files mein AIza ka ZERO hit, browser se google par ZERO request; aur maine do agents se ek hi control do baar banwa diya, jo ab jp-shared mein ek hai. 54 suite, 2072 assertion** | Next: **8B** (deployment readiness + LAUNCH_CHECKLIST) — ⚠️ Point 7 (interview/offer scope) aur §4 Q4 (billing MVP ka likhit confirmation) dono ab bhi client ke paas hain
 >
 > 🔴 **Ye do line har phase ke close-out mein update hongi.** File 3I tak
 > pahunch chuki thi aur ye header **Phase 0** par khada tha — saat phase purana,
@@ -11002,6 +11002,128 @@ rakhta tha. Listbox mein sirf option aur group aa sakte hain, to jab tak list
 khuli aur khaali hai ye `aria-required-children` ka ullanghan hai — aur Lighthouse
 page audit karte waqt koi dropdown kholta hi nahi. Ab `role="option"` +
 `aria-disabled`, aur announcement `aria-live` se bachaya gaya.
+
+### 2.90 PLACES ON — CLIENT KI KEY LIVE, SIRF SERVER PAR, AUR GOOGLE KE TEEN INKAAR
+
+Client ne apni Google key di, ek shart ke saath: wo kabhi client-side na jaaye.
+SR-2 ka seam isi ke liye bana tha — ab wo saabit karna tha.
+**54 suite, 2072 assertion** (pehle 53 suite, 2055).
+
+#### 2.90.1 🔴 SEAM SIRF BACKEND TAK BANA THA — KISI FRONTEND NE USE CHHUA HI NAHI THA
+
+SR-2 ne `IAddressLookupService`, teen endpoints, per-IP limiter aur poora
+master-matching chain bana kar **OFF** ship kiya tha. On karna ek config flip
+samjha gaya tha. Nahi tha: **kisi bhi frontend mein `/api/address` ko call karne
+wali ek bhi line nahi thi**, aur use chhoone wali ekmaatra suite `swagger.mjs`
+thi — jo sirf ye dekhti hai ki endpoints **documented** hain.
+
+⚠️ *Jis seam ko koi consume nahi karta, usko kisi ne aazmaya bhi nahi hai.* Wo
+compile hota tha, documented tha, aur kabhi kisi screen se ek request nahi laya
+tha.
+
+#### 2.90.2 🔴 KEY SAHI HAI — GOOGLE NE TEEN BAAR, TEEN ALAG WAJAH SE MANA KIYA
+
+Pehli call, client ki asli key se:
+
+    REQUEST_DENIED: You're calling a legacy API, which is not enabled for your
+    project. Switch to the Places API (New).
+
+Ye **authenticated refusal** hai, auth failure nahi — key Google tak pahunchi
+aur Google ne jawab diya. SR-2 legacy `maps.googleapis.com/maps/api/place/*` ke
+against likha tha, jo Google naye projects par enable hi nahi karta, toh koi bhi
+configuration use chala hi nahi sakti thi.
+
+Places API (New) par port kiya: `places.googleapis.com/v1/places:autocomplete`
+(POST, JSON body) aur `/v1/places/{id}` (GET, zaroori field mask ke saath).
+**Matching ke niyam jyun ke tyun rahe** — component TYPES wahi hain, sirf
+envelope aur spelling badli (`addressComponents`/`longText`,
+`location.latitude`).
+
+⚠️ **Key query string se header mein chali gayi, aur ye fayda hum waise bhi
+chahte.** Legacy `&key=` leta tha; naya `X-Goog-Api-Key`. URL mein pada secret
+har access log, proxy log aur us error report mein hota hai jo request line
+likhta hai.
+
+Phir doosra inkaar: `403: Requests from referer <empty> are blocked.` — yaani
+HTTP-referrer restriction, jo **browser key** ki setting hai. Server call koi
+referrer bhejti hi nahi, toh jo restriction key ko page mein mehfooz banati hai
+wahi use API se bekaar kar deti hai. Client ke localhost allow karne ke baad
+teesra: `403: Permission denied on the service.` — Places API (New) project par
+enabled nahi.
+
+Har inkaar pichhle se **chhota** tha, aur har ek isliye padha ja saka kyunki
+service Google ka apna vaakya log karti hai, khaali list ko "koi result nahi"
+maan kar chhodti nahi.
+
+#### 2.90.3 ⚠️ IN TEENON KE DAURAAN SEAM THEEK WAISE HI GIRA JAISA WAADA THA
+
+Har inkaar ka natija: log mein Google ke shabdon samet warning, khaali
+suggestion list, khamosh control, aur chalta hua manual cascade. Product kabhi
+toota nahi; sirf kuch nahi kiya. **Yahi wo cheez hai jiski wajah se iska
+diagnosis mumkin hua.**
+
+#### 2.90.4 🔴 MAINE DO AGENTS SE EK HI CONTROL DO BAAR BANWA DIYA
+
+School side aur teacher side ko poora kaam alag-alag, apne repo mein diya gaya.
+Dono ne un hi teen endpoints par type-ahead banaya; dono ek hi deewar se takraye
+(shared `errorInterceptor` 429 par toast karta hai aur per-request opt-out nahi
+tha) aur dono ne ek hi **galat** hal nikala — `new HttpClient(inject(HttpBackend))`,
+jo auth interceptor se bhi bahar nikal jaata hai, toh dono ko bearer token haath
+se jodna pada.
+
+Duplication dono agents ne khud flag ki. **Galti meri hai, unki nahi:** control
+pehle brief se hi jp-shared mein hona chahiye tha, aur sirf ek se likhwana
+chahiye tha.
+
+Merge: `jp-shared/ui/ui-address-search` + `jp-shared/core/address-lookup.service`.
+Toast ka asli hal **`SKIP_ERROR_TOAST`** hai — ek `HttpContextToken`, bilkul us
+`SKIP_LOADER` ki shakal ka jo pehle se maujood tha. Isse auth interceptor chain
+mein wapas aa gaya, aur ye maayne rakhta hai: per-session cap token hone par
+**user** par key karta hai, toh ek NAT ke peeche baitha staff room apne hi
+colleague ki typing se rate-limit nahi hota. jp-teacher ka profile chunk uski
+copy jaane par **223.60 kB → 188.06 kB**.
+
+#### 2.90.5 ⚠️ TEESRE ADDRESS CASCADE PAR BOX THA HI NAHI, AUR YE SIRF BROWSER NE BATAYA
+
+Registration aur campus form ko control mil gaya; **`school-profile`** — product
+ka teesra address form — reh gaya, kyunki wo kisi agent ke scope mein nahi tha.
+School registration par apna pata Places se bhar leta aur baad mein usi pate ko
+theek karne aata toh sirf dropdowns milte. Page kholne par dikhta hai, kisi
+suite ko nahi.
+
+#### 2.90.6 🔴 JO APP SERVE HO RAHI HO USE BUILD KARNA USI KO TOD DETA HAI
+
+Aath browser suites ek saath red hui — saari browser wali, ek bhi HTTP ya SQL
+nahi. `ngDevMode is not defined`, sirf jp-school par. Wajah item 5 ka bundle
+grep tha: har app mein `npm run build`, jabki har app ka dev server chal raha
+tha aur **usi `dist` se serve kar raha tha**.
+
+Project mein pehle se darj hai *"never build jp-shared while it serves"* —
+federation remote ke liye. **Niyam remote se chaura hai:** har host par lagta
+hai. Do din mein ye is parivaar ka doosra waqia hai; pehla tha chalte server ke
+neeche se `.angular/cache` delete karna. Ek restart se aathon theek.
+
+⚠️ Uske baad adhoore re-run mein `jobs-screens` alag wajah se red thi: usi batch
+की kisi suite ne job chhod di thi aur free plan ka ekmaatra JOB_POST allowance
+kharch ho chuka tha. Akele chalane par 57/57. **Jo suite batch mein fail ho aur
+akele paas ho, wo state dependency hai, bug nahi** — aur jhooth batch bolta hai,
+suite nahi.
+
+#### 2.90.7 JO SAABIT HAI, AUR JO AB BHI CLIENT KE PAAS HAI
+
+Naapa hua: key ek **user environment variable** mein hai aur kisi file mein
+nahi — `AIza` ke liye **saaton working tree**, **har git-tracked file**, aur
+**paanch app ki 661 built files** — teenon mein **zero**. Browser
+maps/places.googleapis.com par **zero** request karta hai; sirf hamare teen
+endpoints. Hamare response mein na key aati hai na koi raw Google payload.
+"Go" likhne par **0** request, "Gohana" par theek **1**. Per-IP window hamare
+apne `RATE_LIMITED` body ke saath mana karta hai, aur us dauraan bhi manual
+cascade jawab deta rehta hai.
+
+⚠️ Jo saabit **nahi** hai, aur yahan se ho bhi nahi sakta: ek zinda suggestion.
+Uske liye client ke Google Cloud project par **Places API (New) enable** honi
+hai. Tab tak `address-lookup.mjs` `live suggestions: 0` wajah ke saath **chhapti**
+hai, kisi teesre ki configuration ko assert nahi karti.
 ## 3. SCOPE (Client spec ke against)
 
 ### IN SCOPE — MVP
@@ -13045,3 +13167,34 @@ profile/campus tehsil-village dikha hi nahi sakte · jp-public ke location
 dropdowns · "Showing teachers near you" screen par verify nahi hua (har account
 plan-gated hai aur wo line refusal par chhupti hai) · `team-contract.mjs` ka
 hardcoded password literal.
+
+## ✅ PLACES ON — 2026-11-11 (CLIENT KI KEY LIVE, SIRF SERVER PAR)
+
+Details **2.90**.
+
+```
+54 suite, 2072 assertion   (pehle 53 suite, 2055)
+AIza ke liye: 7 working tree · har git-tracked file · 661 built file  ->  0 hit
+browser se maps/places.googleapis.com par  ->  0 request
+"Go" -> 0 request · "Gohana" -> theek 1
+```
+
+### 🔴 Is pass ki sabse badi baat
+
+**Jis seam ko koi consume nahi karta, usko kisi ne aazmaya bhi nahi hai.**
+SR-2 ne address lookup poora banaya aur OFF ship kiya. On karna ek config flip
+samjha gaya tha — par kisi frontend mein `/api/address` ki ek bhi line nahi
+thi, aur use chhoone wali ekmaatra suite sirf ye dekhti thi ki endpoints
+*documented* hain. Wo compile hota tha, documented tha, aur kabhi kisi screen se
+ek request nahi laya tha.
+
+### Jo khula hai, naam se
+
+**Places API (New) client ke Google Cloud project par enable honi hai** — bina
+uske zinda suggestion nahi aayegi, aur suite use assert nahi karti, `live
+suggestions: 0` wajah ke saath chhapti hai · campus form tehsil/village/place id
+store nahi kar sakta (columns hain, DTO aur proc mein raasta nahi) · teacher ke
+apne location par bhi wahi — sirf state aur town · `<ui-address-search>` par
+`reset()` nahi hai, toh 409 reload ke baad box purana pata dikhata rehta hai ·
+jo level host nahi rakhta use ab koi vaakya nahi batata (wo `keeps`-style input
+maangta hai).

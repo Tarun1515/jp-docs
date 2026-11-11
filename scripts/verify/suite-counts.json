@@ -5,6 +5,7 @@
   "_lastChange": "2026-11-10, and all three went UP: offers 57 -> 59, team-contract 50 -> 52, teacher-verification 33 -> 35. Each gained the same PAIR — a premise assertion that the fixture it used to borrow was built by this run, and an exit assertion that it was taken away again. offers and team-contract stopped depending on head@stmarys.edu.in, whose second school membership (a live client-demo registration) makes G23 answer 400 where both assert a cross-tenant 404; they now build their own second tenant through lib/second-tenant.mjs. teacher-verification now arranges the subject its search filters on. screens-3h stayed at 21: one assertion was rewritten, not added — the literal `Rohit 90` became a before-and-after comparison, because he gained a photo and recalculated to 100.",
   "updatedOn": "2026-11-11",
   "suites": {
+    "address-lookup": 17,
     "admin-analytics": 47,
     "admin-desk": 61,
     "admin-desk-screens": 89,
@@ -18,8 +19,8 @@
     "browse-contract": 31,
     "browse-sets": 8,
     "browse-tabs": 14,
-    "combobox-rank": 8,
     "build-manifest": 12,
+    "combobox-rank": 8,
     "dashboards-3i": 28,
     "entitlement-engine": 34,
     "entitlement-http": 37,

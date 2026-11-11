@@ -1635,3 +1635,126 @@ options and groups, so that is an `aria-required-children` violation for as
 long as the list is open and empty — and Lighthouse audits a page without ever
 opening a dropdown. Now `role="option"` with `aria-disabled`, keeping the
 announcement with `aria-live`.
+
+================================================================================
+PLACES ON — 2026-11-11
+================================================================================
+
+## 🔴 The seam was backend-only. Nothing in any frontend called it.
+
+SR-2 built `IAddressLookupService`, the three endpoints, the per-IP limiter and
+the whole master-matching chain, and shipped it OFF. Turning it on was supposed
+to be a config flip. It was not: **not one line in any frontend called
+`/api/address`**, and the only suite that mentioned it was `swagger.mjs`, which
+checks the endpoints are DOCUMENTED. So the client-side search, the debounce,
+the degradation and the coverage all had to be built, not switched on.
+
+⚠️ A seam that nothing consumes is a seam nobody has tried. It compiled, it was
+documented, and it had never carried a request from a screen.
+
+## 🔴 The key is valid. Google refused us twice, in words, for two different reasons.
+
+The first call with the client's real key:
+
+    REQUEST_DENIED: You're calling a legacy API, which is not enabled for your
+    project. Switch to the Places API (New) or Routes API.
+
+That is an AUTHENTICATED refusal, not an auth failure — the key reached Google
+and Google answered. SR-2 was written against `maps.googleapis.com/maps/api/place/*`,
+which Google no longer enables on new projects, so no amount of configuration
+could have turned it on.
+
+Ported to Places API (New): `places.googleapis.com/v1/places:autocomplete` (a
+POST with a JSON body) and `/v1/places/{id}` (a GET with a required field mask).
+The matching rules survived untouched — the component TYPES are unchanged, only
+the envelope and the spelling moved (`addressComponents`/`longText`,
+`location.latitude`).
+
+⚠️ **The key moved from the query string to a header, and that is a gain we
+would have wanted anyway.** The legacy API took `&key=`; the new one takes
+`X-Goog-Api-Key`. A secret in a URL is a secret in every access log, proxy log
+and error report that records the request line.
+
+Then the second refusal:
+
+    403: Requests from referer <empty> are blocked.
+
+An HTTP-referrer restriction — a BROWSER key setting. Server calls send no
+referrer, so the restriction that makes a key safe in a page is exactly the one
+that makes it useless from an API. After the client allowed localhost:
+
+    403: Permission denied on the service.
+
+which is the Places API (New) not being enabled on the project. Each refusal was
+narrower than the last, and each was readable only because the service logs
+Google's own sentence rather than counting an empty list as "no results".
+
+## ⚠️ The seam degraded correctly through all three
+
+Every one of those refusals produced: a warning in the log with Google's text,
+an empty suggestion list, a silent control, and a working manual cascade. The
+product never broke; it only ever did nothing. **That is the thing the design
+promised and the only reason this was diagnosable at all.**
+
+## 🔴 I briefed two agents to build the same control, and they did
+
+The school side and the teacher side each got the full task in their own repo,
+in parallel. Both built a type-ahead over the same three endpoints; both
+independently hit the same wall (the shared `errorInterceptor` toasts on 429
+with no per-request opt-out) and both solved it the same wrong way, with
+`new HttpClient(inject(HttpBackend))` — which also escapes the auth interceptor,
+so each then re-attached the bearer token by hand.
+
+Both agents flagged the duplication themselves. It is my error, not theirs: the
+control belonged in jp-shared from the first brief, and only one of them should
+have been asked to write it.
+
+Merged into `jp-shared/ui/ui-address-search` + `jp-shared/core/address-lookup.service`,
+and the real fix for the toast is `SKIP_ERROR_TOAST`, an `HttpContextToken`
+shaped exactly like the `SKIP_LOADER` that already existed. With it the auth
+interceptor is back in the chain — which matters: the per-session cap keys on
+the user claim when there is one, so a staff room behind one NAT is not
+rate-limited by a colleague's typing. jp-teacher's profile chunk fell
+223.60 kB → 188.06 kB when its copy went.
+
+## ⚠️ The third address cascade had no search box, and only the browser said so
+
+Registration and the campus form got the control; `school-profile` — the third
+address form in the product — did not, because it was in neither agent's scope.
+A school could fill its address from Places while registering and then find only
+dropdowns when it came back to correct it. Visible by opening the page, invisible
+to every suite.
+
+## 🔴 Building an app while its own dev server serves corrupts what it serves
+
+Eight browser suites went red at once — all of them, none of the HTTP or SQL
+ones. `ngDevMode is not defined`, on jp-school only. The cause was the bundle
+grep for item 5: `npm run build` in each app, while each app's dev server was
+running and serving from that same `dist`.
+
+The project already records "never build jp-shared while it serves" for the
+federation remote. **The rule is wider than the remote:** it applies to every
+host too, and this is the second time in two days I have hit the family —
+earlier it was deleting `.angular/cache` under a running server. One restart
+fixed all eight.
+
+⚠️ A partial re-run then left `jobs-screens` red for an unrelated reason: another
+suite in that batch left a job behind, and the free plan's single JOB_POST
+allowance was already spent. On its own it was 57/57. **A suite that fails in a
+batch and passes alone is a state dependency, not a bug** — and the batch is the
+lie, not the suite.
+
+## What is proven, and what is still the client's
+
+Proven, measured: the key is in a user environment variable and in no file —
+0 hits for `AIza` across all seven working trees, across every git-tracked file,
+and across **661 built files in five apps**. The browser makes **zero** requests
+to maps/places.googleapis.com; it calls only our three endpoints. Our responses
+carry neither the key nor any raw Google payload. Typing "Go" sends nothing;
+"Gohana" sends exactly one request. The per-IP window refuses with our own
+`RATE_LIMITED` body, and the manual cascade keeps answering while it does.
+
+⚠️ NOT proven, and it cannot be from here: a live suggestion. That needs
+**Places API (New) enabled on the client's Google Cloud project**. Until then
+`address-lookup.mjs` prints `live suggestions: 0` with the reason rather than
+asserting a third party's configuration.

@@ -170,6 +170,31 @@ cd D:\Projects\jp-backend\JP.Sso.Api ; dotnet user-secrets list
 cd ..\JP.App.Api                     ; dotnet user-secrets list
 ```
 
+### 2.4b The Google Places key (optional — the address search)
+
+The key lives in **one environment variable on the machine**, never in a file:
+
+```powershell
+[Environment]::SetEnvironmentVariable('GOOGLE_PLACES_API_KEY', '<the key>', 'User')
+```
+
+⚠️ **Open a NEW terminal afterwards.** A process inherits its environment from
+its parent, so the shell you typed that in — and anything already running in it
+— still has the old block. A terminal started after the set has the variable; a
+terminal started before it does not, however many times you check the registry.
+
+🔴 **Nothing breaks without it, and that is the design.** `AddressLookup:Provider`
+is `Google` in appsettings, but `IsAvailable` reads the variable, so a machine
+without one answers `available: false` on `/api/address/availability`, every
+address form renders no search box, and the manual State → District → Town →
+Tehsil cascade is the only path — exactly as it was before Places existed.
+
+**The switch OFF is that fallback, deliberately reachable.** Set
+`AddressLookup:Provider` back to `None` in `JP.App.Api/appsettings.json` and the
+whole feature is gone, with no other change anywhere; `address-lookup.mjs`
+asserts the manual cascade still answers with the lookup refusing, which is the
+same path.
+
 ### 2.5 Create the first administrator
 
 There is **no admin row in any seed script**, on purpose: a password hash
