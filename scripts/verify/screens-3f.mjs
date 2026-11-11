@@ -342,13 +342,77 @@ await page.waitForTimeout(500);
 
 check('the campus form opens', await page.locator('.branch-form').isVisible());
 
-check('🔴 district and city are absent while the dataset is empty (2.47)',
-  (await page.locator('#branchDistrictId').count()) === 0 &&
-  (await page.locator('#branchCityId').count()) === 0,
-  'state and PIN only, with a line saying why');
+/*
+  🔴 THESE TWO CHECKS WERE RE-PINNED, AND ONE OF THEM HAD BEEN PASSING FOR THE
+  WRONG REASON — WHICH IS WORSE THAN FAILING.
 
-check('…and the form says so rather than leaving it a mystery',
-  /district and city lists/i.test(await page.locator('.note').first().textContent()));
+  They were written when the district and city dataset was empty (2.47), and
+  asserted that the campus form showed state and PIN only, with a line saying
+  why. Both statements are now false twice over:
+
+    1. SR seeded the whole country — 782 districts and 902 towns — so the
+       controls SHOULD be there. The explanatory note now renders only for a
+       state whose district list is genuinely empty, which no state is today.
+
+    2. ⚠️ The absence check kept passing anyway, because P1 converted both
+       controls to <ui-combobox> and the ids it looked for — `#branchDistrictId`
+       and `#branchCityId` — stopped existing. It was reading "the control is
+       gone" from an id that had merely been renamed. A suite that goes green
+       on a selector matching nothing is the failure mode this repo keeps
+       paying for; it is the same id trap that killed jobs-screens, except this
+       time it was silent.
+
+  So the question is asked the other way round, by the label a person reads.
+*/
+/*
+  ⚠️ AND THE CASCADE HAS TO BE DRIVEN, NOT PHOTOGRAPHED ON ARRIVAL. District
+  sits behind `@if (hasDistricts())` and town behind `@if (hasCities())`, so on
+  a fresh form with no state chosen BOTH ARE CORRECTLY ABSENT. Asserting their
+  presence without picking a state first fails for the right reason — which is
+  how this check was written the first time.
+*/
+/*
+  ⚠️ SCOPED TO THE FORM, NOT THE PAGE. The campus form is a dialog over a list
+  that has its own address text, so a page-wide `getByLabel(/^State/i).first()`
+  resolved to something behind the dialog and sat on it for thirty seconds —
+  the mid-run death this file already warns about, caused here by the selector
+  rather than by the screen.
+*/
+const form = page.locator('.branch-form');
+
+const pickFirst = async (label) => {
+  await form.getByLabel(label, { exact: false }).first().click();
+  await page.waitForTimeout(300);
+  await page.locator('[role="option"]').first().click();
+  await page.waitForTimeout(700);
+};
+
+check('district is absent until a state is chosen',
+  (await form.getByLabel('District', { exact: false }).count()) === 0,
+  'the cascade hides a level it has no data for yet');
+
+await pickFirst('State');
+
+check('🔴 …and choosing a state reveals district, now that the country is seeded',
+  (await form.getByLabel('District', { exact: false }).count()) === 1,
+  'found by label — the id belongs to <ui-combobox> now');
+
+await pickFirst('District');
+
+check('🔴 …and choosing a district reveals the town, which P1 moved ABOVE tehsil',
+  (await form.getByLabel('Town or city', { exact: false }).count()) === 1,
+  'State -> District -> Town or city');
+
+/*
+  ⚠️ AND THE OLD NOTE MUST NOT BE SHOWING. It says we do not have the district
+  list for this state, which would now be a lie on every state in the country —
+  exactly the kind of stale sentence SR found on the registration form.
+*/
+const noteText = (await page.locator('.note').allTextContents()).join(' ');
+
+check('…and the form no longer claims the district list is missing',
+  !/do not have the district list/i.test(noteText),
+  noteText.slice(0, 80) || '(no note)');
 
 check('latitude and longitude are a plain pair, as this phase allows',
   (await page.locator('#latitude').count()) === 1 && (await page.locator('#longitude').count()) === 1);

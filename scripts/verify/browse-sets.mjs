@@ -182,6 +182,6 @@ try {
   cleanup();
 
   const failed = results.filter((r) => !r).length;
-  console.log(`\n  ${results.length - failed}/${results.length} passed`);
+  console.log(`\n  ${results.length - failed}/${results.length} PASSED`);
   process.exit(failed ? 1 : 0);
 }

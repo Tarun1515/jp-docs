@@ -563,6 +563,32 @@ try {
   await teacher.goto(`${TEACHER_APP}/jobs`, { waitUntil: 'networkidle' });
   await wait(600);
 
+  /*
+    🔴 P5 PUT THREE TABS ON THIS SCREEN, AND THE DEFAULT ONE IS A FILTER.
+
+    "Matches your profile" is the strict match — subjects AND class levels AND
+    qualification AND the teacher's state — so a posting this teacher's profile
+    does not match is correctly ABSENT from the tab the screen opens on. This
+    assertion is about the posting being reachable at all, not about which tab
+    it lands in, so it clears the pre-fill first.
+
+    ⚠️ THIS IS THE FOURTH TIME A SHIPPED DEFAULT HAS BROKEN A SUITE THAT
+    ASSUMED "open the screen and it is there". The lesson is in PROJECT_MEMORY
+    and it keeps arriving in new clothes: when a default becomes a decision,
+    every test that relied on the old default is now testing the default, not
+    the thing it meant to test.
+
+    The pre-fill itself is covered by browse-tabs.mjs, which owns its fixtures
+    and asserts all three tabs; proving it twice here would make this suite
+    fail whenever that behaviour changed deliberately.
+  */
+  const showAll = teacher.locator('button', { hasText: /^Show all jobs$/ }).first();
+
+  if (await showAll.count()) {
+    await showAll.click();
+    await wait(900);
+  }
+
   const browseHasJob = await teacher.locator(`text=5B Physics Teacher`).count();
 
   check('the teacher sees the open posting on Find jobs',

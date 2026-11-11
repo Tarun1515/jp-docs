@@ -401,6 +401,80 @@ const fillJobMasters = async (page) => {
   await pickCombobox(page, /Designation/);
 };
 
+/*
+  ----------------------------------------------------------------------------
+  🔴 P3 DID TO EMPLOYMENT TYPE WHAT SR-5 DID TO SUBJECT — AND IT IS THE SAME
+  FIVE-LINE LESSON, HIT A SECOND TIME.
+  ----------------------------------------------------------------------------
+  `#employmentTypeId` no longer exists: <ui-combobox> owns its own id. Every
+  one of the four helpers below replaces a selector that would have matched
+  NOTHING — and matching nothing is the dangerous outcome here, not an obvious
+  one. `querySelector(...)?.options.length ?? 0` stays falsy forever, so the
+  wait burned its full timeout and the suite died mid-run with no summary line.
+
+  ⚠️ THE FIX IS NOT "USE A DIFFERENT ID". It is to ask the question the way a
+  person would: find the control by the label they read, and read the value
+  they can see.
+*/
+
+/**
+ * Wait until the combobox labelled `label` has a value.
+ *
+ * ⚠️ THIS IS THE SAME SIGNAL THE OLD `options.length > 0` WAS. The form picks
+ * a default employment type the moment the master lands, so a non-empty input
+ * means the list arrived — and unlike a fixed sleep it does not become a flake
+ * on a slower machine.
+ */
+const waitForComboboxValue = async (page, label, timeout = 15_000) => {
+  const input = page.getByLabel(label).first();
+  const deadline = Date.now() + timeout;
+
+  while (Date.now() < deadline) {
+    const value = await input.inputValue().catch(() => '');
+
+    if (value && value.trim()) return value.trim();
+
+    await page.waitForTimeout(200);
+  }
+
+  return '';
+};
+
+/**
+ * Every option the combobox is currently offering, in order.
+ *
+ * ⚠️ IT OPENS THE LIST AND CLOSES IT AGAIN. A combobox renders its options
+ * only while open, so reading them is a gesture rather than a query — and
+ * leaving it open would swallow the next click on the form behind it.
+ */
+const comboboxOptions = async (page, label) => {
+  await page.getByLabel(label).first().click();
+  await page.waitForTimeout(250);
+
+  const texts = (await page.locator('[role="option"]').allTextContents()).map((t) => t.trim());
+
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(150);
+
+  return texts;
+};
+
+/**
+ * Choose an option BY ITS VISIBLE TEXT.
+ *
+ * 🔴 BY TEXT, NOT BY INDEX, and that distinction is load-bearing here: this
+ * suite picks PART_TIME by its CODE precisely so a row moving in DisplayOrder
+ * cannot make the assertion pass while selecting something else. `pickCombobox`
+ * takes an index and would have thrown that guarantee away.
+ */
+const pickComboboxByText = async (page, label, text) => {
+  await page.getByLabel(label).first().click();
+  await page.waitForTimeout(250);
+
+  await page.locator('[role="option"]', { hasText: new RegExp(`^\\s*${text}\\s*$`) }).first().click();
+  await page.waitForTimeout(200);
+};
+
 try {
   // =========================================================================
   console.log('\n=== 1. THE LIFECYCLE, THROUGH THE UI ===');
@@ -456,9 +530,11 @@ try {
     today is a flake on a slower machine, and the failure would read as
     "employment type is empty" rather than "the test did not wait".
   */
-  await page.waitForFunction(
-    () => (document.querySelector('#employmentTypeId')?.options.length ?? 0) > 0,
-    null, { timeout: 15_000 });
+  const employmentReady = await waitForComboboxValue(page, /Employment type/);
+
+  check('the employment-type control filled itself once the master landed',
+    !!employmentReady, employmentReady || 'still empty after 15s');
+
   await page.waitForTimeout(800);
 
   // =========================================================================
@@ -486,8 +562,7 @@ try {
     /max-age=3600/.test(employmentCall?.cacheControl ?? ''), employmentCall?.cacheControl);
 
   const wireNames = (employmentCall?.data ?? []).map((r) => r.name);
-  const renderedNames = (await page.locator('#employmentTypeId option').allTextContents())
-    .map((t) => t.trim());
+  const renderedNames = await comboboxOptions(page, /Employment type/);
 
   check('🔴 every rendered option IS a row from that response — nothing hardcoded',
     renderedNames.length === wireNames.length
@@ -513,7 +588,7 @@ try {
 
   await page.fill('#jobTitle', 'PGT Physics — Senior School');
   await fillJobMasters(page);
-  await page.selectOption('#employmentTypeId', String(partTime.id));
+  await pickComboboxByText(page, /Employment type/, partTime.name);
   await page.fill('#noOfVacancies', '2');
   await page.fill('#salaryMin', '40000');
   await page.fill('#salaryMax', '65000');
@@ -620,8 +695,19 @@ try {
     visible and readable (2.62's "not allowed", not "gone") and still reads
     Part-time.
   */
-  const employmentDisabled = await page.locator('#employmentTypeId').isDisabled();
-  const employmentShown = await page.locator('#employmentTypeId option:checked').textContent();
+  /*
+    ⚠️ The label is matched LOOSELY because it carries "(locked)" on a
+    published job — the same reason line 605 matches subject loosely. The
+    `[disabled]` binding moved onto the combobox's own input, so the question
+    is unchanged even though the element is not.
+  */
+  const employmentDisabled = await page.getByLabel(/Employment type/).first().isDisabled();
+
+  /*
+    ⚠️ A CLOSED COMBOBOX RENDERS ITS SELECTION AS THE INPUT'S VALUE, which is
+    what `option:checked` used to read. Nothing has to be opened to ask this.
+  */
+  const employmentShown = await page.getByLabel(/Employment type/).first().inputValue();
 
   check('🔴 …employment type is locked too, and still readable',
     employmentDisabled === true && employmentShown?.trim() === partTime.name,

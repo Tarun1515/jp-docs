@@ -1322,3 +1322,190 @@ prices in the same commit.
   in the payments queue *after* approval.
 - **The `school-approved` email does not mention the plan.** Left alone rather
   than adding a token nothing renders.
+
+================================================================================
+POLISH PASS (P1–P5) — 2026-11-11
+================================================================================
+
+## 🔴 A suite that is not in the manifest does not run
+
+`browse-sets.mjs` was written in SR, passed 8/8 when run by name, and was cited
+as evidence under a "49 suites / 1987 assertions" regression. It was never in
+`suite-counts.json`, and `run.mjs` takes its list from `Object.keys(suites)` in
+that file and scans no directory. So those 8 assertions have never been part of
+any regression total, including the one that was reported as covering them.
+
+⚠️ THE MANIFEST'S OWN DOCUMENTATION SAID THE OPPOSITE — that a brand-new suite
+"runs unpinned, reports NEW, and is counted NOT CLEAN until one --update pins
+it — so a suite written and forgotten shows up every run instead of silently
+not running". That is exactly the failure that happened, described as though it
+could not. The `NEW`/unpinned state is real, but only reachable by naming the
+suite on the command line, which is precisely what somebody who forgot a suite
+will not do.
+
+Fixed by rewriting that line to say what the code does. The two unregistered
+suites are pinned with MEASURED counts, not guessed ones.
+
+## P5 — the browse tabs are three server queries
+
+The three tabs are a `mode` on the browse procedure, not a re-sort of one
+result set. "You might like" is ANY of the teacher's dimensions MINUS
+everything "Matches your profile" already returned, and that subtraction has to
+happen in SQL: doing it in the browser would mean downloading every job to find
+out which ones to hide, at which point the page size stops meaning anything and
+the number in the tab label counts downloads rather than jobs.
+
+### 🔴 The one-shot widening is GONE, and the tabs are why
+
+`load()` used to notice that the profile's filters matched nothing and silently
+clear them, because an empty screen on arrival reads as "this product has no
+jobs for me". The reasoning was right; the remedy is now better. An empty
+"Matches your profile" sits beside "You might like (9)" with the count visible,
+so the way out is something the teacher chooses rather than something the
+screen does to them while they are reading it.
+
+⚠️ AND THE OLD BEHAVIOUR WOULD NOW BE A BUG: clearing the filters under
+somebody who just clicked a tab would move them out of the tab they picked,
+with the banner still explaining a state they had left.
+
+### ⚠️ `mode` is omitted, not defaulted
+
+Leaving `mode` out of a browse request keeps the plain unfiltered list that
+every other caller already depends on — the saved-jobs screen and the public
+funnel both call `browse()` with no mode and must not start receiving a
+profile-shaped list. The tabs apply only while the list is still the profile's:
+not after "Show all jobs", not after the teacher edits a filter, and not while
+a keyword search is running.
+
+### 🔒 Apply moved onto the card, and the sentence came with it
+
+The class comment used to end: *"Applying is the act of consent, and it happens
+on the job's own page where the consequence can be stated."* P5 moves the entry
+point onto the card. What 2.56 protects is that the consent is informed and
+deliberate, not which page it is given on — so the card opens a sheet that
+NAMES THE JOB and states what the school will be able to see, before anything
+is sent. There is still no bulk apply.
+
+⚠️ The comment was UPDATED rather than left. A sentence describing shipped
+behaviour is a thing that rots, and this one would have been read for months as
+a rule the code no longer followed.
+
+### ⚠️ The counts are one call, not three
+
+Three separate count requests would let the three numbers be computed against
+three slightly different filters — which is how a tab promises twelve jobs and
+shows nine. One request, one filter, one moment. They are derived from the same
+predicates that build the lists; this project already carried a maintained
+`ApplicationCount` that drifted from the rows it counted, and a tab label that
+disagrees with the list under it is that bug wearing a different hat.
+
+A failed count is not an error the teacher sees: the labels lose their numbers
+and nothing else changes. "Matches your profile (0)" beside a list of twelve
+jobs is worse than no number at all.
+
+## P3 — the ranking is asserted now, and the NEGATIVE is the point
+
+Typing "Har" used to put BIHAR first (Bi-*har*, *Har*yana, J*har*khand,
+Ma*har*ashtra) and the first option is the one people press. That was found by
+LOOKING AT A SCREENSHOT the walkthrough had already taken — nothing asserted
+anything about the order, so the picture was filed with the bug in it.
+
+`combobox-rank.mjs` turns that screenshot into a claim, and its load-bearing
+assertion is the second one: **"aryan" must still find Haryana.** The cheap way
+to make "Har" rank Haryana first is to switch the filter from `includes` to
+`startsWith`, which passes the obvious assertion and quietly breaks the control
+for anyone who types the middle of a name.
+
+## 🔴 The feature works through the client, and the SERVER alone cannot make it true
+
+The three tabs were probed over HTTP before any browser was opened, and the
+first probe returned **all six demo jobs under "Matches your profile"** —
+including the one built to match nothing.
+
+The probe was wrong, not the server: MATCHES narrows on the sets THE CALLER
+SENDS. The server resolves the teacher's state and their saved locations from
+the token, but subjects, class levels and qualification ride the query string.
+Send none and none of those three narrow anything.
+
+⚠️ IT IS NOT, HOWEVER, "THE WHOLE MARKET". The state is resolved server-side
+and cannot be widened by a caller at all, so the no-sets shape is "everything
+in the state you live in". That is a real mitigation and it is why the pinned
+assertion in `browse-tabs.mjs` says exactly that, in two halves — it widens
+within the state, and it can never leave it.
+
+The screen does send the sets. `browse-tabs.mjs` pins both shapes, so the day
+somebody makes the server resolve the profile itself, that is the assertion
+that changes — deliberately, rather than by discovering it in a demo.
+
+### ⚠️ Two fixture mistakes, both mine, both worth writing down
+
+**A fixture that does not satisfy the predicate proves nothing about it.** The
+first `browse-tabs` fixture posted its jobs at school 2, whose branch is in
+state 32, while the probe teacher lives in state 14. MATCHES correctly returned
+nothing and three assertions failed — every one of them the suite's fault.
+
+**And "matches nothing" has to mean nothing, including location.** The orphan
+job was then placed in the teacher's own state, where it became a MIGHT_LIKE
+hit through the location arm — the tab it was built to stay out of. The
+teacher's saved preferences are three whole states with no city, so the orphan
+has to sit in a state they have no link to at all. The preference row is now
+inserted BEFORE the jobs, so the orphan's state can be chosen by excluding it.
+
+## 🔴 `sqlcmd -Q` still cannot take a double quote, and the comment counts
+
+A block comment added INSIDE a T-SQL string — `ELSEWHERE means…` with the word
+in quotes — broke the whole command with `Unexpected argument`. The hazard is
+recorded in `lib/second-tenant.mjs` and it applies to prose in a comment
+exactly as much as to a value.
+
+## 🔴 The afternoon's worst hour: `ngDevMode is not defined`
+
+Every app went blank with `ReferenceError: ngDevMode is not defined` thrown
+from a jp-shared chunk. Two hypotheses were acted on before anything was
+measured — that jp-shared's externals cache was poisoned (cleared it; no
+change) and that its production `dist` was being served (deleted it; no
+change). The chunk hash never moved, which should have been the clue.
+
+The answer came from one measurement, `typeof globalThis.ngDevMode` on each
+host:
+
+    jp-teacher   ngDevMode undefined   app-root 0 chars     <- broken
+    jp-school    ngDevMode object      app-root 5951 chars  <- fine
+
+🔴 **The cause was self-inflicted: `.angular/cache` was deleted while that
+app's dev server was running.** The server kept serving the build it could no
+longer reconstruct. jp-school, whose cache was never touched, was healthy the
+whole time. Restarting jp-teacher fixed it in one step.
+
+The lesson is the one already in this file wearing different clothes: *clearing
+a cache under a running process is a kind of build-while-it-serves.* And the
+cheaper one — **measure the difference between the broken thing and the working
+thing before changing either.**
+
+## ⚠️ A screenshot said "Bihar" and the code was right
+
+Find-teachers opened with its location filter on Bihar, which looked exactly
+like the "Har" ranking bug returning. It was not: `principal@greenwood.edu.in`
+owns **SchoolId 4, "Nalanda Vidyalaya"**, whose head office is in Bihar. The
+account's name and its school's name have disagreed since the seed.
+
+The "Showing teachers near you" line is absent on that screen, and that is also
+correct — it is suppressed over a refusal, because the list is not showing
+anybody at all.
+
+⚠️ **Not verified on screen:** the notice itself. Every account to hand is
+plan-gated for teacher search, and the notice is deliberately hidden in that
+state, so the positive case was reasoned from the code and not photographed.
+
+## 🔴 Two defects found only by looking at the screenshots
+
+Neither is reachable by an assertion, and both were introduced by this pass:
+
+1. **The class-level filter truncated to "2 class levels select…" at 1440px.**
+   `.page__toolbar__control` is `flex: 0 1 11rem` in the shared layout so that
+   dropdowns line up across four apps — correct, and not the thing to change.
+   But a multi-select shows a SUMMARY, not an option, and qualification joining
+   the row is what tipped it over. Only the summary controls were widened.
+2. **The apply sheet's location line read as a second, empty input**, because
+   `.note` carries a filled box and it sat directly above a textarea. The sheet
+   looked like it was asking for the town rather than saying where the job is.

@@ -425,10 +425,25 @@ try {
         await page.getByLabel(/^address/i).first().fill('12 Civil Lines, Opposite the bus stand');
       });
 
+      /*
+        🔴 P1 PUT THE TOWN BEFORE THE TEHSIL, AND THE ORDER HERE IS THE POINT
+        OF THE SCREENSHOTS.
+
+        The old chain asked State -> District -> Tehsil -> Town, which is
+        administratively correct and humanly backwards: people think of their
+        town, not their tehsil, and where the two share a name (Gohana tehsil,
+        Gohana town) the same word appeared in two controls and was picked in
+        the wrong one. The town now PARENTS the tehsil — the tehsil list is
+        loaded from `m_mdm_city.TehsilId` for the chosen town — so photographing
+        them in the old order would show a tehsil list that cannot exist yet.
+
+        ⚠️ The labels are matched loosely, so 'Town' still finds "Town or city"
+        and 'Tehsil' still finds "Tehsil / Sub-tehsil" after P1 renamed both.
+      */
       await step('state combobox', () => showCombobox(page, 'State', 'Har', 'register-address-state'));
       await step('district combobox', () => showCombobox(page, 'District', '', 'register-address-district'));
-      await step('tehsil combobox', () => showCombobox(page, 'Tehsil', '', 'register-address-tehsil'));
       await step('town combobox', () => showCombobox(page, 'Town', '', 'register-address-town'));
+      await step('tehsil combobox', () => showCombobox(page, 'Tehsil', '', 'register-address-tehsil'));
       /*
         ⚠️ "Village or area", NOT "Area or locality" — the form has both, and
         the loose /village|area/i matched the wrong one first, so the village

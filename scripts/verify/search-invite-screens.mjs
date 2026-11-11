@@ -208,10 +208,58 @@ try {
 
   const { context: ownerCtx, page: owner, errors: ownerErrors } = await openAs(ownerSession);
 
+  /*
+    ⚠️ THE SUBJECT FILTER IS NO LONGER A <select>, AND THIS ASSERTION USED TO
+    PIN BOTH THE TAG AND THE ID.
+
+    P2 converted every filter on this screen to <ui-combobox> (G27), which owns
+    its own id — so `select#f-subject` matches nothing and the check would have
+    gone red for a control that is present and working. It is asked by the
+    LABEL a person reads instead, which is the handle that survives the next
+    re-implementation of the control.
+  */
+  const subjectFilter = owner.getByLabel(/Subject/i).first();
+
   check('the search screen renders with its filter toolbar',
     (await owner.locator('.page__toolbar').count()) === 1
-    && (await owner.locator('select#f-subject').count()) === 1,
+    && (await subjectFilter.count()) === 1,
     'toolbar and the subject filter present');
+
+  /*
+    🔴 P2 MADE THIS SCREEN OPEN ON THE SCHOOL'S OWN STATE, AND THAT BROKE THE
+    ASSERTION BELOW — WHICH IS THE POINT OF HAVING IT.
+
+    "Find teachers" now pre-fills the location with the head office's state, so
+    it opens on teachers near this school rather than on everybody. This
+    school's head office is in Bihar; the seeded teachers are not, so the first
+    render is legitimately empty and the old assertion read that as a broken
+    search.
+
+    ⚠️ THE DEFAULT IS ASSERTED FIRST, THEN WIDENED. Working around it silently
+    would leave the new behaviour untested and this suite passing for the wrong
+    reason — the state filter could stop being applied altogether and nothing
+    here would notice.
+  */
+  const nearMe = owner.getByLabel(/State|Location/i).first();
+  const nearMeValue = (await nearMe.inputValue().catch(() => '')) ?? '';
+
+  check('P2: the screen opens pre-filled with the school\'s own state',
+    nearMeValue.trim().length > 0, `location filter reads "${nearMeValue.trim() || '(empty)'}"`);
+
+  /*
+    ⚠️ ONE CLICK, AND IT IS NAMED ON SCREEN. A default a school cannot get out
+    of is not a default, so the control has to exist — this both widens the
+    search for the assertions below and proves the way out is there.
+  */
+  const widen = owner.locator('button', { hasText: /everywhere/i }).first();
+
+  check('P2: …and one named control widens it to everywhere',
+    (await widen.count()) === 1, 'the way out of the default');
+
+  if (await widen.count()) {
+    await widen.click();
+    await owner.waitForTimeout(1200);
+  }
 
   const rowCount = await owner.locator('.results__item').count();
   const summary = (await owner.locator('.search__summary').textContent())?.trim() ?? '';
@@ -507,6 +555,19 @@ try {
   // =========================================================================
 
   const { context: phoneCtx, page: phone } = await openAs(ownerSession, PHONE);
+
+  /*
+    ⚠️ THE PHONE CONTEXT IS A FRESH VISIT, so P2's "near you" default applies
+    here too and this screen also opens on the school's own state. The widen
+    above was a click in the other context and does not carry over — a
+    per-viewport default is still a default.
+  */
+  const widenPhone = phone.locator('button', { hasText: /everywhere/i }).first();
+
+  if (await widenPhone.count()) {
+    await widenPhone.click();
+    await phone.waitForTimeout(1200);
+  }
 
   const overflow = await phone.evaluate(() => ({
     doc: document.documentElement.scrollWidth,

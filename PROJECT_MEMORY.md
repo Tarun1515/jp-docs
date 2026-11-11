@@ -1,7 +1,7 @@
 # TEACHER RECRUITMENT PORTAL — PROJECT MEMORY
 
 > **Ye file har kaam ke baad update hogi.** Har naye chat/session mein sabse pehle ye file padho.
-> Last updated: **2026-11-11** | Phase **3 COMPLETE** + **2.5 engine** + **4 jobs COMPLETE** + **2.67 swagger fix** + **PRE-5 (G26 band, 2.68/2.69)** + **PRE-5b (baseline green)** + **5A applications BACKEND (2.70, G28)** + **5B applications SCREENS COMPLETE — PHASE 5 POORA (2.71, G30)** + **6A-0 approval engine above level 1 (2.72, G14 BAND, G31)** + **6A Offer Lite BACKEND COMPLETE (2.73, G32)** + **6B TEACHER SEARCH + INVITES BACKEND COMPLETE — 🔒 CONSENT PATH 2 (2.74, G33, G34)** + **6C-0 verification ka bakaya: G33 aur G34 BAND (2.75, G35, G36)** + **6C-1 NOTIFICATIONS BACKEND + G27 BAND (2.76, G37)** + **6C-2-0 G37 BAND — badge asli hua, aur shared suite runner (2.77, G35 BAND)** + **6C-2 SCREENS COMPLETE — 🔒 consent path 2 screen se, devtools-forced negatives dono taraf (2.78)** + **6.5A BILLING BACKEND COMPLETE — manual first, seam service par, expiry derived (2.79, G38)** + **6.5B BILLING SCREENS COMPLETE — PHASE 6.5 POORA (2.80)** + **7A-0 PUBLIC SURFACE KE TEEN FAISLE, CODE SE PEHLE (2.81, G39, G40)** + **7A PUBLIC JOB PAGES + CONTACT FORM COMPLETE — 🔒 pehli ANONYMOUS surface, SSR JS band kar ke saabit (2.82, G41, G42)** + **7B-0 G41 BAND — public→teacher funnel, aur ek parameter jo do jagah likha jaata tha aur kahin padha nahi (2.83, G43)** + **7B ADMIN OPERATIONS DESK COMPLETE — paanch surface, chha screen, athaarah route, aur ek column jo hamesha zero rehta tha (2.84, G43 BAND, G44)** + **8-0 COMPLETE — saaton item: chhe gap band (G31, G36, G38, G42, G44 + sweep ke G3/G4), Accounts aur Analytics screens, aur §2A ka poora sweep (2.85, 2.86, 2.87); G38 "future risk" likha gaya tha par DO shipped procedure mein ZINDA tha, aur G45/G46 screen banate waqt mili** + **8A SECURITY PASS + E2E CONSOLIDATION COMPLETE — chha gap band (G8, G9, G10, G22, G45, G46), aur run_all mein GYARAH file missing thin: naye machine par public site, moderation desk aur analytics teeno fail hote, poori regression green rehte hue (2.88)** + **SR SCHOOL REVAMP COMPLETE (SR-0…SR-5) — client ke demo feedback ka poora pass: FIELD_MATRIX, address model + tehsil master, poore Bharat ki geography (782 district, 902 town), ek searchable combobox 20 jagah (G27), logo step, principal fields profile par, plan catalogue chalu, registration par plan choice, aur teacher ko apni profile se matching jobs; TEEN cheezein green build ke peeche chupi thin — run_all ka order naye machine par toota, teacher-verification ka darj kaaran galat tha, aur do CATCH block asli failure chhupa rahe the; CHAAR aur sirf screenshot dekhne se mili, jinme ek form ka jhooth aur ek class jo kuch karti hi nahi thi (2.86)** | Next: **8B** (deployment readiness + LAUNCH_CHECKLIST) — ⚠️ Point 7 (interview/offer scope) aur §4 Q4 (billing MVP ka likhit confirmation) dono ab bhi client ke paas hain
+> Last updated: **2026-11-11** | Phase **3 COMPLETE** + **2.5 engine** + **4 jobs COMPLETE** + **2.67 swagger fix** + **PRE-5 (G26 band, 2.68/2.69)** + **PRE-5b (baseline green)** + **5A applications BACKEND (2.70, G28)** + **5B applications SCREENS COMPLETE — PHASE 5 POORA (2.71, G30)** + **6A-0 approval engine above level 1 (2.72, G14 BAND, G31)** + **6A Offer Lite BACKEND COMPLETE (2.73, G32)** + **6B TEACHER SEARCH + INVITES BACKEND COMPLETE — 🔒 CONSENT PATH 2 (2.74, G33, G34)** + **6C-0 verification ka bakaya: G33 aur G34 BAND (2.75, G35, G36)** + **6C-1 NOTIFICATIONS BACKEND + G27 BAND (2.76, G37)** + **6C-2-0 G37 BAND — badge asli hua, aur shared suite runner (2.77, G35 BAND)** + **6C-2 SCREENS COMPLETE — 🔒 consent path 2 screen se, devtools-forced negatives dono taraf (2.78)** + **6.5A BILLING BACKEND COMPLETE — manual first, seam service par, expiry derived (2.79, G38)** + **6.5B BILLING SCREENS COMPLETE — PHASE 6.5 POORA (2.80)** + **7A-0 PUBLIC SURFACE KE TEEN FAISLE, CODE SE PEHLE (2.81, G39, G40)** + **7A PUBLIC JOB PAGES + CONTACT FORM COMPLETE — 🔒 pehli ANONYMOUS surface, SSR JS band kar ke saabit (2.82, G41, G42)** + **7B-0 G41 BAND — public→teacher funnel, aur ek parameter jo do jagah likha jaata tha aur kahin padha nahi (2.83, G43)** + **7B ADMIN OPERATIONS DESK COMPLETE — paanch surface, chha screen, athaarah route, aur ek column jo hamesha zero rehta tha (2.84, G43 BAND, G44)** + **8-0 COMPLETE — saaton item: chhe gap band (G31, G36, G38, G42, G44 + sweep ke G3/G4), Accounts aur Analytics screens, aur §2A ka poora sweep (2.85, 2.86, 2.87); G38 "future risk" likha gaya tha par DO shipped procedure mein ZINDA tha, aur G45/G46 screen banate waqt mili** + **8A SECURITY PASS + E2E CONSOLIDATION COMPLETE — chha gap band (G8, G9, G10, G22, G45, G46), aur run_all mein GYARAH file missing thin: naye machine par public site, moderation desk aur analytics teeno fail hote, poori regression green rehte hue (2.88)** + **SR SCHOOL REVAMP COMPLETE (SR-0…SR-5) — client ke demo feedback ka poora pass: FIELD_MATRIX, address model + tehsil master, poore Bharat ki geography (782 district, 902 town), ek searchable combobox 20 jagah (G27), logo step, principal fields profile par, plan catalogue chalu, registration par plan choice, aur teacher ko apni profile se matching jobs; TEEN cheezein green build ke peeche chupi thin — run_all ka order naye machine par toota, teacher-verification ka darj kaaran galat tha, aur do CATCH block asli failure chhupa rahe the; CHAAR aur sirf screenshot dekhne se mili, jinme ek form ka jhooth aur ek class jo kuch karti hi nahi thi (2.86)** + **POLISH PASS P1–P5 COMPLETE — address cascade ulta (district→city→tehsil, naam-milaan ke bajaye `m_mdm_city.TehsilId`), Find-teachers apne ilaake par khulta hai, combobox sweep poori (par jp-public tak pahunch hi nahi sakti — wo jaan-boojh kar unfederated hai), browse ka qualification default, aur teacher browse ke TEEN SERVER-SIDE TAB with apply on the card; 52/52 suite, 2020 assertion. 🔴 EK SUITE REGRESSION MEIN KABHI CHALI HI NAHI THI (`browse-sets` manifest mein nahi thi aur uski summary line bhi unparseable thi — pichhle pass ke saboot mein ginwayi gayi thi), aur pin karte hi usne ek ZINDA BUG pakda: unmoded browse ke set filters WHERE se classification mein chale gaye the, to `?subjectIds=999999` saari jobs laata tha; aur EK ASSERTION GALAT WAJAH SE PAAS HO RAHI THI — `screens-3f` ne "id nahi mili" ko "control nahi hai" padh liya (2.89)** | Next: **8B** (deployment readiness + LAUNCH_CHECKLIST) — ⚠️ Point 7 (interview/offer scope) aur §4 Q4 (billing MVP ka likhit confirmation) dono ab bhi client ke paas hain
 >
 > 🔴 **Ye do line har phase ke close-out mein update hongi.** File 3I tak
 > pahunch chuki thi aur ye header **Phase 0** par khada tha — saat phase purana,
@@ -10669,6 +10669,227 @@ padhta hai, aur jo agle re-implementation ke baad bhi bacha rahega.
 
 ---
 
+
+### 2.89 POLISH PASS (P1 … P5) — CASCADE ULTA, TEEN TAB, AUR EK SUITE JO KABHI CHALI HI NAHI
+
+Client ke demo feedback ke baad ka polish: address ka kram, Find-teachers ki
+intelligence, combobox sweep ka poora hona, browse ka qualification default,
+aur teacher browse ki Naukri-shape. **52/52 suite clean, 2020 assertion, 870 s**
+(pehle 49/52 ke hisaab se 49 suite, 1987).
+
+#### 2.89.1 P1 — CITY AB TEHSIL KA PARENT HAI, AUR NAAM-MILAAN WALA JUGAAD GAYA
+
+Form ab **State → District → Town/City → Tehsil (optional) → Village/Area**
+poochta hai. Ye sirf kram nahi badla — **parent badle**: district city ka
+parent, city tehsil ka.
+
+🔴 **Pehla design naam par milaan karne wala tha** (chuni hui city ka naam us
+district ke kisi tehsil se exactly mile to wo tehsil chun lo). Client ne ise
+palta, aur theek kiya: asli link pehle se maujood hai — `m_mdm_city.TehsilId`,
+jise 039 ka build guard pakadta hai ki city ka tehsil usi city ke district ka
+ho. **Naam ka milaan ek foreign key ki jagah khada andaaza hota.**
+
+⚠️ **Aur wo Haryana par kaam bhi kar jaata, isliye aur khatarnak tha.**
+`012_seed_haryana_geography.sql` har tehsil ke liye ek city seed karta hai aur
+**CityId ko TehsilId ke barabar** rakhta hai. Naapa gaya: poore desh mein
+`TehsilId <> CityId` wali **ek bhi row nahi**. To naam-milaan testing mein sahi
+dikhta aur kahin aur chup-chaap galat hota.
+
+🔴 **Isi wajah se naya master key alag hai, `tehsil` ko overload nahi kiya.**
+District id aur city id dono plain int hain aur `@ParentId` apne saath type
+nahi le jaata — ek hi key dono le to use **andaaza** lagana padta, aur galat
+andaaze ka natija 200 ke saath ek **asli id ki asli list** hoti, kisi log mein
+kuch nahi. `MASTER_KEYS.tehsilByCity` = `tehsil-by-city`.
+
+⚠️ **Naya branch isi liye saabit bhi karna pada, seedha probe se nahi.** City
+80001 → tehsil 80001 sahi dikhta hai par ittefaq bhi ho sakta hai. Transaction
+mein us city ko tehsil 80002 par point kiya: lookup ne **80002 "Ambala Cantt"**
+diya, ParentId city hi raha — phir rollback. Tab jaa kar pata chala ki wo
+`m_mdm_city.TehsilId` follow karta hai, id ke sanyog ko nahi.
+
+#### 2.89.2 🔴 P1 NE EK DATA-LOSS BUG NIKALA JO KISI LIST MEIN NAHI THA
+
+Registration draft dobara kholne par `tehsilId`, `areaOrVillage`, `latitude`,
+`longitude`, `googlePlaceId` aur **`logoPath`** wapas set hote hi nahi the,
+jabki `USP_SaveSchoolRegistrationDraft` in sab ko **unconditionally** assign
+karta hai (`LogoPath = @LogoPath`, `TehsilId = @TehsilId`). Matlab: Monday ko
+logo upload karo, Thursday ko wapas aao, **ek Continue** dabao — tehsil,
+village, coordinates aur logo gaya.
+
+Logo ka symptom sabse saaf tha: `validate('logo')` use maangta hai, to school
+ko usi logo ke liye roka jaata tha jo pehle se disk par pada tha, aur
+template ki apni "Your image is saved" branch kabhi render hi nahi ho sakti thi.
+
+#### 2.89.3 P2 — FIND TEACHERS: DEFAULT APNA ILAAKA, AUR GATED STATE EK HI BAAR
+
+Har filter ab shared combobox (G27). Location **head office ke state** par
+pre-filled, "Showing teachers near you" ke saath aur ek named control se
+chaura: *Show teachers everywhere*. Wording `Any …` → `All …`.
+
+⚠️ **District default nahi ho sakta, aur ye backend ki baat hai:** search chain
+mein district hai hi nahi — `t_app_teachers` sirf `CurrentCityId`/`CurrentStateId`
+rakhta hai, `USP_SearchTeachers` sirf `@CityId`/`@StateId` leta hai. Town bhi
+jaan-boojh kar nahi: Hisar ke school ko sirf Hisar likhne walon tak simit karna
+wahi pre-filter trap hai, chhote radius par.
+
+Plan-gated haalat ab **ek hi baar** dikhti hai: ek banner + upgrade CTA
+`/billing` par, filters dikhte hain, Search disabled with reason. Neeche wala
+duplicate box gaya.
+
+#### 2.89.4 🔴 P3 — SWEEP POORI HUI, PAR jp-public TAK PAHUNCH HI NAHI SAKTI
+
+Audit poora: jp-admin ke do master-fed control converted, jp-school/jobs ka
+employment type converted, teacher profile ka qualification pehle se combobox.
+
+🔴 **Client ne jo location dropdowns ginwaye the wo jp-public par hain, aur
+wahan ye component ja hi nahi sakta.** jp-public **jaan-boojh kar unfederated**
+hai: na `jp-shared` ka tsconfig path, na federation config, aur
+`public-api.service.ts` apna `ApiResponse<T>` dobara likhta hai — header mein
+wajah darj hai, *"the public site must build and deploy on its own"*. Teen
+raaste, teenon client ke: federate karo (ek darj faisla palto), local copy
+banao (G27 saaf mana karta hai), ya native select rehne do. **Teesra chuna
+gaya aur template mein likh diya**, taaki agli sweep dobara na khoje.
+
+⚠️ Us page par ek aur keemat hai: wo anonymous visitors ke liye **SSR** hota
+hai. Native `<select>` apne option ke naam server HTML mein bhejta hai;
+combobox list sirf focus ke baad banata hai. Convert karna matlab crawlable
+facet naam dekar search box lena — un lists par jo aaj do aur chaar row lambi hain.
+
+#### 2.89.5 P4/P5 — TEEN TAB, AUR APPLY CARD PAR
+
+Tabs **teen server queries** hain: MATCHES (subject AND level AND qualification
+AND state), MIGHT_LIKE (ANY, **MINUS** MATCHES, SQL mein), PREFERRED
+(`t_app_teacher_preferred_locations`, jiska ye pehla reader hai).
+
+🔴 **Counts ek hi call se aate hain aur list ke wahi predicates padhte hain** —
+`ApplicationCount` ka bug dobara banane se bachne ke liye, aur ek **build guard**
+dono procedure ke shared block ko **textually identical** rakhta hai.
+
+🔴 **State client nahi bhejta.** `@StateId` toolbar ka filter hai aur teenon
+mode par lagta hai — profile ka state wahan rakhne se **Preferred tab usi state
+mein simat jaata** jisse teacher nikalna chahta hai, aur teenon counts ek aise
+filter par bante jo sirf ek tab ko dikhna chahiye. MATCHES apna state
+`t_app_teachers.CurrentStateId` se khud nikalta hai.
+
+⚠️ **Isi se "Matches" ka matlab badla:** pehle wo top preferred location ka
+state tha (jahan kaam chahiye), ab jahan rehte hain. Tabs isi ko sahi banate
+hain — tab 1 aas-paas ka kaam, tab 3 chuni hui jagah. **Ek state dono kabhi
+nahi keh sakta tha.**
+
+🔒 **Apply ab card par hai, aur uske saath wo vaakya bhi aaya.** Class comment
+kehta tha *"applying… happens on the job's own page where the consequence can
+be stated"*. 2.56 jo bachata hai wo **soch-samajh kar di gayi sehmati** hai, ye
+nahi ki kaunse page par. Card ab ek sheet kholta hai jo **job ka naam leti hai**
+aur bhejne se pehle anjaam likhti hai. Bulk apply ab bhi nahi hai.
+
+🔴 **Purana one-shot widening hata diya.** Wo khaali profile-matched list dekh
+kar chup-chaap filters saaf kar deta tha. Ab khaali "Matches" ke bagal mein
+"You might like (9)" count ke saath khada hai — raasta wo cheez hai jo teacher
+chunta hai, na ki jo screen uske padhte-padhte kar deti hai. **Aur purani
+behaviour ab bug hoti:** tab dabane wale ko uske chune hue tab se bahar
+phenk deti.
+
+#### 2.89.6 🔴 JO SUITE MANIFEST MEIN NAHI HAI WO CHALTI HI NAHI
+
+`browse-sets.mjs` SR mein likhi gayi, naam se chalane par 8/8 paas hui, aur
+**"49 suite / 1987 assertion" wale regression ke saboot mein ginwayi gayi**. Wo
+`suite-counts.json` mein thi hi nahi, aur `run.mjs` apni list `Object.keys(suites)`
+se leta hai — koi directory scan nahi. **Wo 8 assertion kabhi kisi regression
+ka hissa nahi the.**
+
+⚠️ **Manifest ka apna doc ulta dawa kar raha tha** — ki nayi suite "runs
+unpinned, reports NEW… so a suite written and forgotten shows up every run
+instead of silently not running". Theek wahi hua jise wo asambhav bata raha
+tha. Line badal di gayi.
+
+⚠️ **Aur wo do baar invisible thi:** runner `N/M PASSED` (capital) padhta hai,
+ye `passed` chhapti thi. Pin karte hi — pehli hi regression mein — usne ek
+**zinda bug** pakda.
+
+#### 2.89.7 🔴 US ZINDA BUG KA NAAM: UNMODED BROWSE KUCH FILTER NAHI KARTA THA
+
+Mode machinery aate waqt teenon set filter WHERE se nikal kar **classification**
+mein chale gaye. Natija: `@Mode` NULL wali call par wo kuch narrow karte hi nahi
+the — `?subjectIds=999999` **saari open jobs** laata tha, jabki screen kehti
+"aapke subjects ki jobs".
+
+**Kuch red nahi tha**, kyunki har moded call mein set theek kaam karte the —
+aur naya code sirf wahi chalata tha. Fix: ek `SetsOk` column (state ke **bina**,
+kyunki unmoded browse ko caller ke shehar mein kaid nahi karna), dono shared
+block mein byte-identical taaki drift guard khush rahe, aur delete sirf
+`@EffMode IS NULL` par.
+
+#### 2.89.8 🔴 EK ASSERTION GALAT WAJAH SE PAAS HO RAHI THI
+
+`screens-3f` kehti thi "district aur city gayab hain kyunki dataset khaali hai
+(2.47)". SR ne poora desh seed kar diya — wo gayab honi hi nahi chahiye thi.
+Wo paas isliye ho rahi thi ki P1 ne control `<ui-combobox>` bana diye aur
+`#branchDistrictId` / `#branchCityId` **ids gayab ho gayin**. Suite ne "id nahi
+mili" ko "control nahi hai" padh liya.
+
+**Fail hone se bura.** Ab wo cascade chalati hai: state chuno → district aaye →
+district chuno → town aaye.
+
+#### 2.89.9 ⚠️ DO SUITES NAYE DEFAULT SE TOOTIN — SR-4 KA SABAK CHAUTHI BAAR
+
+`applications-screens` ("teacher ko posting dikhti hai") P5 ke tabs se, aur
+`search-invite-screens` ("khulte hi asli teachers") P2 ke "near you" se. Dono
+ko **sirf bypass nahi kiya** — pehle default ko assert kiya, phir widen, warna
+nayi behaviour bilkul untested reh jaati aur suite galat wajah se paas hoti.
+
+*Jo test shipped DEFAULT par tikka hai wo tab toot ta hai jab default ek faisla
+ban jaata hai.*
+
+#### 2.89.10 ⚠️ TEEN CHEEZEIN JO MERI APNI GALTI THIN, AUR WAQT KHA GAYIN
+
+**`ngDevMode is not defined` — saare app blank.** Do andaazon par kaam kiya
+(jp-shared ka externals cache, phir uska production `dist`) — dono galat, chunk
+hash hila hi nahi. Jawab ek naap se aaya: `typeof globalThis.ngDevMode`
+jp-teacher par `undefined`, jp-school par `object`. **Wajah: maine jp-teacher ka
+`.angular/cache` tab delete kiya jab uska dev server chal raha tha.** *Chalte
+process ke neeche se cache hatana bhi ek tarah ka build-while-it-serves hai* —
+aur *toote hue aur chalte hue ke beech ka farq pehle naapo, badlo baad mein.*
+
+**`sqlcmd -Q` ab bhi double quote nahi leta, aur comment bhi gina jaata hai.**
+T-SQL string ke andar likhe ek block comment mein do quotes ne poora command
+`Unexpected argument` se tod diya.
+
+**Rate limit ne jhoothi red di.** Baar-baar suites chalane se
+`principal@greenwood.edu.in` ka ghante wala login cap khatam ho gaya; regression
+ke beech `429` aane lage. Limiter process ke andar hai — dono API restart, phir
+saaf run. *Jhoothi red asli se mehngi padti hai: unhe debug karne mein waqt
+jaata hai.*
+
+#### 2.89.11 ⚠️ DO DEFECT SIRF SCREENSHOT DEKHNE SE MILE — DONO IS PASS KE JODE HUE
+
+1. **1440 par filter kat raha tha: "2 class levels select…"**.
+   `.page__toolbar__control` shared layout mein `flex: 0 1 11rem` hai taaki
+   chaar app mein dropdown line-up karein — wo sahi hai aur badalne layak nahi.
+   Par multi-select ek **summary** dikhata hai, option nahi, aur qualification
+   ke us row mein aane se jagah tang ho gayi. Sirf summary wale control chaude
+   kiye gaye.
+2. **Apply sheet ki location line ek dusri, khaali input jaisi padhti thi** —
+   `.note` apne saath bhara hua box laata hai aur wo seedha textarea ke upar
+   baithi thi. Sheet lagta tha town poochh rahi hai, bata nahi rahi.
+
+#### 2.89.12 JO KHULA HAI, NAAM SE
+
+- **Teacher ka tehsil kahin save nahi ho sakta.** Column maujood hai
+  (`t_app_teacher_preferred_locations.TehsilId`, comment ke saath *"SR-3 lands
+  the picker; this is the column it writes to"*) par use koi carry nahi karta —
+  na DTO, na `dbo.PreferredLocationList` TVP, na save proc. **Control
+  jaan-boojh kar nahi joda gaya**: sirf master key land karne se wo chuni hui
+  cheez kha jaata.
+- **School profile aur campus form tehsil/village dikha hi nahi sakte.** Columns
+  `t_app_schools` aur `t_app_school_branches` dono mein hain aur provisioning
+  unhe bharta hai, par `SchoolProfile`/`SaveBranchBody`/`USP_UpdateSchoolProfile`/
+  `USP_SaveBranch` mein se koi unhe nahi padhta. School registration par apna
+  tehsil batata hai aur uske baad kabhi dekh ya badal nahi sakta.
+- **jp-public ke location dropdowns** — 2.89.4.
+- **"Showing teachers near you" screen par verify nahi hua**: har maujooda
+  account teacher-search ke liye plan-gated hai aur wo line refusal par
+  jaan-boojh kar chhupti hai.
+- **`team-contract.mjs` ka hardcoded password literal** ab bhi wahan hai.
 ## 3. SCOPE (Client spec ke against)
 
 ### IN SCOPE — MVP
@@ -10896,6 +11117,7 @@ naya Code, agla free Id, kuch renumber mat karo.
 | 2026-10-14 | 7A | **Public job pages + contact form — pehli ANONYMOUS surface.** `public-contract.mjs` **50/50 (nayi)** · `public-screens.mjs` **41/41 (nayi)**. 🔴 **Chaar asli bug, teen suite ne pakde:** (1) **file sahi thi, database purana** — `/jobs/filters` `id:0 name:""` de raha tha jabki count sahi tha; `024` disk par `AS Id, AS Name` karti hai par **deployed proc** mein purana `AS SubjectName` khada tha, aur SQL-layer probe deployed version par chali thi to C# mapper loop mein hi nahi tha. **Dono raw-bytes sweep pass hue** — shape perfect, content khaali; *schema assertion data assertion nahi hai*. Naya content check joda aur **purana alias wapas daal kar fail karte dekha** (sirf `subjects` ka naam liya, `states` ka nahi). (2) **sirf ek anonymous write hai aur uspar validation hi nahi thi** — `{}` POST → 200 aur Name/Email/Subject/Message chaaron khaali ek row; DTO ke `= string.Empty` ki wajah se sab "valid" bind hua. JP.App.Api ke paas **ek bhi validator nahi tha** (zaroorat bhi nahi thi — ab tak sab token ke peeche tha aur har write apni proc mein check karti thi); `PublicValidators.cs` + `FluentValidationFilter` + `AddValidatorsFromAssembly` wire hue, har maximum **apne column ke barabar**, aur 🔒 **honeypot par koi rule nahi** (ek "Website must be empty" wahi jumla bot likhne wale ko wapas de deta). (3) **Apply CTA job saath le hi nahi ja sakti** — jp-teacher mein `?redirect=` **koi nahi** padhta (poore app mein sirf reset-password ek query param padhta hai), `jobs/:id/apply` route **nahi hai**, aur `jobs/:jobId` `Number()` karta hai jabki public surface jaan-boojh kar sirf uid deta hai (2.47) — parameter **hata diya, chhupaya nahi** (jo parameter koi padhta nahi, use bhejna na bhejne se bura hai), **G41**. (4) **title 66 akshar** — `site-audit` ne pehli hi asli job par pakda; `fitTitle()` teen seedhi utarti hai (at-school → school gira → ellipsis) aur **teeno chal kar dekhi gayi**, school ka naam **beech se kabhi nahi** katta. 🔴 **SSR JavaScript BAND kar ke saabit hua** — wahi ek test jo server render aur hydration mein farq karta hai; `**` catch-all `/jobs` ko chup-chaap build-time par khaali page bana deta (koi error, koi warning nahi), aur build ne confirm kiya: **6 static route prerender**, `/jobs` unme nahi (pehle 7 the — `/faq` ab Server). 🔒 **Anonymous hona wire par naapa** — 5 request, ek par bhi Authorization/cookie nahi, teeno storage khaali, aur **wahi request valid token ke saath byte-identical** (1117 === 1117). 🔒 **404 deewar us lamhe par chali jab IST aur UTC ki date ALAG thi** (IST 10-14 · UTC 10-13) — UTC comparison us waqt har job 5.5 ghante pehle expire kar deta; chaaron state 404 aur refusal **kaaran nahi batati**, aur wahi paanch id school ki apni list par maujood hain. ⚠️ **Do suite ek hi rate-limit budget maang rahi thin, aur ye poori regression par hi dikha** — `public-contract` ka limit test **read budget** khatam karta tha aur agli suite ka SSR 429 aata tha, jise suite ne *"listing is not server-rendered"* likha (jhooth, aur galat file par le jaata); ab EXIT mein budget **wapas** hota hai (poll). Contact ka 3/hour dono maang rahi thin → zimmedari baanti: contract suite **server ka contract** (asli row, honeypot, chautha refuse), screens suite **screen** (interception se exact payload), budget **zero**. ⚠️ **Naya case jo pehle nahi tha:** failed send — 500 par page kehta hai nahi gaya, **jo likha tha wo form mein rehta hai**, prefilled mailto: milta hai — yehi 2.44 ki badi fikr thi. ⚠️ **FAQ copy DB mein** (`003_seed_public_faqs`, insert-if-absent — admin ke edit overwrite nahi) **aur ek jawab jhoota ho gaya tha**: "Can I search for jobs without an account?" ka "Not yet" **usi commit mein** theek hua, seed mein guard, dono suite data se assert. ⚠️ `role` field **hata diya** (column nahi, brief ne maanga nahi; collect kar ke discard karna teen mein se saaf galat raasta). ⚠️ **Swagger floor 113 → 119 (naapa, calculate nahi)** aur anonymous surface par ek **CEILING** — *exactly six operations*, kyunki yahan khatra route **gayab** hone ka nahi, **aa jaane** ka hai. **33/33 suite clean, 1183 assertion, 577 s · backend 0/0 · paanchon frontend 0 warning · Lighthouse 9 page SEO 100/a11y 100 · site-audit NO PROBLEMS · SQL 189 file (3 nayi), 285 DB object** | ✅ Done |
 | 2026-10-11 | 6.5B | **Billing screens — 6.5 POORA.** `billing-screens.mjs` **60/60**. 🔴 **Ek component, dono portal** (`UiBillingPageComponent` `jp-shared` mein, school aur teacher dono usi par route karte hain — wahi shape jo `/notifications` ka tha, G27); **admin ka screen alag**, kyunki "mera plan" aur "sabke pending payment" do kaam hain. 🔴 **Ek asli hole band hua jo 6.5A se khula tha:** `plan-change` par koi permission check nahi tha, to school ka **koi bhi** member — including read-only `SCHOOL_VIEWER` — apne account ko payment ke liye commit kar sakta tha. **Poochh kar mila ki naya menu row kisko dikhta hai**, kisi test ke fail hone se nahi. `BILLING.MANAGE` (SCHOOL_OWNER + TEACHER; 007 ka guard **closed set** assert karta hai, SCHOOL_VIEWER ko grant karte hi build exit 1). Reuse pehle dhoonda — `PROFILE.EDIT`/`USER.MANAGE`/`BRANCH.MANAGE` teeno aaj theek chalte, par koi bhi "paise ka zimmedaar" ka matlab nahi rakhta. 🔒 **Panel dekhna gated NAHI** — HR ko allowance pata honi chahiye, warna wo limit ko refuse hone se jaanta hai; 007 ka doosra guard **ulti disha** se assert karta hai ki row par permission na lage. 🔴 **Control wajah ke saath GHAYAB hai, disabled nahi** (2.62) — disabled "abhi nahi" kehta jo jhooth hai. 🔴 **Koi pay-now button nahi**, aur suite uski ghairhaazri assert karti hai; mode list mein ONLINE nahi aur screen **kehti hai kyun**. 🔴 **Mismatch shabdon mein** — "₹100.00 short" / "₹100.00 overpaid", server ke `ShortBy` ki wahi direction; remark zaroori hote hi Confirm disabled, par **server bhi wahi rule enforce karta hai** — client pehle poochhta hai, jagah nahi leta. 🔒 **Lapsed plan screen par naam se aata hai:** "paid plan ended on …", free plan par chal raha hai, allowance `of 3` (paid `of 25` nahi), kuch delete nahi hua, aur DB row `status 1, isActive 1` — kuch sweep nahi hua. **Teen forced negative:** viewer `plan-change` → **403**, school apna hi `verify` → **403** (payment PENDING, koi receipt nahi), teacher school plan id → **404 aur 403 nahi** (2.6). ⚠️ **Do apni galtiyan:** owner ka button ghayab tha aur stale cheez sirf ek **cached JWT** thi (claims mein permission hoti hai; suite ab cached token shuru mein phenk deti hai) · admin ka **375 check khaali queue naap raha tha** — table hi nahi tha, aur table hi 375 par overflow karta hai; ab pehle row banti hai aur assertion node count par nahi, us cheez par hai jo overflow karti. ⚠️ **Count guard isi commit mein hile:** permissions 24 → 25, SUPER_ADMIN **24 of 25** (pehli permission jo uske paas nahi), teacher 2 → 3, menus 34 → **37**, swagger **113 hi** (ek bhi endpoint nahi jura). **31/31 suite clean, 1214 assertion · SQL 296 · backend 0/0 · paanchon frontend 0 warning · run_all ×2 content-identical · 34 RoutePath, 0 dangling** | ✅ Done |
 | 2026-11-11 | SR | **SCHOOL REVAMP (SR-0…SR-5) — client ke demo feedback ka poora pass.** Details **2.86**. **49/49 suite clean, 1987 assertion, 798 s** (pehle 45/49, 1819). 🔴 **SR-0 ne ek bug nikala jo har link ke test hone ke baad bhi zinda tha:** principal ka mobile registration par liya jaata tha aur approval par **gir jaata tha** — `USP_ProvisionSchoolFromApproval` mein parameter hi nahi tha; `PrincipalName` paar chala jaata tha, isliye profile par principal dikhta tha, bas usse phone nahi kar sakte the. Kisi suite ne nahi pakda kyunki koi suite **poori chain** nahi chalti thi — har link test hota tha, unke **beech ka jod** nahi. 🔴 **Geography: 782 district, 902 town, 36 state/UT**, generator se (`gen-geography.mjs`) kyunki 759 row haath se type karna matlab ek digit idhar-udhar aur district doosre state ke number range mein, **kuch bhi red nahi**. **Tehsil sirf Haryana ke, jaan-boojh kar** — ~6,000 hain aur koi citable list poori+current nahi; `hasTehsils()` pehle se control chhupa deta hai. ⚠️ **Teen bug seeding ne hi diye:** generator T-SQL ke liye escape nahi kar raha tha (`file's` ka apostrophe string tod kar baaki line ko code bana deta tha, aur file ke digits **label** ban jaate the) · city code mein underscore `part()` se strip ho kar naam **do baar** aa gaya (61 char) · `m_mdm_district.Code` abhi bhi varchar(30) tha — **truncation error acchi baat thi**, column ne row refuse ki chhoti karke store nahi ki, warna do district ek hi code par takra jaate aur kuch bhi red na hota. 🔴 **Item 1 full-stack:** `<ui-multi-select>` → repeated query keys → `int[] [FromQuery]` → `dbo.IntIdList` → `USP_BrowseJobs`. **`int[]`, `IReadOnlyList<int>` nahi** — baaki contracts body par bind hote hain jahan JSON deserialiser list banata hai; query binder read-only interface bhar hi nahi sakta, to values **chupchap khaali** aatin aur khaali set ka matlab "filter mat karo" hai: screen saari jobs dikhati hue kehti ki "aapki profile ki jobs hain". `browse-sets.mjs` **8/8**, HTTP ke through, kyunki direct EXEC wahi layer skip kar deta jo tootne wala tha. 🔴 **Registration par plan:** Free pre-selected, paid chunne par **pending request**, account Free par shuru. **Saatvaan step nahi** — plan wo cheez nahi jise admin verify karta hai, aur priced cards ka apna step verification form ke andar checkout padhta hai. **`USP_ProvisionSchoolFromApproval` par naya parameter nahi** — wo jp_app mein hai, request jp_mdm mein, aur parameter ka matlab hota ek column jo jp_app store kare aur koi padhe nahi: **SR-0 ka ulta shape**. ⚠️ **"First login" guidance FLAG nahi hai** — shart pending request khud hai, kyunki flag ek baar chalta hai aur bank transfer un das second mein nahi hota jo koi dashboard par bitaata hai. 🔴 **Teen cheezein green build ke peeche chupi thin:** `run_all` ka order (011 chaaron plan maangta hai par do banata 013 hai — **sirf naye machine par** fail hota, transaction mein naap kar saabit kiya) · `teacher-verification` ka darj kaaran galat tha (subject nahi, `TEACHER_SEARCH` ka BOOLEAN gate + `SCHOOL_FREE` mein included=0 — **kuch toota nahi tha**, suite refusal ko absence samajh rahi thi) · do CATCH block `USP_LogError` ko aise parameter de rahe the jo usme hain hi nahi, to asli failure kabhi `THROW` hota hi nahi. ⚠️ **Aur chaar sirf SCREENSHOT dekhne se mili, jinhe koi assertion nahi pakadti:** form kehta tha "we are still building the district and city lists" jabki usi screen par dono bhar rahe the · "Har" likhne par **Bihar** sabse upar (Bi-*har*, *Har*yana, J*har*khand, Ma*har*ashtra) aur pehla option hi dabaya jaata hai · `.form-check--block` ek class thi jo **kahin define hi nahi** thi, isliye plan ka naam aur allowances jud gaye the · `includesLine()` ke baad separator nahi tha. 🔴 **SR ne khud `jobs-screens` todi** — `#subjectId` ab exist nahi karta (combobox apna id banata hai); suite ne assertion fail nahi ki, wo **beech mein mari**: 30s timeout, summary line nahi, runner ne `nosummary` bola. **Walkthrough: 49 screen, kuch bhi missed nahi**, dono width. **backend 0/0 · paanchon frontend 0/0 · geography idempotent (pass 2 same) · catalogue poore run ke baad salamat (4 plan, 8 mapping)** | ✅ Done |
+| 2026-11-11 | P1–P5 | **POLISH PASS — address ka kram, Find-teachers, combobox sweep, qualification default, aur teacher browse ke teen tab.** Details **2.89**. **52/52 suite clean, 2020 assertion, 870 s** (pehle 49 suite, 1987). 🔴 **Cascade ulta: district ab city ka parent, city tehsil ka.** Pehla design naam par milaan karta (city ka naam = tehsil ka naam) — client ne palta aur theek kiya: asli link `m_mdm_city.TehsilId` hai, 039 ke build guard ke saath. ⚠️ **Aur naam-milaan Haryana par chal bhi jaata**, kyunki `012_seed_haryana_geography.sql` `CityId` ko `TehsilId` ke **barabar** rakhta hai — naapa: poore desh mein `TehsilId <> CityId` wali **ek bhi row nahi**. Isi wajah se naya branch **saabit** karna pada: transaction mein city 80001 ko tehsil 80002 par point kiya, lookup ne **80002 "Ambala Cantt"** diya, phir rollback. **Naya key alag hai (`tehsil-by-city`), `tehsil` overload nahi** — district id aur city id dono plain int hain, galat andaaze ka natija 200 ke saath **asli id ki asli list** hota aur kisi log mein kuch nahi. 🔴 **P1 ne ek data-loss bug nikala jo kisi list mein nahi tha:** draft reload `tehsilId`, `areaOrVillage`, coordinates aur **`logoPath`** wapas nahi laata tha jabki save proc in sab ko **unconditionally** assign karta hai — Monday ko logo, Thursday ko ek Continue, aur sab gaya; school ko usi logo ke liye roka jaata tha jo disk par pada tha. 🔴 **P3 ki sabse badi baat ye hai ki wo poori ho hi nahi sakti:** client ne jo location dropdowns ginwaye wo **jp-public** par hain, aur wo **jaan-boojh kar unfederated** hai (na tsconfig path, na federation config; `public-api.service.ts` apna `ApiResponse<T>` dobara likhta hai). Teen raaste teenon client ke; native select rakha gaya aur **template mein likh diya** taaki agli sweep dobara na khoje. ⚠️ Us page par SSR ki keemat bhi hai: native select apne option server HTML mein bhejta hai, combobox focus ke baad. 🔴 **P5 ke teen tab teen server query hain**, MIGHT_LIKE = ANY **MINUS** MATCHES SQL mein, counts ek hi call se aur **list ke wahi predicates** (ApplicationCount ka bug dobara na bane), aur ek **build guard** dono block ko textually identical rakhta hai. 🔴 **State client nahi bhejta** — `@StateId` teenon mode par lagta, to Preferred tab usi state mein simat jaata jisse teacher nikalna chahta hai; MATCHES apna state `CurrentStateId` se khud nikalta hai. ⚠️ Isse "Matches" ka matlab badla: pehle jahan kaam chahiye, ab jahan rehte hain — **ek state dono kabhi nahi keh sakta tha**. 🔒 **Apply card par aaya aur uske saath wo vaakya bhi** — sheet job ka naam leti hai aur anjaam likhti hai; bulk apply ab bhi nahi. 🔴 **Purana one-shot widening hata diya**: ab khaali "Matches" ke bagal mein "You might like (9)" khada hai — raasta teacher chunta hai, screen uske padhte-padhte nahi badalti; **purani behaviour ab bug hoti**. 🔴 **`browse-sets.mjs` kabhi kisi regression mein chali hi nahi thi** — manifest mein nahi thi (runner `Object.keys(suites)` se list leta hai, koi scan nahi) **aur** uski summary line `passed` chhapti thi jabki runner `PASSED` padhta hai: **do baar invisible**, aur pichhle pass ke "49/1987" saboot mein ginwayi gayi thi. Manifest ka apna doc ulta dawa kar raha tha; line badal di. **Pin karte hi pehli regression mein usne ek zinda bug pakda:** 🔴 mode machinery ke saath teenon set filter WHERE se nikal kar classification mein chale gaye the, to **unmoded browse kuch narrow karta hi nahi tha** — `?subjectIds=999999` saari open jobs; kuch red nahi tha kyunki har moded call theek chalti thi. Fix: `SetsOk` column (state ke **bina**), dono shared block mein byte-identical, delete sirf `@EffMode IS NULL` par. 🔴 **Ek assertion galat wajah se paas ho rahi thi** — `screens-3f` kehti "district/city gayab hain kyunki dataset khaali hai", jabki desh seed ho chuka hai; wo paas isliye thi ki ids combobox ke saath gayab ho gayin aur suite ne "id nahi mili" ko "control nahi hai" padha. **Fail hone se bura.** ⚠️ **Do suites naye default se tooteen** (`applications-screens` P5 ke tab se, `search-invite-screens` P2 ke "near you" se) — dono ko sirf bypass nahi kiya, **pehle default assert kiya phir widen**; SR-4 ka sabak chauthi baar. ⚠️ **Teen cheezein meri apni galti thin:** `ngDevMode is not defined` se saare app blank — do andaazon par kaam kiya, jawab ek naap se aaya (`typeof ngDevMode` jp-teacher `undefined`, jp-school `object`), wajah: **chalte dev server ke neeche se `.angular/cache` delete karna** · `sqlcmd -Q` ka double-quote hazard **comment ke andar** bhi laga · baar-baar suites chalane se login ka ghanta-cap khatam hokar `429` ki **jhoothi red** aayi, API restart se theek. ⚠️ **Do defect sirf screenshot dekhne se mile, dono is pass ke jode hue:** 1440 par filter "2 class levels select…" kat raha tha (shared `flex: 0 1 11rem` sahi hai — multi-select **summary** dikhata hai, option nahi; sirf wahi control chaude kiye) · apply sheet ki location line `.note` ke bhare box ki wajah se **khaali input jaisi** padhti thi. **Demo fixture: 3 school, 6 advert, 4 teacher**, setup khud ko verify karta hai aur teardown ne sab 0 par chhoda; **chhe suite uske lage rehne par jaan-boojh kar red hoti hain** (`t_app_jobs` khaali hona assert karti hain) — isliye regression teardown ke baad chala. **backend 0/0 · chaaron frontend 0/0 · catalogue salamat (4 plan, 8 mapping) · 0 job left behind** | ✅ Done |
 
 ---
 
@@ -12668,3 +12890,46 @@ Sab ke liye 2.42 ka start order: **`jp-shared` :4999 pehle**.
    assertion fail nahi hui thi.
 2. **Test suite ko apne fixtures khud banane chahiye.** `m_mdm_subject` 2B tak
    khaali hai; suite 900+ id block use karti hai jo asli seed kabhi nahi lega.
+
+## ✅ POLISH PASS COMPLETE — 2026-11-11 (P1 … P5)
+
+Details **2.89**. Client ke demo feedback ke baad ka polish, chha agents par
+banta kaam, har agent ka kaam khud pehle haath se verify kiya gaya.
+
+```
+52/52 suite clean, 2020 assertion, 870 s   (pehle 49 suite, 1987)
+backend 0/0 · chaaron frontend 0/0
+catalogue poore run ke baad salamat: 4 plan, 8 mapping
+demo fixture ke teardown ke baad 0 job left behind
+```
+
+### Item-wise
+
+| # | Item | Saboot |
+|---|---|---|
+| P1 | Address ka kram ulta, city ab tehsil ka parent | `screens-3f` cascade chalati hai: state → district aaya → district → town aaya |
+| P1 | `tehsil-by-city` master key | transaction mein city 80001 ko tehsil 80002 par point kiya; lookup ne **80002** diya, phir rollback |
+| P2 | Find teachers apne ilaake par khulta hai | `search-invite-screens` 33/33 — default assert, phir widen |
+| P3 | Combobox sweep | jp-admin 2, jp-school/jobs 1 converted; jp-public **pahunch se bahar** (unfederated) |
+| P3 | Prefix ranking ab asserted | `combobox-rank` 6/6 — aur negative: "aryan" ab bhi Haryana dhoondhta hai |
+| P4 | Qualification browse ke default mein | demo par: English teacher ko **sirf** Gohana English job |
+| P5 | Teen tab, server-side | `browse-tabs` 14/14 — overlap nahi, counts = lists, orphan kisi tab mein nahi |
+| P5 | Apply card par | sheet job ka naam leti hai aur anjaam likhti hai; bulk apply nahi |
+
+### 🔴 Is pass ki sabse badi baat
+
+**Jo suite manifest mein nahi hai wo chalti hi nahi.** `browse-sets.mjs` SR mein
+likhi gayi, naam se 8/8 paas hui, aur pichhle pass ke "49 suite / 1987
+assertion" wale saboot mein ginwayi gayi — par wo kabhi kisi regression ka
+hissa thi hi nahi. Do wajah, dono chup: manifest mein key nahi thi, aur uski
+summary line `passed` chhapti thi jabki runner `PASSED` padhta hai.
+
+**Pin karte hi, pehli hi regression mein, usne ek zinda bug pakda.**
+
+### Jo khula hai, naam se
+
+Teacher ka tehsil kahin save nahi ho sakta (column hai, raasta nahi) · school
+profile/campus tehsil-village dikha hi nahi sakte · jp-public ke location
+dropdowns · "Showing teachers near you" screen par verify nahi hua (har account
+plan-gated hai aur wo line refusal par chhupti hai) · `team-contract.mjs` ka
+hardcoded password literal.
