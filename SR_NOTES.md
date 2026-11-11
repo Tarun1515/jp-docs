@@ -1509,3 +1509,129 @@ Neither is reachable by an assertion, and both were introduced by this pass:
 2. **The apply sheet's location line read as a second, empty input**, because
    `.note` carries a filled box and it sat directly above a textarea. The sheet
    looked like it was asking for the town rather than saying where the job is.
+
+================================================================================
+P3b + TWO BUGS THE SCREENSHOTS FOUND — 2026-11-11
+================================================================================
+
+## 🔴 `transform: none` that was not none — every dropdown in the product
+
+Taking the walkthrough screenshots showed the open list sitting slightly to the
+right of its control. Measured on the school profile, scrolled to 2067px:
+
+```
+input   left 293   bottom  522
+list    left 565   top   -1461      position: fixed
+```
+
+The list was pinned 1983px above the viewport. The control worked, the options
+existed, and nobody could see them.
+
+🔴 **The cause was one word in a mixin.** `enter-sequence` used
+`animation-fill-mode: both`, which keeps the animation's LAST KEYFRAME applied
+forever. That keyframe says `transform: none` — but a filled animated value is
+a COMPUTED transform and serialises as `matrix(1, 0, 0, 1, 0, 0)`. Visually
+nothing; per CSS, still "a transform other than none". **Any such element
+becomes the containing block for every `position: fixed` descendant**, so
+`.page.enter` quietly captured every pinned dropdown in four apps.
+
+⚠️ IT HID ON SHORT PAGES, WHICH IS WHY IT SHIPPED. The offset is the card's own
+position, so near the top of a page the list lands a little to the right and
+still looks plausible — which is exactly how it appeared in the SR walkthrough
+screenshots months earlier and was read as a rendering quirk.
+
+`backwards` is all it ever needed: the FROM keyframe during the stagger delay,
+nothing after the end. Verified: `pageTransform` went `matrix(1,0,0,1,0,0)` →
+`none`, and the list moved from `left 565 / top -1461` to `left 293 / top 526`,
+which is the control's own left and its bottom plus the 4px gap.
+
+⚠️ **AND I CHASED TWO WRONG THEORIES FIRST** — a poisoned externals cache, then
+a stale production `dist` — acting on both before measuring either. The chunk
+hash never moved, which should have ended the first theory immediately. The
+answer came from one line: `typeof globalThis.ngDevMode` per host.
+
+## 🔴 The tehsil step was missing, and the walkthrough is what noticed
+
+The first re-run after P1 captured 47 screens instead of 49, with one skip line:
+*"Tehsil is not shown here (the data has no level for it)"*. All 143 Haryana
+towns have a tehsil, so the data was not the problem.
+
+`GET /masters/tehsil-by-city?cityId=80001` → 1 row.
+`GET /masters/tehsil-by-city?parentId=80001` → **0 rows**.
+
+Angular reaches every dependent master through `MasterService.getByParent`,
+which spells the id `parentId`. The new named action took `cityId` alone, on
+the reasoning that the generic `{masterKey}` route would still answer
+`?parentId=`. 🔴 **It does not: a named route SHADOWS the generic one for its
+own path.**
+
+⚠️ AND THE FAILURE WAS SILENT ALL THE WAY DOWN. An unrecognised query parameter
+is not an error, so the procedure was asked for the tehsils of no city and
+answered `[]` as designed; the form read an empty list as "this town has no
+tehsil level" and hid the control. HTTP 200 throughout, nothing in any log. A
+green build, a green regression, and a step of the address form that simply
+never appeared — caught because a screenshot sequence was two frames short.
+
+## P3b — the public site gets searchable filters without being federated
+
+jp-public stays unfederated (2.43). It got its OWN combobox as progressive
+enhancement: the server renders a native `<select>` with every option, and
+hydration upgrades it in place to a `role="combobox"` type-ahead. With
+JavaScript off the form is a real GET and the server filters.
+
+🔴 **The twin is DECLARED, and parity is ASSERTED rather than trusted.** One
+vector file, `lib/combobox-vectors.mjs`, holds the filtering and ranking rule as
+DATA; `combobox-rank.mjs` runs it against jp-shared's control in a browser and
+`public-combobox.mjs` runs it against jp-public's own function. Narrowing
+`visible()` in jp-shared now turns the PUBLIC SITE's suite red.
+
+⚠️ `combobox-rank` prints COVERAGE per case and marks a case weak when its
+option universe is mostly absent — "Chopta" and "Delhi Cantonment" are towns,
+not states, so against the 36-row state master those cases degrade to a claim
+about one name. A suite that did not say so would be reporting a pass for a
+test comparing one name to itself.
+
+### ⚠️ Two suites were leaning on other suites' leftovers
+
+`public-combobox` refused outright with "publish a job, or run
+public-screens.mjs first" — the public filters are FACETS, so an empty
+`t_app_jobs` renders no controls at all. That is a dependency on somebody
+else's data, which is what PRE-5b forbids: a suite green only after another one
+has run is green by coincidence. It owns two postings now and deletes them in
+`finally`.
+
+`public-screens` turned out to have the same shape — it creates its own probe
+jobs, but its subject-filter section had been written against a native select,
+and converting the control broke it in a way that read as the OLD race ("the
+control dropped it twice"). The real cause: reading the premise left focus on
+the input, and **a click on an already-focused combobox toggles the list shut**.
+Filling the field opens and filters it from either state.
+
+### 🔴 Playwright cannot click with JavaScript disabled
+
+The no-JS submit assertion hung for its full timeout, even with
+`{ force: true }`. Playwright decides an element is "stable" using
+requestAnimationFrame, and a rAF callback never runs in a page with no
+JavaScript. `public-screens.mjs` has used `javaScriptEnabled: false` since 7A
+and only ever READS, which is why this had never surfaced.
+
+The claim was asked of the server instead, which is whose claim it is: a native
+form with `method="get" action="/jobs"` and named controls submits to exactly
+that URL — the markup is asserted in the section above — and what matters is
+that the SERVER answers it with the filter applied and the chosen option
+`selected` in its own bytes. Testing the browser's form handling would be
+testing the browser.
+
+### ⚠️ And one assertion that reported a missing form that was plainly there
+
+`class="job-filters"` matched nothing because Angular's NgForm appends
+`ng-untouched ng-pristine ng-valid` to every form it binds.
+
+## ⚠️ An ARIA violation Lighthouse could never have caught
+
+jp-shared's combobox rendered its empty-state line as
+`<li role="status">` **inside** `role="listbox"`. A listbox may contain only
+options and groups, so that is an `aria-required-children` violation for as
+long as the list is open and empty — and Lighthouse audits a page without ever
+opening a dropdown. Now `role="option"` with `aria-disabled`, keeping the
+announcement with `aria-live`.

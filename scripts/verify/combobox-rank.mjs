@@ -39,6 +39,13 @@
 import { chromium } from 'playwright';
 
 import { secret } from './lib/accounts.mjs';
+import {
+  RANK_CASES,
+  coverage,
+  expectedFor,
+  optionName,
+  project,
+} from './lib/combobox-vectors.mjs';
 
 const TEACHER_APP = process.env.JP_TEACHER ?? 'http://localhost:4400';
 const SSO = process.env.JP_SSO ?? 'http://localhost:5199/api';
@@ -134,45 +141,50 @@ try {
   await signIn(page);
   await page.goto(`${TEACHER_APP}/profile`, { waitUntil: 'networkidle' });
 
-  // -- 1. the prefix wins ----------------------------------------------------
-  const har = (await openAndType(page, 'State', 'Har')).map((t) => t.trim()).filter(Boolean);
-
-  check('"Har" returns options at all', har.length > 0, `${har.length} shown`);
-
-  check('"Har": HARYANA IS FIRST — the prefix outranks Bihar/Jharkhand/Maharashtra',
-    /^haryana$/i.test(har[0] ?? ''), `first = "${har[0] ?? '(none)'}"`);
+  /*
+    🔴 THE CASES ARE NOT WRITTEN HERE. They live in lib/combobox-vectors.mjs,
+    and jp-public's own suite runs the same file against its own combobox —
+    so narrowing `visible()` in jp-shared turns the PUBLIC SITE's suite red
+    too, and a case added there obliges both controls to answer it. See the
+    twin declaration in ui-combobox.component.ts.
+  */
 
   /*
-    ⚠️ The others must still BE there. If they had merely been filtered out,
-    Haryana would be first for the wrong reason and the control would have
-    silently become `startsWith` — which case 3 below is what really catches.
+    ⚠️ READ ONCE, WITH AN EMPTY QUERY: everything this control can offer. The
+    cases are written over four or five names; the live state master holds 36.
+    `expectedFor` reduces a case to the names actually present, and `coverage`
+    is printed so a case whose universe is missing shows up as weak rather than
+    passing by comparing one name to itself.
   */
-  const alsoThere = har.filter((t) => /bihar|jharkhand|maharashtra/i.test(t));
+  const present = new Set(
+    (await openAndType(page, 'State', '')).map(optionName).filter(Boolean),
+  );
 
-  check('"Har": the substring matches are still in the list, just lower',
-    alsoThere.length >= 2, alsoThere.join(', ') || 'none');
+  check('the control offers its master at all', present.size > 10, `${present.size} options`);
 
-  // -- 2. an exact name is first, not merely present -------------------------
-  const bihar = (await openAndType(page, 'State', 'Bihar')).map((t) => t.trim()).filter(Boolean);
+  for (const kase of RANK_CASES) {
+    const observed = await openAndType(page, 'State', kase.query);
+    const got = project(observed, kase.options);
+    const want = expectedFor(kase, present);
+    const cover = coverage(kase, present);
 
-  check('"Bihar": Bihar is first', /^bihar$/i.test(bihar[0] ?? ''), `first = "${bihar[0] ?? '(none)'}"`);
+    const same = got.length === want.length && got.every((n, i) => n === want[i]);
 
-  // -- 3. 🔴 the regression guard: substring-only still matches ---------------
-  /*
-    "aryan" appears in HARYANA but starts nothing. A `startsWith` filter would
-    return an empty list here while every other assertion in this file still
-    passed.
-  */
-  const aryan = (await openAndType(page, 'State', 'aryan')).map((t) => t.trim()).filter(Boolean);
+    check(
+      `${kase.id}: ${kase.claim}`,
+      same,
+      `${cover}/${kase.options.length} of this case's options exist here`
+      + ` · got [${got.join(', ') || '—'}] · want [${want.join(', ') || '—'}]`,
+    );
 
-  check('🔴 "aryan" still finds Haryana — the filter is CONTAINS, not STARTS-WITH',
-    aryan.some((t) => /haryana/i.test(t)), aryan.join(', ') || 'EMPTY — the filter was narrowed');
-
-  // -- 4. nonsense finds nothing, and says so --------------------------------
-  const nonsense = (await openAndType(page, 'State', 'zzqqxx')).map((t) => t.trim()).filter(Boolean);
-
-  check('a query matching nothing returns no options',
-    nonsense.length === 0, nonsense.join(', ') || 'none');
+    /*
+      ⚠️ A CASE THAT CANNOT SEE ITS OWN OPTIONS IS NOT EVIDENCE. Said out loud
+      rather than left to be inferred from a green line.
+    */
+    if (cover < 2 && kase.options.length > 1) {
+      console.log(`        ⚠️ weak: only ${cover} of this case's options exist in this master`);
+    }
+  }
 } catch (error) {
   /*
     🔴 THE THROW IS PRINTED, NOT SWALLOWED.

@@ -1,6 +1,6 @@
 # School walkthrough — every screen, in order
 
-Captured 2026-11-10 from a live run.
+Captured 2026-11-11 from a live run.
 
 > Part 1 is a genuinely new school registering from nothing, and it ends
 > where a real new school ends: waiting for approval. Part 2 uses an
@@ -73,29 +73,29 @@ District — chosen.
 
 ![11-register-address-district-chosen-1440.png](design-screens/walkthrough/11-register-address-district-chosen-1440.png)
 
-### register address tehsil open
-
-Tehsil — the list, open.
-
-![12-register-address-tehsil-open-1440.png](design-screens/walkthrough/12-register-address-tehsil-open-1440.png)
-
-### register address tehsil chosen
-
-Tehsil — chosen.
-
-![13-register-address-tehsil-chosen-1440.png](design-screens/walkthrough/13-register-address-tehsil-chosen-1440.png)
-
 ### register address town open
 
 Town — the list, open.
 
-![14-register-address-town-open-1440.png](design-screens/walkthrough/14-register-address-town-open-1440.png)
+![12-register-address-town-open-1440.png](design-screens/walkthrough/12-register-address-town-open-1440.png)
 
 ### register address town chosen
 
 Town — chosen.
 
-![15-register-address-town-chosen-1440.png](design-screens/walkthrough/15-register-address-town-chosen-1440.png)
+![13-register-address-town-chosen-1440.png](design-screens/walkthrough/13-register-address-town-chosen-1440.png)
+
+### register address tehsil open
+
+Tehsil — the list, open.
+
+![14-register-address-tehsil-open-1440.png](design-screens/walkthrough/14-register-address-tehsil-open-1440.png)
+
+### register address tehsil chosen
+
+Tehsil — chosen.
+
+![15-register-address-tehsil-chosen-1440.png](design-screens/walkthrough/15-register-address-tehsil-chosen-1440.png)
 
 ### register address complete
 

@@ -117,11 +117,22 @@ const settled = async (page) => {
     reachable the control is not rendered at all (G40 does this to the city
     filter every run), so the absence of the select counts as settled.
   */
+  /*
+    🔴 P3b UPGRADED THIS CONTROL IN PLACE, so `.options` is no longer there to
+    count. The server still sends a native <select> — that is the whole point
+    of the progressive enhancement — and hydration replaces it with a
+    `role="combobox"` input under the SAME id. Both shapes are settled states,
+    and the upgraded one is settled BY DEFINITION: the component only renders
+    after the options it was given are in hand.
+  */
   await page.waitForFunction(
     () => {
-      const select = document.querySelector('#filter-subject');
+      const el = document.querySelector('#filter-subject');
 
-      return !select || select.options.length > 1;
+      if (!el) return true;
+      if (el.getAttribute('role') === 'combobox') return true;
+
+      return el.options.length > 1;
     },
     undefined,
     { timeout: 15_000 },
@@ -298,15 +309,28 @@ try {
     "visible" in the sense Playwright's locators wait for, so
     `.filter({ hasText })` on one times out rather than matching.
   */
-  const mathsOption = await page.evaluate(() => {
-    const select = document.querySelector('#filter-subject');
+  /*
+    🔴 P3b: THE OPTIONS ONLY EXIST WHILE THE LIST IS OPEN, so the premise is
+    read as a gesture rather than a query — open the control, read what it
+    offers, close it again. The premise is also now about the TEXT rather than
+    an <option> value: the chosen id goes into the URL, which is what the
+    assertion below reads anyway.
+  */
+  const box = page.locator('#filter-subject');
 
-    return [...(select?.options ?? [])]
-      .find((option) => option.text.startsWith('Mathematics'))?.value ?? null;
-  });
+  await box.click();
+  await page.waitForTimeout(300);
+
+  const offered = (await page.locator('#filter-subject-list [role="option"]').allTextContents())
+    .map((t) => t.trim());
+
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(150);
+
+  const mathsLabel = offered.find((t) => t.startsWith('Mathematics')) ?? null;
 
   check('premise: the subject filter offers Mathematics, with a count',
-    !!mathsOption, `value ${mathsOption}`);
+    !!mathsLabel, mathsLabel ?? `offered [${offered.slice(0, 4).join(', ')}]`);
 
   /*
     🔴 SELECT, THEN CHECK THE SELECTION SURVIVED, THEN SELECT AGAIN IF IT DID NOT.
@@ -328,13 +352,37 @@ try {
     a person does not select an option in the same millisecond a response
     lands. The URL assertion below is untouched and still has to pass.
   */
-  const selectMaths = async () => {
-    await page.selectOption('#filter-subject', mathsOption ?? '');
+  /*
+    ⚠️ AND THE RACE THE COMMENT ABOVE DOCUMENTS CANNOT HAPPEN ANY MORE. It was
+    a re-render replacing a selected <option> with no change event. The chosen
+    subject now lives in the URL, not in a DOM control, so there is nothing for
+    a second render to drop — the retry is kept because it costs nothing and the
+    assertion below is unchanged.
+  */
+  /*
+    ⚠️ TYPED, NOT CLICKED OPEN. Reading the premise above left focus on this
+    input, and a click on an ALREADY-FOCUSED combobox toggles the list SHUT —
+    so the first version of this reopened nothing, found no options twice, and
+    reported "the control dropped it", which is a sentence about the old
+    <select>'s race and had nothing to do with what was happening.
 
-    return page.evaluate(
-      (want) => document.querySelector('#filter-subject')?.value === want,
-      mathsOption ?? '',
-    );
+    Filling the field opens and filters it in one gesture, from either state.
+  */
+  const selectMaths = async () => {
+    await box.fill('Mathematics');
+    await page.waitForTimeout(350);
+
+    const option = page
+      .locator('#filter-subject-list [role="option"]')
+      .filter({ hasText: /^\s*Mathematics/ })
+      .first();
+
+    if (!(await option.count())) return false;
+
+    await option.click();
+    await page.waitForTimeout(500);
+
+    return /subjectId=\d+/.test(page.url());
   };
 
   let stuck = await selectMaths();
